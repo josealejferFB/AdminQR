@@ -1,9 +1,13 @@
 package com.example.escanqradmin.presentation.ui.home
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class ActiveUser(
@@ -15,20 +19,65 @@ data class ActiveUser(
     val plate: String
 )
 
-@HiltViewModel
-class HomeViewModel @Inject constructor() : ViewModel() {
-    
-    private val _totalScans = MutableStateFlow(20)
-    val totalScans = _totalScans.asStateFlow()
-    
-    private val _totalUsers = MutableStateFlow(32)
-    val totalUsers = _totalUsers.asStateFlow()
+data class HomeUiState(
+    val totalScans: Int = 0,
+    val totalUsers: Int = 0,
+    val activeUsers: List<ActiveUser> = emptyList(),
+    val isRefreshing: Boolean = false
+)
 
-    private val _activeUsers = MutableStateFlow(
-        listOf(
-            ActiveUser("1", "José Fernandez", "C.I: V-27.865.738", "VALIDADO", "+58 (412) 442-0728", "B-XQ 4920"),
-            ActiveUser("2", "Juan Velasquez", "ID: 31.053.989", "ESPERANDO", "+58 (412) 535-9589", "K-LP 1123")
-        )
-    )
-    val activeUsers = _activeUsers.asStateFlow()
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val repository: com.example.escanqradmin.domain.repository.HistoryRepository
+) : ViewModel() {
+    
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState = _uiState.asStateFlow()
+
+    init {
+        observeHistory()
+    }
+
+    private fun observeHistory() {
+        viewModelScope.launch {
+            repository.getHistory().collect { history ->
+                val activeUsers = history.map { qr ->
+                    ActiveUser(
+                        id = qr.androidId,
+                        name = qr.userName,
+                        document = qr.cedula,
+                        status = "VALIDADO", // Default for scanned
+                        contact = "", // Not in QR
+                        plate = qr.plate
+                    )
+                }
+                
+                _uiState.update { 
+                    it.copy(
+                        activeUsers = activeUsers,
+                        totalUsers = activeUsers.size,
+                        totalScans = activeUsers.size // Simplifying for now
+                    )
+                }
+            }
+        }
+    }
+
+    fun deleteUser(id: String) {
+        repository.deleteRecord(id)
+    }
+
+    fun refreshData() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true) }
+            // Simulación de carga (1.5 segundos)
+            delay(1500)
+            _uiState.update { 
+                it.copy(
+                    totalScans = it.totalScans + 1,
+                    isRefreshing = false
+                )
+            }
+        }
+    }
 }

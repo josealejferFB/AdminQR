@@ -4,11 +4,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,255 +22,230 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomBottomBar
-import com.example.escanqradmin.presentation.common.sharedcomponents.CustomTopBar
+import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
+import com.example.escanqradmin.presentation.ui.home.components.StatCard
+import com.example.escanqradmin.presentation.theme.color.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onNavigateToScanner: () -> Unit,
+    navController: NavHostController,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
-    val totalScans by viewModel.totalScans.collectAsState()
-    val totalUsers by viewModel.totalUsers.collectAsState()
-    val activeUsers by viewModel.activeUsers.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
 
     Scaffold(
-        topBar = { CustomTopBar() },
-        bottomBar = {
-            CustomBottomBar(
-                currentRoute = "home",
-                onNavigateToHome = { },
-                onNavigateToScanner = onNavigateToScanner
-            )
-        },
-        containerColor = Color(0xFFFAFAFA)
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 24.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
-        ) {
-            item {
-                Text(
-                    text = "ESTÁS EN LÍNEA",
-                    color = Color.Gray,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Registros Activos",
-                    color = Color(0xFF0D1B54),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        value = totalScans.toString(),
-                        label = "ESCANEOS TOTALES",
-                        valueColor = Color(0xFF0D1B54)
-                    )
-                    StatCard(
-                        modifier = Modifier.weight(1f),
-                        value = totalUsers.toString(),
-                        label = "USUARIOS TOTALES",
-                        valueColor = Color(0xFFFF6B6B)
+        containerColor = BackgroundLight,
+        contentWindowInsets = WindowInsets(0.dp)
+    ) { _ ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            val state = rememberPullToRefreshState()
+            
+            // 1. Content Layer with Pull to Refresh
+            PullToRefreshBox(
+                state = state,
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = { viewModel.refreshData() },
+                modifier = Modifier.fillMaxSize(),
+                indicator = {
+                    PullToRefreshDefaults.Indicator(
+                        state = state,
+                        isRefreshing = uiState.isRefreshing,
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 70.dp) // Offset below TopBar
                     )
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                TextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar usuario por Cédula, Número de Teléfono o Placa...", fontSize = 12.sp, color = Color.Gray) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Gray, modifier = Modifier.size(18.dp)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(16.dp)),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFFEEEEEE),
-                        unfocusedContainerColor = Color(0xFFEEEEEE),
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
-                    singleLine = true
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Usuarios Activos",
-                        color = Color.Black,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(
+                        top = 80.dp, // Space for the minimal logo/title
+                        bottom = 120.dp,
+                        start = 24.dp,
+                        end = 24.dp
                     )
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0xFFE8EAF6), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
+                ) {
+                    item {
                         Text(
-                            text = "${activeUsers.size} En línea",
-                            color = Color(0xFF3F51B5),
+                            text = "ESTÁS EN LÍNEA",
+                            color = Color.Gray,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold
                         )
-                    }
-                }
+                        Text(
+                            text = "Registros Activos",
+                            color = PrimaryBlue,
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+                        )
 
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            StatCard(
+                                modifier = Modifier.weight(1f),
+                                value = uiState.totalScans.toString(),
+                                label = "ESCANEOS TOTALES",
+                                valueColor = PrimaryBlue
+                            )
+                            StatCard(
+                                modifier = Modifier.weight(1f),
+                                value = uiState.totalUsers.toString(),
+                                label = "USUARIOS TOTALES",
+                                valueColor = SecondaryOrange
+                            )
+                        }
 
-            items(activeUsers) { user ->
-                ActiveUserCard(user)
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-        }
-    }
-}
+                        Spacer(modifier = Modifier.height(24.dp))
 
-@Composable
-fun StatCard(modifier: Modifier = Modifier, value: String, label: String, valueColor: Color) {
-    Box(
-        modifier = modifier
-            .background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp))
-            .padding(16.dp)
-    ) {
-        Column {
-            Text(
-                text = value,
-                color = valueColor,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = label,
-                color = Color.Gray,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-    }
-}
-
-@Composable
-fun ActiveUserCard(user: ActiveUser) {
-    Surface(
-        color = Color.White,
-        shape = RoundedCornerShape(20.dp),
-        shadowElevation = 2.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Row {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(
-                                color = if (user.status == "VALIDADO") Color(0xFFE8EAF6) else Color(0xFFF0F0F0),
-                                shape = RoundedCornerShape(12.dp)
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Buscar usuario por Cédula, Teléfono o Placa...", fontSize = 12.sp, color = Color.Gray) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Gray, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .clip(RoundedCornerShape(16.dp)),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = SurfaceGrey,
+                                unfocusedContainerColor = SurfaceGrey,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
                             ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = if (user.status == "VALIDADO") Color(0xFF0D1B54) else Color.Gray,
-                            modifier = Modifier.size(24.dp)
+                            singleLine = true
                         )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Usuarios Activos",
+                                color = Color.Black,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .background(SurfaceGrey.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${uiState.activeUsers.size} En línea",
+                                    color = PrimaryBlue,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = user.name,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black,
-                            fontSize = 14.sp
+
+                    items(uiState.activeUsers) { user ->
+                        ActiveUserCard(
+                            user = user,
+                            onDelete = {
+                                userToDelete = user
+                                showDeleteDialog = true
+                            }
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = user.document,
-                            color = Color.Gray,
-                            fontSize = 11.sp
-                        )
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
-                
-                Text(
-                    text = user.status,
-                    color = if (user.status == "VALIDADO") Color(0xFF0D1B54) else Color(0xFFFF6B6B),
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 9.sp
+            }
+
+            // 4. Delete Confirmation Dialog
+            if (showDeleteDialog && userToDelete != null) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text("Confirmar eliminación", fontWeight = FontWeight.Bold) },
+                    text = { Text("¿Estás seguro de que deseas eliminar el registro de ${userToDelete?.name}? Esta acción no se puede deshacer.") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                userToDelete?.let { viewModel.deleteUser(it.id) }
+                                showDeleteDialog = false
+                                userToDelete = null
+                            }
+                        ) {
+                            Text("ELIMINAR", color = Color.Red, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = false }) {
+                            Text("CANCELAR", color = Color.Gray)
+                        }
+                    },
+                    containerColor = Color.White,
+                    shape = RoundedCornerShape(24.dp)
                 )
             }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Text(
-                text = "CONTACTO",
-                color = Color.Gray,
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = user.contact,
-                color = Color.Black,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
+
+            // 2. Minimal Fixed Header Layer (Logo and Title only)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 12.dp)
+                    .zIndex(2f),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "PLACA",
-                        color = Color.Gray,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = "Logo",
+                        tint = PrimaryBlue,
+                        modifier = Modifier.size(24.dp)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = user.plate,
-                        color = Color(0xFF0D1B54),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.ExtraBold
+                        text = "EscanQR",
+                        color = PrimaryBlue,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
                     )
                 }
                 
-                Text(
-                    text = "DETALLES",
-                    color = Color(0xFF3F51B5),
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 10.sp
-                )
+                // Keep the profile button for consistency but without the bar background
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhoneAndroid,
+                        contentDescription = "Profile",
+                        tint = SecondaryOrange,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
+
+            // 3. Floating BottomBar
+            CustomBottomBar(
+                navController = navController,
+                isFloating = true,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .zIndex(1f)
+            )
         }
     }
 }
