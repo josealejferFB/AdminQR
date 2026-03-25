@@ -210,15 +210,16 @@ fun HomeScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = when (bluetoothConnectionState) {
-                                                is BluetoothConnectionState.Connected -> "CONECTADO"
+                                            text = when (val s = bluetoothConnectionState) {
+                                                is BluetoothConnectionState.Connected -> "CONECTADO (${s.deviceAddress})"
                                                 is BluetoothConnectionState.Connecting -> "CONECTANDO..."
                                                 is BluetoothConnectionState.Error -> "ERROR"
                                                 else -> "DESCONECTADO"
                                             },
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (bluetoothConnectionState is BluetoothConnectionState.Connected) Color.Black else Color.Gray
+                                            color = if (bluetoothConnectionState is BluetoothConnectionState.Connected) Color.Black else Color.Gray,
+                                            fontSize = if (bluetoothConnectionState is BluetoothConnectionState.Connected) 11.sp else 12.sp
                                         )
                                     }
                                 }
@@ -294,7 +295,8 @@ fun HomeScreen(
                     connectionState = bluetoothConnectionState,
                     onStartScan = { viewModel.startDiscovery() },
                     onStopScan = { viewModel.stopDiscovery() },
-                    onConnect = { address -> viewModel.connectToDevice(address) }
+                    onConnect = { address -> viewModel.connectToDevice(address) },
+                    onDisconnect = { viewModel.disconnect() }
                 )
             }
 
@@ -334,7 +336,20 @@ fun HomeScreen(
                             } else {
                                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
                             }
-                            permissionLauncher.launch(permissions)
+                            
+                            // Check if already granted
+                            val allGranted = permissions.all { perm ->
+                                androidx.core.content.ContextCompat.checkSelfPermission(
+                                    navController.context, perm
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                            }
+
+                            if (allGranted) {
+                                showBluetoothDialog = true
+                                viewModel.startDiscovery()
+                            } else {
+                                permissionLauncher.launch(permissions)
+                            }
                         },
                         modifier = Modifier
                             .size(36.dp)

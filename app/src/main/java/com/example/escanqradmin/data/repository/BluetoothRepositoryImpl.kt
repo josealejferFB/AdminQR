@@ -127,7 +127,7 @@ class BluetoothRepositoryImpl @Inject constructor(
                 socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
                 bluetoothAdapter.cancelDiscovery()
                 socket?.connect()
-                _connectionState.value = BluetoothConnectionState.Connected
+                _connectionState.value = BluetoothConnectionState.Connected(address)
                 listenForMessages()
             } catch (e: IOException) {
                 _connectionState.value = BluetoothConnectionState.Error(e.message ?: "Connection failed")

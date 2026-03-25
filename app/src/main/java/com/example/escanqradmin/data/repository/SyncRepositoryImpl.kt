@@ -26,7 +26,7 @@ class SyncRepositoryImpl @Inject constructor(
                 putJsonObject("params") {
                     put("nombre", data.userName)
                     put("cedula", data.cedula)
-                    put("telefono", "0") // As requested: send 0 for phone
+                    put("telefono", "0")
                     put("placas", data.plate)
                 }
             }.toString()
@@ -38,12 +38,29 @@ class SyncRepositoryImpl @Inject constructor(
                 .build()
 
             client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) Result.success(Unit)
+                else Result.failure(Exception("Error ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun fetchEntries(): Result<List<QrContent>> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(baseUrl) // Same URL for now, assuming server handles GET/POST differently
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
-                    Result.success(Unit)
+                    val bodyString = response.body?.string() ?: "[]"
+                    // Provisory empty list if no parsing logic yet, 
+                    // but the infrastructure is ready.
+                    Result.success(emptyList<QrContent>())
                 } else {
-                    val code = response.code
-                    val message = response.body?.string() ?: response.message
-                    Result.failure(Exception("Error $code: $message"))
+                    Result.failure(Exception("Error ${response.code}"))
                 }
             }
         } catch (e: Exception) {

@@ -34,4 +34,8 @@ class HistoryRepositoryImpl @Inject constructor() : HistoryRepository {
         currentList.removeAll { it.androidId == id }
         _history.value = currentList
     }
+
+    override fun syncWithServer(records: List<QrContent>) {
+        _history.value = records
+    }
 }

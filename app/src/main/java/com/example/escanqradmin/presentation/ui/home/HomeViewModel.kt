@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.HistoryRepository
+import com.example.escanqradmin.domain.repository.SyncRepository
 import javax.inject.Inject
 
 data class ActiveUser(
@@ -32,7 +33,8 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: HistoryRepository,
-    private val bluetoothRepository: BluetoothRepository
+    private val bluetoothRepository: BluetoothRepository,
+    private val syncRepository: com.example.escanqradmin.domain.repository.SyncRepository
 ) : ViewModel() {
 
     val scannedDevices = bluetoothRepository.scannedDevices
@@ -65,7 +67,7 @@ class HomeViewModel @Inject constructor(
                     it.copy(
                         activeUsers = activeUsers,
                         totalUsers = activeUsers.size,
-                        totalScans = activeUsers.size // Simplifying for now
+                        totalScans = activeUsers.size // Deriving from history
                     )
                 }
             }
@@ -90,13 +92,16 @@ class HomeViewModel @Inject constructor(
     fun refreshData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            // Simulación de carga (1.5 segundos)
-            delay(1500)
+            
+            // Sync with server
+            syncRepository.fetchEntries().onSuccess { records ->
+                repository.syncWithServer(records)
+            }
+            
+            delay(500) // Aesthetic delay
+            
             _uiState.update { 
-                it.copy(
-                    totalScans = it.totalScans + 1,
-                    isRefreshing = false
-                )
+                it.copy(isRefreshing = false)
             }
         }
     }

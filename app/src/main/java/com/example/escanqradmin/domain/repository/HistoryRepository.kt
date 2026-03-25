@@ -8,4 +8,5 @@ interface HistoryRepository {
     fun addRecord(record: QrContent)
     fun updateRecord(record: QrContent)
     fun deleteRecord(id: String)
+    fun syncWithServer(records: List<QrContent>)
 }
