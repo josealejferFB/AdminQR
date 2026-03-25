@@ -8,6 +8,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.example.escanqradmin.domain.repository.BluetoothConnectionState
+import com.example.escanqradmin.domain.repository.BluetoothRepository
+import com.example.escanqradmin.domain.repository.HistoryRepository
 import javax.inject.Inject
 
 data class ActiveUser(
@@ -28,8 +31,14 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: com.example.escanqradmin.domain.repository.HistoryRepository
+    private val repository: HistoryRepository,
+    private val bluetoothRepository: BluetoothRepository
 ) : ViewModel() {
+
+    val scannedDevices = bluetoothRepository.scannedDevices
+    val pairedDevices = bluetoothRepository.pairedDevices
+    val isScanning = bluetoothRepository.isScanning
+    val bluetoothConnectionState = bluetoothRepository.connectionState
     
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState = _uiState.asStateFlow()
@@ -47,7 +56,7 @@ class HomeViewModel @Inject constructor(
                         name = qr.userName,
                         document = qr.cedula,
                         status = "VALIDADO", // Default for scanned
-                        contact = "", // Not in QR
+                        contact = qr.phone,
                         plate = qr.plate
                     )
                 }
@@ -67,6 +76,17 @@ class HomeViewModel @Inject constructor(
         repository.deleteRecord(id)
     }
 
+    fun updateUser(user: ActiveUser) {
+        val qrContent = com.example.escanqradmin.domain.model.QrContent(
+            androidId = user.id,
+            userName = user.name,
+            cedula = user.document,
+            phone = user.contact,
+            plate = user.plate
+        )
+        repository.updateRecord(qrContent)
+    }
+
     fun refreshData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
@@ -79,5 +99,22 @@ class HomeViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    // Bluetooth Methods
+    fun startDiscovery() {
+        bluetoothRepository.startDiscovery()
+    }
+
+    fun stopDiscovery() {
+        bluetoothRepository.stopDiscovery()
+    }
+
+    fun connectToDevice(address: String) {
+        bluetoothRepository.connectToDevice(address)
+    }
+
+    fun disconnect() {
+        bluetoothRepository.disconnect()
     }
 }

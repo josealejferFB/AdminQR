@@ -20,6 +20,15 @@ class HistoryRepositoryImpl @Inject constructor() : HistoryRepository {
         _history.value = currentList
     }
 
+    override fun updateRecord(record: QrContent) {
+        val currentList = _history.value.toMutableList()
+        val index = currentList.indexOfFirst { it.androidId == record.androidId }
+        if (index != -1) {
+            currentList[index] = record
+            _history.value = currentList
+        }
+    }
+
     override fun deleteRecord(id: String) {
         val currentList = _history.value.toMutableList()
         currentList.removeAll { it.androidId == id }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -34,6 +35,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.escanqradmin.presentation.navigation.Home
 import com.example.escanqradmin.presentation.navigation.Scanner
 import com.example.escanqradmin.presentation.theme.color.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun CustomTopBar(
@@ -46,14 +48,23 @@ fun CustomTopBar(
     Surface(
         color = containerColor,
         modifier = modifier
-            .then(if (isFloating) Modifier.padding(start = 16.dp, end = 16.dp, top = 48.dp, bottom = 8.dp) else Modifier)
+            .then(
+                if (isFloating) {
+                    Modifier
+                        .statusBarsPadding()
+                        .displayCutoutPadding()
+                        .padding(horizontal = 24.dp, vertical = 8.dp)
+                } else {
+                    Modifier
+                }
+            )
             .fillMaxWidth(),
         shape = if (isFloating) RoundedCornerShape(24.dp) else RoundedCornerShape(0.dp),
         shadowElevation = if (isFloating) 8.dp else 4.dp
     ) {
         Row(
             modifier = Modifier
-                .then(if (applyPrivacyPadding) Modifier.statusBarsPadding() else Modifier)
+                .then(if (applyPrivacyPadding && !isFloating) Modifier.statusBarsPadding() else Modifier)
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -98,16 +109,28 @@ fun CustomBottomBar(
     modifier: Modifier = Modifier,
     containerColor: Color = Color.White,
     applyPrivacyPadding: Boolean = false,
-    isFloating: Boolean = false
+    isFloating: Boolean = false,
+    isBluetoothConnected: Boolean = false
 ) {
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val destination = navBackStackEntry.value?.destination
     val haptic = LocalHapticFeedback.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Surface(
         color = containerColor,
         modifier = modifier
-            .then(if (isFloating) Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp, top = 12.dp) else Modifier)
+            .then(
+                if (isFloating) {
+                    Modifier
+                        .navigationBarsPadding()
+                        .displayCutoutPadding()
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                } else {
+                    Modifier
+                }
+            )
             .fillMaxWidth(),
         shadowElevation = if (isFloating) 12.dp else 8.dp,
         shape = when {
@@ -150,9 +173,21 @@ fun CustomBottomBar(
             Box(
                 modifier = Modifier
                     .size(60.dp)
-                    .background(PrimaryBlue, RoundedCornerShape(20.dp))
-                    .clickable { 
+                    .background(
+                        if (isBluetoothConnected) PrimaryBlue else Color(0xFF9E9E9E),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (!isBluetoothConnected) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar(
+                                    "Conecta el ESP32 primero 🔒",
+                                    duration = SnackbarDuration.Short
+                                )
+                            }
+                            return@clickable
+                        }
                         if (destination?.hasRoute<Scanner>() != true) {
                             navController.navigate(Scanner) {
                                 launchSingleTop = true
@@ -162,12 +197,21 @@ fun CustomBottomBar(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.QrCodeScanner,
-                    contentDescription = "Scanner",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
+                if (isBluetoothConnected) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = "Scanner",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Bloqueado",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.width(32.dp))
@@ -184,6 +228,19 @@ fun CustomBottomBar(
                 }
             )
         }
+    }
+
+    // BT-locked Snackbar
+    SnackbarHost(
+        hostState = snackbarHostState,
+        modifier = Modifier.padding(bottom = 96.dp)
+    ) { data ->
+        Snackbar(
+            snackbarData = data,
+            containerColor = Color(0xFF1E1E1E),
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 }
 

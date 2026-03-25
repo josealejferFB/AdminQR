@@ -16,3 +16,6 @@ data class Result(
     val phone: String,
     val plate: String
 )
+
+@Serializable
+object ESPConfig

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">172.17.12.119</domain>
+        <!-- Also permit localhost just in case -->
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+    <!-- Fallback for other domains -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

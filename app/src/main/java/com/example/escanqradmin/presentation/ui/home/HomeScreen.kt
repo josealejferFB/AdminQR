@@ -28,7 +28,16 @@ import androidx.navigation.NavHostController
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomBottomBar
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
+import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
 import com.example.escanqradmin.presentation.theme.color.*
+import com.example.escanqradmin.domain.repository.BluetoothConnectionState
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.SettingsInputComponent
+import com.example.escanqradmin.presentation.navigation.ESPConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,9 +46,24 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val pairedDevices by viewModel.pairedDevices.collectAsState()
+    val scannedDevices by viewModel.scannedDevices.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
+    val bluetoothConnectionState by viewModel.bluetoothConnectionState.collectAsState()
+
     var searchQuery by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showBluetoothDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions.values.all { it }) {
+            showBluetoothDialog = true
+            viewModel.startDiscovery()
+        }
+    }
 
     Scaffold(
         containerColor = BackgroundLight,
@@ -154,6 +178,64 @@ fun HomeScreen(
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
+
+                        // Bluetooth Status and ESP Config Button
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Estado ESP32",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = Color.Gray
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(
+                                                    if (bluetoothConnectionState is BluetoothConnectionState.Connected) Color.Green else Color.Red
+                                                )
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = when (bluetoothConnectionState) {
+                                                is BluetoothConnectionState.Connected -> "CONECTADO"
+                                                is BluetoothConnectionState.Connecting -> "CONECTANDO..."
+                                                is BluetoothConnectionState.Error -> "ERROR"
+                                                else -> "DESCONECTADO"
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (bluetoothConnectionState is BluetoothConnectionState.Connected) Color.Black else Color.Gray
+                                        )
+                                    }
+                                }
+                                
+                                Button(
+                                    onClick = { navController.navigate(ESPConfig) },
+                                    enabled = bluetoothConnectionState is BluetoothConnectionState.Connected,
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Default.SettingsInputComponent, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("CONFIG")
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
 
                     items(uiState.activeUsers) { user ->
@@ -162,12 +244,15 @@ fun HomeScreen(
                             onDelete = {
                                 userToDelete = user
                                 showDeleteDialog = true
-                            }
+                            },
+                            onUpdate = { viewModel.updateUser(it) }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
             }
+
+
 
             // 4. Delete Confirmation Dialog
             if (showDeleteDialog && userToDelete != null) {
@@ -196,11 +281,27 @@ fun HomeScreen(
                 )
             }
 
+            // Bluetooth Dialog
+            if (showBluetoothDialog) {
+                BluetoothDialog(
+                    onDismiss = { 
+                        showBluetoothDialog = false
+                        viewModel.stopDiscovery()
+                    },
+                    pairedDevices = pairedDevices.filter { it.name?.startsWith("ESP32", ignoreCase = true) == true },
+                    scannedDevices = scannedDevices.filter { it.name?.startsWith("ESP32", ignoreCase = true) == true },
+                    isScanning = isScanning,
+                    connectionState = bluetoothConnectionState,
+                    onStartScan = { viewModel.startDiscovery() },
+                    onStopScan = { viewModel.stopDiscovery() },
+                    onConnect = { address -> viewModel.connectToDevice(address) }
+                )
+            }
+
             // 2. Minimal Fixed Header Layer (Logo and Title only)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .statusBarsPadding()
                     .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 12.dp)
                     .zIndex(2f),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -222,19 +323,44 @@ fun HomeScreen(
                     )
                 }
                 
-                // Keep the profile button for consistency but without the bar background
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PhoneAndroid,
-                        contentDescription = "Profile",
-                        tint = SecondaryOrange,
-                        modifier = Modifier.size(20.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = {
+                            val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                arrayOf(
+                                    Manifest.permission.BLUETOOTH_SCAN,
+                                    Manifest.permission.BLUETOOTH_CONNECT
+                                )
+                            } else {
+                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+                            }
+                            permissionLauncher.launch(permissions)
+                        },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(PrimaryBlue.copy(alpha = 0.15f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bluetooth,
+                            contentDescription = "Bluetooth",
+                            tint = PrimaryBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhoneAndroid,
+                            contentDescription = "Profile",
+                            tint = SecondaryOrange,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
 
@@ -242,6 +368,7 @@ fun HomeScreen(
             CustomBottomBar(
                 navController = navController,
                 isFloating = true,
+                isBluetoothConnected = bluetoothConnectionState is BluetoothConnectionState.Connected,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .zIndex(1f)
