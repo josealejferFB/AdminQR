@@ -53,10 +53,12 @@ class HomeViewModel @Inject constructor(
 
     private var autoDisconnectJob: Job? = null
     private var isHomeActive = false
+    private var isDeleteInProgress = false
 
     init {
         observeHistory()
         observeBluetoothConnection()
+        observeBluetoothMessages()
     }
 
     private fun observeHistory() {
@@ -83,14 +85,99 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun observeBluetoothMessages() {
+        viewModelScope.launch {
+            bluetoothRepository.messages.collect { raw ->
+                val msg = raw.trim()
+                handleBluetoothDeleteResponse(msg)
+            }
+        }
+    }
+
+    private var pendingDeleteCedula: String? = null
+    private var pendingDeleteId: String? = null
+    private var pendingUpdateUser: ActiveUser? = null
+
+    private fun handleBluetoothDeleteResponse(msg: String) {
+        when (msg) {
+            "LISTO_PARA_ELIMINAR" -> {
+                pendingDeleteCedula?.let { cedula ->
+                    viewModelScope.launch {
+                        bluetoothRepository.sendMessage("$cedula\n")
+                    }
+                }
+            }
+            "USUARIO_ELIMINADO" -> {
+                val id = pendingDeleteId
+                val cedula = pendingDeleteCedula
+                pendingDeleteId = null
+                pendingDeleteCedula = null
+                isDeleteInProgress = false
+                
+                if (id != null && cedula != null) {
+                    viewModelScope.launch {
+                        deleteFromServer(id, cedula)
+                    }
+                }
+            }
+            "ERROR_ELIMINAR", "USUARIO_NO_EXISTE" -> {
+                pendingDeleteId = null
+                pendingDeleteCedula = null
+                isDeleteInProgress = false
+                viewModelScope.launch {
+                    _snackbarMessages.emit("Error al eliminar en ESP32: $msg")
+                }
+            }
+            "LISTO_PARA_MODIFICAR" -> {
+                pendingUpdateUser?.let { user ->
+                    viewModelScope.launch {
+                        bluetoothRepository.sendMessage("${user.document}\n")
+                    }
+                }
+            }
+            "ENVIE_NUEVOS_DATOS" -> {
+                pendingUpdateUser?.let { user ->
+                    viewModelScope.launch {
+                        val json = """{"mac":"${user.plate}","placa":"${user.name}"}"""
+                        bluetoothRepository.sendMessage("$json\n")
+                    }
+                }
+            }
+            "USUARIO_MODIFICADO" -> {
+                val user = pendingUpdateUser
+                pendingUpdateUser = null
+                isDeleteInProgress = false
+                
+                if (user != null) {
+                    viewModelScope.launch {
+                        updateOnServer(user)
+                    }
+                }
+            }
+            "ERROR_MODIFICAR", "ERROR_JSON" -> {
+                pendingUpdateUser = null
+                isDeleteInProgress = false
+                viewModelScope.launch {
+                    _snackbarMessages.emit("Error al modificar en ESP32: $msg")
+                }
+            }
+        }
+    }
+
     private fun observeBluetoothConnection() {
         viewModelScope.launch {
             bluetoothConnectionState.collect { state ->
-                // Reiniciar o detener el temporizador según el estado de la conexión y la pantalla
                 if (state is BluetoothConnectionState.Connected) {
                     if (isHomeActive) resetAutoDisconnectTimer()
+                    
+                    if (pendingDeleteId != null && pendingDeleteCedula != null && !isDeleteInProgress) {
+                        isDeleteInProgress = true
+                        delay(500)
+                        bluetoothRepository.sendMessage("eliminar\n")
+                    }
                 } else {
                     stopAutoDisconnectTimer()
+                    isDeleteInProgress = false
                 }
             }
         }
@@ -132,23 +219,121 @@ class HomeViewModel @Inject constructor(
     fun connectToDevice(address: String) { bluetoothRepository.connectToDevice(address) }
     fun disconnect() { bluetoothRepository.disconnect() }
 
+    fun connectToEsp32() {
+        viewModelScope.launch {
+            val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
+            
+            if (isConnected) {
+                _snackbarMessages.emit("Ya estás conectado al ESP32")
+            } else {
+                val esp32Address = pairedDevices.value
+                    .firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }
+                    ?.address
+                
+                if (esp32Address != null) {
+                    _snackbarMessages.emit("Conectando al ESP32...")
+                    connectToDevice(esp32Address)
+                } else {
+                    _snackbarMessages.emit("No hay ESP32 vinculado. Conecta uno primero.")
+                }
+            }
+        }
+    }
+
     // Métodos de gestión de usuarios
     fun deleteUser(id: String, document: String) {
         viewModelScope.launch {
-            syncRepository.deleteEntry(document).onSuccess {
-                repository.deleteRecord(id)
+            val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
+            
+            if (isConnected) {
+                startDeleteProcess(id, document)
+            } else {
+                val esp32Address = pairedDevices.value
+                    .firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }
+                    ?.address
+                
+                if (esp32Address != null) {
+                    _snackbarMessages.emit("Conectando al ESP32...")
+                    connectToDevice(esp32Address)
+                    delay(2000)
+                    val connected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
+                    if (connected) {
+                        startDeleteProcess(id, document)
+                    } else {
+                        _snackbarMessages.emit("No se pudo conectar al ESP32. No se puede eliminar.")
+                    }
+                } else {
+                    _snackbarMessages.emit("No hay ESP32 vinculado. Conecta uno primero.")
+                }
             }
+        }
+    }
+
+    private fun startDeleteProcess(id: String, document: String) {
+        pendingDeleteId = id
+        pendingDeleteCedula = document
+        isDeleteInProgress = true
+        viewModelScope.launch {
+            delay(500)
+            bluetoothRepository.sendMessage("eliminar\n")
+        }
+    }
+
+    private suspend fun deleteFromServer(id: String, cedula: String) {
+        syncRepository.deleteEntry(cedula).onSuccess {
+            repository.deleteRecord(id)
+            _snackbarMessages.emit("Usuario eliminado correctamente")
+        }.onFailure { e ->
+            _snackbarMessages.emit("Error al eliminar del servidor: ${e.message}")
         }
     }
 
     fun updateUser(user: ActiveUser) {
         viewModelScope.launch {
-            val qrContent = com.example.escanqradmin.domain.model.QrContent(
-                androidId = user.id, userName = user.name, cedula = user.document, plate = user.plate
-            )
-            syncRepository.updateEntry(qrContent).onSuccess {
-                repository.updateRecord(qrContent)
+            val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
+            
+            if (isConnected) {
+                startUpdateProcess(user)
+            } else {
+                val esp32Address = pairedDevices.value
+                    .firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }
+                    ?.address
+                
+                if (esp32Address != null) {
+                    _snackbarMessages.emit("Conectando al ESP32...")
+                    connectToDevice(esp32Address)
+                    delay(2000)
+                    val connected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
+                    if (connected) {
+                        startUpdateProcess(user)
+                    } else {
+                        _snackbarMessages.emit("No se pudo conectar al ESP32. No se puede modificar.")
+                    }
+                } else {
+                    _snackbarMessages.emit("No hay ESP32 vinculado. Conecta uno primero.")
+                }
             }
+        }
+    }
+
+    private fun startUpdateProcess(user: ActiveUser) {
+        pendingUpdateUser = user
+        isDeleteInProgress = true
+        viewModelScope.launch {
+            delay(500)
+            bluetoothRepository.sendMessage("modificar\n")
+        }
+    }
+
+    private suspend fun updateOnServer(user: ActiveUser) {
+        val qrContent = com.example.escanqradmin.domain.model.QrContent(
+            androidId = user.id, userName = user.name, cedula = user.document, plate = user.plate
+        )
+        syncRepository.updateEntry(qrContent).onSuccess {
+            repository.updateRecord(qrContent)
+            _snackbarMessages.emit("Usuario modificado correctamente")
+        }.onFailure { e ->
+            _snackbarMessages.emit("Error al modificar en servidor: ${e.message}")
         }
     }
 

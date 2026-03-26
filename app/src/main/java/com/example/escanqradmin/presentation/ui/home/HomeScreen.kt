@@ -1,6 +1,7 @@
 package com.example.escanqradmin.presentation.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,6 +29,7 @@ import androidx.navigation.NavHostController
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomBottomBar
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnackbar
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
+import com.example.escanqradmin.presentation.ui.home.components.SearchBar
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
 import com.example.escanqradmin.presentation.theme.color.*
@@ -70,8 +72,9 @@ fun HomeScreen(
         }
     }
 
-    // Observe snackbar messages from ViewModel
+    // Observe snackbar messages from ViewModel and sync on start
     LaunchedEffect(Unit) {
+        viewModel.refreshData()
         viewModel.snackbarMessages.collectLatest { message: String ->
             snackbarHostState.showSnackbar(
                 message = message,
@@ -156,22 +159,9 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        TextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            placeholder = { Text("Buscar usuario por Cédula o Placa...", fontSize = 12.sp, color = Color.Gray) },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Gray, modifier = Modifier.size(18.dp)) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp)
-                                .clip(RoundedCornerShape(16.dp)),
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = SurfaceGrey,
-                                unfocusedContainerColor = SurfaceGrey,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            ),
-                            singleLine = true
+                        SearchBar(
+                            query = searchQuery,
+                            onQueryChange = { searchQuery = it }
                         )
 
                         Spacer(modifier = Modifier.height(24.dp))
@@ -217,7 +207,11 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { viewModel.connectToEsp32() }
+                                ) {
                                     Text(
                                         text = "Estado ESP32",
                                         style = MaterialTheme.typography.labelMedium,
@@ -263,7 +257,17 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                     }
 
-                    items(uiState.activeUsers) { user ->
+                    val filteredUsers = if (searchQuery.isBlank()) {
+                        uiState.activeUsers
+                    } else {
+                        uiState.activeUsers.filter { user ->
+                            user.name.contains(searchQuery, ignoreCase = true) ||
+                            user.document.contains(searchQuery, ignoreCase = true) ||
+                            user.plate.contains(searchQuery, ignoreCase = true)
+                        }
+                    }
+
+                    items(filteredUsers) { user ->
                         ActiveUserCard(
                             user = user,
                             onDelete = {
@@ -281,10 +285,16 @@ fun HomeScreen(
 
             // 4. Delete Confirmation Dialog
             if (showDeleteDialog && userToDelete != null) {
+                val connected = bluetoothConnectionState is BluetoothConnectionState.Connected
+                val deleteMessage = if (connected) {
+                    "El usuario será eliminado del ESP32 y del servidor."
+                } else {
+                    "Esta acción eliminará el usuario de la base de datos del servidor."
+                }
                 AlertDialog(
                     onDismissRequest = { showDeleteDialog = false },
                     title = { Text("Confirmar eliminación", fontWeight = FontWeight.Bold) },
-                    text = { Text("¿Estás seguro de que deseas eliminar el registro de ${userToDelete?.name}? Esta acción eliminará el usuario de la base de datos del servidor.") },
+                    text = { Text("¿Estás seguro de que deseas eliminar el registro de ${userToDelete?.name}? $deleteMessage") },
                     confirmButton = {
                         TextButton(
                             onClick = {

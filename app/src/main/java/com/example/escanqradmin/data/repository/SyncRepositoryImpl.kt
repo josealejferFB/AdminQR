@@ -1,5 +1,7 @@
 package com.example.escanqradmin.data.repository
 
+import com.example.escanqradmin.data.network.ApiConstants.Endpoints.GET_CONDUCTORES
+import com.example.escanqradmin.data.network.ApiConstants.Endpoints.SYNC_VEHICULAR
 import com.example.escanqradmin.data.network.model.ConductoresResponse
 import com.example.escanqradmin.domain.model.QrContent
 import com.example.escanqradmin.domain.repository.SyncRepository
@@ -20,8 +22,6 @@ class SyncRepositoryImpl @Inject constructor(
 ) : SyncRepository {
 
     private val mediaType = "application/json; charset=utf-8".toMediaType()
-    private val baseUrl = "http://172.17.2.178:8059/api/sync_vehicular"
-    private val refreshUsers = "http://172.17.2.178:8059/api/get_conductores"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -38,7 +38,7 @@ class SyncRepositoryImpl @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url(baseUrl)
+                .url(SYNC_VEHICULAR)
                 .addHeader("Content-Type", "application/json")
                 .post(jsonBody.toRequestBody(mediaType))
                 .build()
@@ -55,7 +55,7 @@ class SyncRepositoryImpl @Inject constructor(
     override suspend fun fetchEntries(): Result<List<QrContent>> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
-                .url(baseUrl)
+                .url(SYNC_VEHICULAR)
                 .get()
                 .build()
 
@@ -74,7 +74,7 @@ class SyncRepositoryImpl @Inject constructor(
     override suspend fun refreshConductores(): Result<List<QrContent>> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
-                .url(refreshUsers)
+                .url(GET_CONDUCTORES)
                 .get()
                 .build()
 
@@ -107,7 +107,7 @@ class SyncRepositoryImpl @Inject constructor(
 
     override suspend fun deleteEntry(cedula: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val url = baseUrl.toHttpUrlOrNull()?.newBuilder()
+            val url = SYNC_VEHICULAR.toHttpUrlOrNull()?.newBuilder()
                 ?.addQueryParameter("cedula", cedula)
                 ?.build() ?: throw Exception("Invalid URL")
 
@@ -134,7 +134,7 @@ class SyncRepositoryImpl @Inject constructor(
             }.toString()
 
             val request = Request.Builder()
-                .url(baseUrl)
+                .url(SYNC_VEHICULAR)
                 .addHeader("Content-Type", "application/json")
                 .put(jsonBody.toRequestBody(mediaType))
                 .build()
