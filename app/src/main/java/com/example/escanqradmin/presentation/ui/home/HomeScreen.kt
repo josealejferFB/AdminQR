@@ -26,6 +26,7 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomBottomBar
+import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnackbar
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
@@ -36,8 +37,11 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.SettingsInputComponent
 import com.example.escanqradmin.presentation.navigation.ESPConfig
+import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,10 +55,30 @@ fun HomeScreen(
     val isScanning by viewModel.isScanning.collectAsState()
     val bluetoothConnectionState by viewModel.bluetoothConnectionState.collectAsState()
 
+    val snackbarHostState = remember { SnackbarHostState() }
+
     var searchQuery by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showBluetoothDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
+
+    // Logic for auto-disconnect timer lifecycle
+    DisposableEffect(Unit) {
+        viewModel.onHomeEntered()
+        onDispose {
+            viewModel.onHomeExited()
+        }
+    }
+
+    // Observe snackbar messages from ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.snackbarMessages.collectLatest { message: String ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short
+            )
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -213,7 +237,7 @@ fun HomeScreen(
                                             text = when (val s = bluetoothConnectionState) {
                                                 is BluetoothConnectionState.Connected -> "CONECTADO (${s.deviceAddress})"
                                                 is BluetoothConnectionState.Connecting -> "CONECTANDO..."
-                                                is BluetoothConnectionState.Error -> "ERROR"
+                                                is BluetoothConnectionState.Error -> "DESCONECTADO"
                                                 else -> "DESCONECTADO"
                                             },
                                             style = MaterialTheme.typography.bodyMedium,
@@ -379,15 +403,32 @@ fun HomeScreen(
                 }
             }
 
-            // 3. Floating BottomBar
+            // 3. Floating BottomBar (Now correctly passing the snackbar host state)
             CustomBottomBar(
                 navController = navController,
                 isFloating = true,
                 isBluetoothConnected = bluetoothConnectionState is BluetoothConnectionState.Connected,
+                snackbarHostState = snackbarHostState,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .zIndex(1f)
             )
+
+            // ABSOLUTE SNACKBAR HOST (Overlaying everything)
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 110.dp) // Absolute offset above HUD
+                    .zIndex(100f) // Ensure it's on top of everything
+            ) { data ->
+                val isBluetoothMessage = data.visuals.message.contains("Bluetooth", ignoreCase = true)
+                CustomSnackbar(
+                    message = data.visuals.message,
+                    icon = if (isBluetoothMessage) Icons.Default.BluetoothDisabled else Icons.Default.Lock,
+                    containerColor = if (isBluetoothMessage) PrimaryBlue else SecondaryOrange
+                )
+            }
         }
     }
 }

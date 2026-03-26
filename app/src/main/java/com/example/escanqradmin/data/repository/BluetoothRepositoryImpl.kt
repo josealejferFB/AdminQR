@@ -61,8 +61,11 @@ class BluetoothRepositoryImpl @Inject constructor(
                         intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                     }
                     device?.let {
-                        val domainDevice = BluetoothDeviceDomain(it.name, it.address)
-                        if (!_scannedDevices.value.any { d -> d.address == it.address }) {
+                        val isAlreadyPaired = _pairedDevices.value.any { d -> d.address == it.address }
+                        val isAlreadyScanned = _scannedDevices.value.any { d -> d.address == it.address }
+                        
+                        if (!isAlreadyPaired && !isAlreadyScanned) {
+                            val domainDevice = BluetoothDeviceDomain(it.name, it.address)
                             _scannedDevices.update { list -> list + domainDevice }
                         }
                     }
@@ -90,6 +93,7 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun startDiscovery() {
+        updatePairedDevices() // Asegurar que la lista de vinculados esté al día
         if (bluetoothAdapter?.isDiscovering == true) {
             bluetoothAdapter.cancelDiscovery()
         }

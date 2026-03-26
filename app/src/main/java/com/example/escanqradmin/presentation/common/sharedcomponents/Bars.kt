@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -110,13 +111,17 @@ fun CustomBottomBar(
     containerColor: Color = Color.White,
     applyPrivacyPadding: Boolean = false,
     isFloating: Boolean = false,
-    isBluetoothConnected: Boolean = false
+    isBluetoothConnected: Boolean = false,
+    snackbarHostState: SnackbarHostState? = null // Optional provided state
 ) {
     val navBackStackEntry = navController.currentBackStackEntryAsState()
     val destination = navBackStackEntry.value?.destination
     val haptic = LocalHapticFeedback.current
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    
+    // Internal state if none provided
+    val internalSnackbarHostState = remember { SnackbarHostState() }
+    val effectiveSnackbarHostState = snackbarHostState ?: internalSnackbarHostState
 
     Surface(
         color = containerColor,
@@ -181,7 +186,7 @@ fun CustomBottomBar(
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (!isBluetoothConnected) {
                             scope.launch {
-                                snackbarHostState.showSnackbar(
+                                effectiveSnackbarHostState.showSnackbar(
                                     "Conecta el ESP32 primero 🔒",
                                     duration = SnackbarDuration.Short
                                 )
@@ -229,40 +234,40 @@ fun CustomBottomBar(
             )
         }
     }
+}
 
-    // BT-locked Snackbar
-    SnackbarHost(
-        hostState = snackbarHostState,
-        modifier = Modifier
-            .navigationBarsPadding()
-            .padding(top = 720.dp) // Below the floating bottom bar
-    ) { data ->
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp), // Safezone alignment
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = SecondaryOrange),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+@Composable
+fun CustomSnackbar(
+    message: String,
+    icon: ImageVector = Icons.Default.Lock,
+    containerColor: Color = SecondaryOrange,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Lock, 
-                    contentDescription = null, 
-                    tint = Color.White, 
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    text = data.visuals.message,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            }
+            Icon(
+                imageVector = icon, 
+                contentDescription = null, 
+                tint = Color.White, 
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = message,
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
         }
     }
 }
