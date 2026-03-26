@@ -233,14 +233,37 @@ fun CustomBottomBar(
     // BT-locked Snackbar
     SnackbarHost(
         hostState = snackbarHostState,
-        modifier = Modifier.padding(bottom = 96.dp)
+        modifier = Modifier
+            .navigationBarsPadding()
+            .padding(top = 720.dp) // Below the floating bottom bar
     ) { data ->
-        Snackbar(
-            snackbarData = data,
-            containerColor = Color(0xFF1E1E1E),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp), // Safezone alignment
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = SecondaryOrange),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock, 
+                    contentDescription = null, 
+                    tint = Color.White, 
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    text = data.visuals.message,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
+        }
     }
 }
 

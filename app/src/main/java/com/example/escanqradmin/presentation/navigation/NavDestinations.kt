@@ -13,7 +13,6 @@ data class Result(
     val androidId: String,
     val userName: String,
     val cedula: String,
-    val phone: String,
     val plate: String
 )
 

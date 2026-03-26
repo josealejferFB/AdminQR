@@ -36,8 +36,6 @@ fun ActiveUserCard(
     
     // Editable states
     var name by remember(user) { mutableStateOf(user.name) }
-    var document by remember(user) { mutableStateOf(user.document) }
-    var contact by remember(user) { mutableStateOf(user.contact) }
     var plate by remember(user) { mutableStateOf(user.plate) }
 
     Card(
@@ -127,21 +125,6 @@ fun ActiveUserCard(
                 Column {
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    Text(
-                        text = "CONTACTO",
-                        color = Color.Gray,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (user.contact.isEmpty()) "No registrado" else user.contact,
-                        color = if (user.contact.isEmpty()) Color.LightGray else Color.Black,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -185,23 +168,23 @@ fun ActiveUserCard(
                         singleLine = true
                     )
                     Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Cédula NO EDITABLE
                     OutlinedTextField(
-                        value = document,
-                        onValueChange = { document = it },
-                        label = { Text("Cédula") },
+                        value = user.document,
+                        onValueChange = { },
+                        label = { Text("Cédula (No editable)") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true
+                        singleLine = true,
+                        enabled = false,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledBorderColor = Color.LightGray,
+                            disabledTextColor = Color.Gray,
+                            disabledLabelColor = Color.Gray
+                        )
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = contact,
-                        onValueChange = { contact = it },
-                        label = { Text("Teléfono") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true
-                    )
+                    
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = plate,
@@ -220,7 +203,7 @@ fun ActiveUserCard(
                     ) {
                         Button(
                             onClick = {
-                                onUpdate(user.copy(name = name, document = document, contact = contact, plate = plate))
+                                onUpdate(user.copy(name = name, plate = plate))
                                 isExpanded = false
                             },
                             modifier = Modifier.weight(1f),
@@ -248,4 +231,3 @@ fun ActiveUserCard(
         }
     }
 }
-

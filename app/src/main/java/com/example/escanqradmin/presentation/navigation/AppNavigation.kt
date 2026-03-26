@@ -57,7 +57,6 @@ fun AppNavigation(navController: NavHostController) {
                         androidId = qrContent.androidId,
                         userName = qrContent.userName,
                         cedula = qrContent.cedula,
-                        phone = qrContent.phone,
                         plate = qrContent.plate
                     )
                 )
@@ -70,7 +69,6 @@ fun AppNavigation(navController: NavHostController) {
                 androidId = result.androidId,
                 userName = result.userName,
                 cedula = result.cedula,
-                phone = result.phone,
                 plate = result.plate
             )
             

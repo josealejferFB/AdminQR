@@ -135,7 +135,7 @@ fun HomeScreen(
                         TextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Buscar usuario por Cédula, Teléfono o Placa...", fontSize = 12.sp, color = Color.Gray) },
+                            placeholder = { Text("Buscar usuario por Cédula o Placa...", fontSize = 12.sp, color = Color.Gray) },
                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Gray, modifier = Modifier.size(18.dp)) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -260,11 +260,11 @@ fun HomeScreen(
                 AlertDialog(
                     onDismissRequest = { showDeleteDialog = false },
                     title = { Text("Confirmar eliminación", fontWeight = FontWeight.Bold) },
-                    text = { Text("¿Estás seguro de que deseas eliminar el registro de ${userToDelete?.name}? Esta acción no se puede deshacer.") },
+                    text = { Text("¿Estás seguro de que deseas eliminar el registro de ${userToDelete?.name}? Esta acción eliminará el usuario de la base de datos del servidor.") },
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                userToDelete?.let { viewModel.deleteUser(it.id) }
+                                userToDelete?.let { viewModel.deleteUser(it.id, it.document) }
                                 showDeleteDialog = false
                                 userToDelete = null
                             }

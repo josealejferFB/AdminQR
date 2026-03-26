@@ -19,7 +19,6 @@ data class ActiveUser(
     val name: String,
     val document: String,
     val status: String,
-    val contact: String,
     val plate: String
 )
 
@@ -34,7 +33,7 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val repository: HistoryRepository,
     private val bluetoothRepository: BluetoothRepository,
-    private val syncRepository: com.example.escanqradmin.domain.repository.SyncRepository
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     val scannedDevices = bluetoothRepository.scannedDevices
@@ -58,7 +57,6 @@ class HomeViewModel @Inject constructor(
                         name = qr.userName,
                         document = qr.cedula,
                         status = "VALIDADO", // Default for scanned
-                        contact = qr.phone,
                         plate = qr.plate
                     )
                 }
@@ -74,28 +72,40 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun deleteUser(id: String) {
-        repository.deleteRecord(id)
+    fun deleteUser(id: String, document: String) {
+        viewModelScope.launch {
+            syncRepository.deleteEntry(document).onSuccess {
+                repository.deleteRecord(id)
+            }
+        }
     }
 
     fun updateUser(user: ActiveUser) {
-        val qrContent = com.example.escanqradmin.domain.model.QrContent(
-            androidId = user.id,
-            userName = user.name,
-            cedula = user.document,
-            phone = user.contact,
-            plate = user.plate
-        )
-        repository.updateRecord(qrContent)
+        viewModelScope.launch {
+            val qrContent = com.example.escanqradmin.domain.model.QrContent(
+                androidId = user.id,
+                userName = user.name,
+                cedula = user.document,
+                plate = user.plate
+            )
+            
+            // 1. Actualizar en el servidor (PUT)
+            syncRepository.updateEntry(qrContent).onSuccess {
+                // 2. Si tiene éxito, actualizar localmente
+                repository.updateRecord(qrContent)
+            }
+        }
     }
 
     fun refreshData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
             
-            // Sync with server
-            syncRepository.fetchEntries().onSuccess { records ->
+            // Sync with server using the new refreshConductores endpoint
+            syncRepository.refreshConductores().onSuccess { records ->
                 repository.syncWithServer(records)
+            }.onFailure {
+                // Optional: handle error (e.g. show toast)
             }
             
             delay(500) // Aesthetic delay
