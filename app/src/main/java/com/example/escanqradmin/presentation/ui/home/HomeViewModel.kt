@@ -43,6 +43,11 @@ class HomeViewModel @Inject constructor(
     val pairedDevices = bluetoothRepository.pairedDevices
     val isScanning = bluetoothRepository.isScanning
     val bluetoothConnectionState = bluetoothRepository.connectionState
+
+    companion object {
+        // MAC del ESP32_Seguro activo. Actualizar si se cambia el hardware.
+        const val ESP32_TARGET_MAC = "E0:5A:1B:31:29:6E"
+    }
     
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState = _uiState.asStateFlow()
@@ -51,8 +56,12 @@ class HomeViewModel @Inject constructor(
     private val _snackbarMessages = MutableSharedFlow<String>()
     val snackbarMessages = _snackbarMessages.asSharedFlow()
 
-    private var autoDisconnectJob: Job? = null
-    private var isHomeActive = false
+    // true = la desconexión fue iniciada por el usuario o por una reconexión
+    // false = la desconexión fue inesperada (timeout del ESP32, pérdida de señal)
+    @Volatile private var isManualDisconnect = false
+    // true = estamos en medio de un intento de conexión (evita falso snackbar)
+    @Volatile private var isConnecting = false
+    private var previousConnectionState: BluetoothConnectionState = BluetoothConnectionState.Idle
     private var isDeleteInProgress = false
 
     init {
@@ -167,57 +176,67 @@ class HomeViewModel @Inject constructor(
     private fun observeBluetoothConnection() {
         viewModelScope.launch {
             bluetoothConnectionState.collect { state ->
-                if (state is BluetoothConnectionState.Connected) {
-                    if (isHomeActive) resetAutoDisconnectTimer()
-                    
-                    if (pendingDeleteId != null && pendingDeleteCedula != null && !isDeleteInProgress) {
-                        isDeleteInProgress = true
-                        delay(500)
-                        bluetoothRepository.sendMessage("eliminar\n")
-                    }
-                } else {
-                    stopAutoDisconnectTimer()
-                    isDeleteInProgress = false
+                // Detectamos si se desconectó automáticamente.
+                // Solo emitimos si veníamos de Connected, y no fue manual ni parte de una reconexión.
+                if (previousConnectionState is BluetoothConnectionState.Connected &&
+                    state !is BluetoothConnectionState.Connected &&
+                    !isManualDisconnect &&
+                    !isConnecting
+                ) {
+                    _snackbarMessages.emit("Bluetooth desconectado automáticamente")
                 }
+
+                when (state) {
+                    is BluetoothConnectionState.Connected -> {
+                        isManualDisconnect = false
+                        isConnecting = false
+
+                        if (pendingDeleteId != null && pendingDeleteCedula != null && !isDeleteInProgress) {
+                            isDeleteInProgress = true
+                            delay(500)
+                            bluetoothRepository.sendMessage("eliminar\n")
+                        }
+                    }
+                    is BluetoothConnectionState.Connecting -> {
+                        // No hacemos nada especial
+                    }
+                    else -> {
+                        isDeleteInProgress = false
+                    }
+                }
+
+                previousConnectionState = state
             }
         }
     }
 
-    fun onHomeEntered() {
-        isHomeActive = true
-        // Al entrar al Home, si ya está conectado, iniciamos el conteo
-        if (bluetoothConnectionState.value is BluetoothConnectionState.Connected) {
-            resetAutoDisconnectTimer()
-        }
-    }
 
-    fun onHomeExited() {
-        isHomeActive = false
-        stopAutoDisconnectTimer()
-    }
-
-    fun resetAutoDisconnectTimer() {
-        autoDisconnectJob?.cancel()
-        autoDisconnectJob = viewModelScope.launch {
-            delay(20000) // 20 segundos exactos
-            if (isHomeActive && bluetoothConnectionState.value is BluetoothConnectionState.Connected) {
-                // 1. Notificar a la UI PRIMERO
-                _snackbarMessages.emit("Bluetooth desconectado automáticamente por inactividad")
-                // 2. Ejecutar la desconexión
-                bluetoothRepository.disconnect()
-            }
-        }
-    }
-
-    fun stopAutoDisconnectTimer() {
-        autoDisconnectJob?.cancel()
-    }
 
     // Métodos delegados del Repositorio
     fun startDiscovery() { bluetoothRepository.startDiscovery() }
     fun stopDiscovery() { bluetoothRepository.stopDiscovery() }
-    fun connectToDevice(address: String) { bluetoothRepository.connectToDevice(address) }
-    fun disconnect() { bluetoothRepository.disconnect() }
+    fun connectToDevice(address: String) { 
+        // Marcamos que estamos en reconexión para no disparar snackbar falso
+        isConnecting = true
+        isManualDisconnect = false
+        bluetoothRepository.connectToDevice(address) 
+    }
+    fun disconnect() { 
+        isManualDisconnect = true
+        isConnecting = false
+        bluetoothRepository.disconnect() 
+    }
+
+    /**
+     * Busca la dirección del ESP32 objetivo.
+     * Prioriza la MAC exacta configurada; si no está vinculada,
+     * cae en el primer dispositivo cuyo nombre empiece con "ESP32".
+     */
+    private fun findEsp32Address(): String? {
+        val devices = pairedDevices.value
+        return devices.firstOrNull { it.address.equals(ESP32_TARGET_MAC, ignoreCase = true) }?.address
+            ?: devices.firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }?.address
+    }
 
     fun connectToEsp32() {
         viewModelScope.launch {
@@ -226,9 +245,7 @@ class HomeViewModel @Inject constructor(
             if (isConnected) {
                 _snackbarMessages.emit("Ya estás conectado al ESP32")
             } else {
-                val esp32Address = pairedDevices.value
-                    .firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }
-                    ?.address
+                val esp32Address = findEsp32Address()
                 
                 if (esp32Address != null) {
                     _snackbarMessages.emit("Conectando al ESP32...")
@@ -240,6 +257,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+
     // Métodos de gestión de usuarios
     fun deleteUser(id: String, document: String) {
         viewModelScope.launch {
@@ -248,9 +266,7 @@ class HomeViewModel @Inject constructor(
             if (isConnected) {
                 startDeleteProcess(id, document)
             } else {
-                val esp32Address = pairedDevices.value
-                    .firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }
-                    ?.address
+                val esp32Address = findEsp32Address()
                 
                 if (esp32Address != null) {
                     _snackbarMessages.emit("Conectando al ESP32...")
@@ -295,9 +311,7 @@ class HomeViewModel @Inject constructor(
             if (isConnected) {
                 startUpdateProcess(user)
             } else {
-                val esp32Address = pairedDevices.value
-                    .firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }
-                    ?.address
+                val esp32Address = findEsp32Address()
                 
                 if (esp32Address != null) {
                     _snackbarMessages.emit("Conectando al ESP32...")

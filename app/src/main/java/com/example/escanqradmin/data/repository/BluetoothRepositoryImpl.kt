@@ -48,6 +48,7 @@ class BluetoothRepositoryImpl @Inject constructor(
     private var socket: BluetoothSocket? = null
     private var connectionJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val readBuffer = StringBuilder()
 
     private val receiver = object : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
@@ -93,7 +94,7 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun startDiscovery() {
-        updatePairedDevices() // Asegurar que la lista de vinculados esté al día
+        updatePairedDevices()
         if (bluetoothAdapter?.isDiscovering == true) {
             bluetoothAdapter.cancelDiscovery()
         }
@@ -123,19 +124,46 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun connectToDevice(address: String) {
-        disconnect()
+        // Cancelamos job anterior sin cambiar el estado (evita snackbar falso)
+        connectionJob?.cancel()
+        socket?.close()
+        socket = null
+        readBuffer.clear()
+
         connectionJob = scope.launch {
             _connectionState.value = BluetoothConnectionState.Connecting
-            val device = bluetoothAdapter?.getRemoteDevice(address) ?: return@launch
+            val device = bluetoothAdapter?.getRemoteDevice(address) ?: run {
+                _connectionState.value = BluetoothConnectionState.Error("Dispositivo no encontrado")
+                return@launch
+            }
+            
+            // Cancelar discovery mejora la velocidad de conexión
+            bluetoothAdapter.cancelDiscovery()
+
             try {
+                // Método estándar con UUID SPP
                 socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-                bluetoothAdapter.cancelDiscovery()
-                socket?.connect()
+                withContext(Dispatchers.IO) { socket?.connect() }
+                
                 _connectionState.value = BluetoothConnectionState.Connected(address)
                 listenForMessages()
+                
             } catch (e: IOException) {
-                _connectionState.value = BluetoothConnectionState.Error(e.message ?: "Connection failed")
-                socket?.close()
+                // FALLBACK: Conexión por reflexión (canal 1)
+                try {
+                    socket?.close()
+                    socket = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                        .invoke(device, 1) as BluetoothSocket
+                    withContext(Dispatchers.IO) { socket?.connect() }
+                    
+                    _connectionState.value = BluetoothConnectionState.Connected(address)
+                    listenForMessages()
+                    
+                } catch (e2: Exception) {
+                    _connectionState.value = BluetoothConnectionState.Error("Fallo de conexión: ${e2.message}")
+                    socket?.close()
+                    socket = null
+                }
             }
         }
     }
@@ -144,6 +172,7 @@ class BluetoothRepositoryImpl @Inject constructor(
         connectionJob?.cancel()
         socket?.close()
         socket = null
+        readBuffer.clear()
         _connectionState.value = BluetoothConnectionState.Idle
     }
 
@@ -162,17 +191,34 @@ class BluetoothRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             val inputStream: InputStream = socket?.inputStream ?: return@withContext
             val buffer = ByteArray(1024)
-            while (isActive && socket?.isConnected == true) {
+            while (isActive) {
                 try {
                     val bytes = inputStream.read(buffer)
                     if (bytes > 0) {
-                        val message = String(buffer, 0, bytes)
-                        _messages.emit(message)
+                        // Añadimos al buffer para manejar mensajes parciales
+                        readBuffer.append(String(buffer, 0, bytes))
+                        // Procesamos cada línea completa (el ESP32 termina con \n via println)
+                        var newlineIdx = readBuffer.indexOf('\n')
+                        while (newlineIdx != -1) {
+                            val line = readBuffer.substring(0, newlineIdx).trim()
+                            readBuffer.delete(0, newlineIdx + 1)
+                            if (line.isNotEmpty()) {
+                                _messages.emit(line)
+                            }
+                            newlineIdx = readBuffer.indexOf('\n')
+                        }
+                    } else if (bytes == -1) {
+                        // El extremo remoto cerró la conexión limpiamente
+                        break
                     }
                 } catch (e: IOException) {
-                    _connectionState.value = BluetoothConnectionState.Error("Disconnected")
+                    // El ESP32 cerró la conexión (timeout u otro motivo)
                     break
                 }
+            }
+            // Si el job sigue activo, significa que el cierre fue remoto (ESP32 timeout)
+            if (isActive) {
+                _connectionState.value = BluetoothConnectionState.Error("Desconectado")
             }
         }
     }

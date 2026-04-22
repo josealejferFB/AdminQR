@@ -86,10 +86,41 @@ fun ESPConfigScreen(
                 actions = {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 16.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(end = 12.dp)
                     ) {
+                        // Botón Listar usuarios
+                        val isListing = st.flowState == EspFlowState.WAIT_LISTING
+                        FilledTonalIconButton(
+                            onClick  = { viewModel.sendListCommand() },
+                            enabled  = isIdle || isListing,
+                            modifier = Modifier.size(36.dp),
+                            shape    = RoundedCornerShape(10.dp),
+                            colors   = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor          = Color(0xFF58A6FF).copy(alpha = 0.15f),
+                                contentColor            = Color(0xFF58A6FF),
+                                disabledContainerColor  = ConsoleBorder.copy(alpha = 0.12f),
+                                disabledContentColor    = MutedText
+                            )
+                        ) {
+                            if (isListing) {
+                                CircularProgressIndicator(
+                                    modifier  = Modifier.size(16.dp),
+                                    color     = Color(0xFF58A6FF),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.FormatListBulleted,
+                                    contentDescription = "Listar usuarios",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        // Indicador Conectado
                         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(RxColor))
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text("Conectado", color = RxColor, fontSize = 12.sp)
                     }
                 },
@@ -173,6 +204,8 @@ fun ESPConfigScreen(
                         onSubmit = viewModel::submitForm,
                         onCancel = viewModel::dismissForm
                     )
+                    // WAIT_LISTING usa la misma barra libre (el sheet cubre la info)
+                    EspFlowState.WAIT_LISTING,
                     EspFlowState.IDLE -> FreeInputBar(
                         value    = st.freeCommand,
                         onChange = viewModel::onFreeCommandChange,
@@ -181,8 +214,18 @@ fun ESPConfigScreen(
                 }
             }
         }
+
+        // ── Modal Bottom Sheet: Lista de usuarios ────────────────────────
+        if (st.showUserList) {
+            UserListSheet(
+                users     = st.userList,
+                isLoading = st.flowState == EspFlowState.WAIT_LISTING,
+                onDismiss = { viewModel.dismissUserList() }
+            )
+        }
     }
 }
+
 
 // ── Quick Commands Bar ────────────────────────────────────────────
 @Composable
@@ -497,6 +540,192 @@ private fun EmptyConsole() {
             Spacer(Modifier.height(10.dp))
             Text("Consola vacía", color = MutedText, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
             Text("Selecciona un comando arriba", color = ConsoleBorder, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        }
+    }
+}
+
+// ── User List Modal Bottom Sheet ──────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UserListSheet(
+    users: List<String>,
+    isLoading: Boolean,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+
+    ModalBottomSheet(
+        onDismissRequest  = onDismiss,
+        sheetState        = sheetState,
+        containerColor    = ConsolePanel,
+        dragHandle        = {
+            // Handle personalizado con header
+            Column(
+                modifier            = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Spacer(Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .size(width = 36.dp, height = 4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(ConsoleBorder)
+                )
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier             = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    verticalAlignment    = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.FormatListBulleted,
+                            contentDescription = null,
+                            tint     = PromptColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Usuarios en ESP32",
+                            color      = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize   = 16.sp
+                        )
+                        if (isLoading) {
+                            Spacer(Modifier.width(10.dp))
+                            CircularProgressIndicator(
+                                modifier    = Modifier.size(14.dp),
+                                color       = PromptColor,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Spacer(Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = PromptColor.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    "${users.size}",
+                                    color    = PromptColor,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint     = MutedText,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = ConsoleBorder)
+            }
+        }
+    ) {
+        if (isLoading && users.isEmpty()) {
+            // Estado: esperando la primera respuesta
+            Box(
+                modifier            = Modifier
+                    .fillMaxWidth()
+                    .padding(48.dp),
+                contentAlignment    = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = PromptColor)
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Cargando usuarios del ESP32...",
+                        color      = MutedText,
+                        fontSize   = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+        } else if (!isLoading && users.isEmpty()) {
+            // Estado: respuesta recibida pero sin usuarios
+            Box(
+                modifier         = Modifier
+                    .fillMaxWidth()
+                    .padding(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        Icons.Default.PersonOff,
+                        contentDescription = null,
+                        tint     = ConsoleBorder,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text("Sin usuarios registrados", color = MutedText, fontFamily = FontFamily.Monospace)
+                }
+            }
+        } else {
+            // Estado: mostrando la lista
+            LazyColumn(
+                modifier        = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+                contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(users) { line ->
+                    Surface(
+                        shape         = RoundedCornerShape(12.dp),
+                        color         = FormBg,
+                        tonalElevation = 2.dp,
+                        modifier      = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier          = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier          = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(RxColor),
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                text       = line,
+                                color      = Color.White,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize   = 13.sp,
+                                modifier   = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+                if (isLoading) {
+                    item {
+                        Row(
+                            modifier          = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier    = Modifier.size(14.dp),
+                                color       = PromptColor,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Recibiendo...", color = MutedText, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(8.dp)) }
+            }
         }
     }
 }

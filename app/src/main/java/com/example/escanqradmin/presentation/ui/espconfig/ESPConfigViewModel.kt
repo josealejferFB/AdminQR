@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
@@ -36,6 +38,8 @@ enum class EspFlowState {
     WAIT_CEDULA_MODIFICAR,
     /** modificar step-2 → board awaits JSON {"mac":...,"placa":...} */
     WAIT_JSON_MODIFICAR,
+    /** listar → acumulando respuestas del ESP32 */
+    WAIT_LISTING,
 }
 
 /**
@@ -53,7 +57,10 @@ data class ESPConfigUiState(
     val freeCommand: String = "",          // free-form input bar
     val flowState: EspFlowState = EspFlowState.IDLE,
     val form: FormFields = FormFields(),
-    val activeMode: String? = null
+    val activeMode: String? = null,
+    // Resultados acumulados del comando listar
+    val userList: List<String> = emptyList(),
+    val showUserList: Boolean = false
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────
@@ -67,6 +74,7 @@ class ESPConfigViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private var listingTimeoutJob: Job? = null
 
     init { observeMessages() }
 
@@ -97,6 +105,29 @@ class ESPConfigViewModel @Inject constructor(
             // Any terminal response → reset to IDLE
             else -> {
                 if (msg.startsWith("DATOS_ACTUALES:")) return  // ENVIE_NUEVOS_DATOS follows, keep waiting
+
+                // En modo listing acumulamos cada línea de respuesta del ESP32
+                if (_uiState.value.flowState == EspFlowState.WAIT_LISTING) {
+                    // Reiniciamos el timer de inactividad cada vez que llega una línea.
+                    // Si pasan 1.5s sin recibir nada, asumimos que terminó (el ESP32 no manda fin de lista).
+                    listingTimeoutJob?.cancel()
+                    listingTimeoutJob = viewModelScope.launch {
+                        delay(1500)
+                        backToIdle()
+                    }
+
+                    if (isTerminal(msg)) {
+                        listingTimeoutJob?.cancel()
+                        backToIdle()
+                    } else {
+                        // Solo agregamos a la lista de usuarios las líneas que contienen datos reales
+                        if (msg.startsWith("Cedula", ignoreCase = true)) {
+                            _uiState.update { it.copy(userList = it.userList + msg) }
+                        }
+                    }
+                    return
+                }
+
                 if (isTerminal(msg)) backToIdle()
             }
         }
@@ -116,6 +147,31 @@ class ESPConfigViewModel @Inject constructor(
 
     private fun backToIdle() {
         _uiState.update { it.copy(flowState = EspFlowState.IDLE, activeMode = null, form = FormFields()) }
+    }
+
+    // ── Listar usuarios ───────────────────────────────────────────
+
+    fun sendListCommand() {
+        _uiState.update { it.copy(
+            userList    = emptyList(),
+            showUserList = true,
+            flowState   = EspFlowState.WAIT_LISTING,
+            activeMode  = "Listando usuarios..."
+        )}
+        sendRaw("listar")
+        
+        // Iniciamos el timer de seguridad inicial
+        listingTimeoutJob?.cancel()
+        listingTimeoutJob = viewModelScope.launch {
+            delay(3000) // 3s iniciales para recibir la primera línea
+            if (_uiState.value.userList.isEmpty() && _uiState.value.flowState == EspFlowState.WAIT_LISTING) {
+                backToIdle()
+            }
+        }
+    }
+
+    fun dismissUserList() {
+        _uiState.update { it.copy(showUserList = false) }
     }
 
     // ── Form field updates ────────────────────────────────────────
@@ -141,7 +197,8 @@ class ESPConfigViewModel @Inject constructor(
                 val f = st.form
                 """{"mac":"${f.mac}","placa":"${f.placa}"}"""
             }
-            EspFlowState.IDLE -> return
+            EspFlowState.IDLE,
+            EspFlowState.WAIT_LISTING -> return
         }
         sendRaw(payload)
     }

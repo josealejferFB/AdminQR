@@ -64,14 +64,6 @@ fun HomeScreen(
     var showBluetoothDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
 
-    // Logic for auto-disconnect timer lifecycle
-    DisposableEffect(Unit) {
-        viewModel.onHomeEntered()
-        onDispose {
-            viewModel.onHomeExited()
-        }
-    }
-
     // Observe snackbar messages from ViewModel and sync on start
     LaunchedEffect(Unit) {
         viewModel.refreshData()
@@ -89,6 +81,30 @@ fun HomeScreen(
         if (permissions.values.all { it }) {
             showBluetoothDialog = true
             viewModel.startDiscovery()
+        }
+    }
+
+    val requestBluetoothAction = {
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        
+        val allGranted = permissions.all { perm ->
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                navController.context, perm
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+
+        if (allGranted) {
+            showBluetoothDialog = true
+            viewModel.startDiscovery()
+        } else {
+            permissionLauncher.launch(permissions)
         }
     }
 
@@ -210,7 +226,26 @@ fun HomeScreen(
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .clickable { viewModel.connectToEsp32() }
+                                        .clickable { 
+                                            // Modified to request permissions before connecting
+                                            val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                                arrayOf(Manifest.permission.BLUETOOTH_CONNECT)
+                                            } else {
+                                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+                                            }
+                                            
+                                            val allGranted = permissions.all { perm ->
+                                                androidx.core.content.ContextCompat.checkSelfPermission(
+                                                    navController.context, perm
+                                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                            }
+
+                                            if (allGranted) {
+                                                viewModel.connectToEsp32()
+                                            } else {
+                                                permissionLauncher.launch(permissions)
+                                            }
+                                        }
                                 ) {
                                     Text(
                                         text = "Estado ESP32",
@@ -361,30 +396,7 @@ fun HomeScreen(
                 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = {
-                            val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                arrayOf(
-                                    Manifest.permission.BLUETOOTH_SCAN,
-                                    Manifest.permission.BLUETOOTH_CONNECT
-                                )
-                            } else {
-                                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-                            }
-                            
-                            // Check if already granted
-                            val allGranted = permissions.all { perm ->
-                                androidx.core.content.ContextCompat.checkSelfPermission(
-                                    navController.context, perm
-                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                            }
-
-                            if (allGranted) {
-                                showBluetoothDialog = true
-                                viewModel.startDiscovery()
-                            } else {
-                                permissionLauncher.launch(permissions)
-                            }
-                        },
+                        onClick = requestBluetoothAction,
                         modifier = Modifier
                             .size(36.dp)
                             .background(PrimaryBlue.copy(alpha = 0.15f), CircleShape)
