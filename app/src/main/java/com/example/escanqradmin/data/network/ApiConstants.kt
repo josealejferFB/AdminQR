@@ -32,7 +32,7 @@ object ApiConstants {
 
     object Endpoints {
         val SYNC_VEHICULAR: String
-            get() = "$BASE_URL/api/sync_vehicular"
+            get() = "$BASE_URL/api/control_acceso"
         val GET_CONDUCTORES: String
             get() = "$BASE_URL/api/get_conductores"
     }
