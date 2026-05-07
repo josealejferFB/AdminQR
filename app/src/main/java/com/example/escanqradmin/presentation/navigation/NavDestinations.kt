@@ -22,8 +22,3 @@ object ESPConfig
 @Serializable
 object Config
 
-@Serializable
-data class UserSync(
-    val userName: String,
-    val cedula: String
-)

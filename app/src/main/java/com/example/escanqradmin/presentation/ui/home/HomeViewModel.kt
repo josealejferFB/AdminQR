@@ -109,14 +109,14 @@ class HomeViewModel @Inject constructor(
 
     private fun handleBluetoothDeleteResponse(msg: String) {
         when (msg) {
-            "LISTO_PARA_ELIMINAR" -> {
+            "OK_ELIMINAR" -> {
                 pendingDeleteCedula?.let { cedula ->
                     viewModelScope.launch {
                         bluetoothRepository.sendMessage("$cedula\n")
                     }
                 }
             }
-            "USUARIO_ELIMINADO" -> {
+            "ELIMINADO_OK" -> {
                 val id = pendingDeleteId
                 val cedula = pendingDeleteCedula
                 pendingDeleteId = null
@@ -129,7 +129,7 @@ class HomeViewModel @Inject constructor(
                     }
                 }
             }
-            "ERROR_ELIMINAR", "USUARIO_NO_EXISTE" -> {
+            "ERROR_ELIMINAR", "NO_EXISTE" -> {
                 pendingDeleteId = null
                 pendingDeleteCedula = null
                 isDeleteInProgress = false

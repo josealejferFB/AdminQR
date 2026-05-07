@@ -260,18 +260,11 @@ fun HomeScreen(
                         ActiveUserCard(
                             user = user, 
                             onDelete = { userToDelete = user; showDeleteDialog = true }, 
-                            onUpdate = { viewModel.updateUser(it) },
-                            onSync = { u ->
-                                navController.navigate(
-                                    com.example.escanqradmin.presentation.navigation.UserSync(
-                                        userName = u.name,
-                                        cedula = u.document
-                                    )
-                                )
-                            }
+                            onUpdate = { viewModel.updateUser(it) }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                     }
+
                 }
             }
 

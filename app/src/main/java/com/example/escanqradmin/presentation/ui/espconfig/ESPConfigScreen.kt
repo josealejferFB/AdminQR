@@ -2,10 +2,12 @@ package com.example.escanqradmin.presentation.ui.espconfig
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,8 +44,7 @@ private data class QuickCmd(val label: String, val cmd: String, val icon: ImageV
 private val quickCmds = listOf(
     QuickCmd("Agregar",   "agregar",   Icons.Default.PersonAdd,    Color(0xFF238636)),
     QuickCmd("Eliminar",  "eliminar",  Icons.Default.PersonRemove, Color(0xFFDA3633)),
-    QuickCmd("Modificar", "modificar", Icons.Default.Edit,         Color(0xFFD29922)),
-    QuickCmd("Consultar", "consultar", Icons.Default.Search,       Color(0xFF1F6FEB)),
+    QuickCmd("Config",    "config",    Icons.Default.Settings,     Color(0xFF8957E5))
 )
 
 // ── Screen ────────────────────────────────────────────────────────
@@ -204,6 +205,14 @@ fun ESPConfigScreen(
                         onSubmit = viewModel::submitForm,
                         onCancel = viewModel::dismissForm
                     )
+                    EspFlowState.WAIT_JSON_CONFIG -> FormConfig(
+                        form         = st.form,
+                        onProtocolo  = viewModel::onProtocoloChange,
+                        onIpOdoo     = viewModel::onIpOdooChange,
+                        onPort       = viewModel::onPortChange,
+                        onSubmit     = viewModel::submitForm,
+                        onCancel     = viewModel::dismissForm
+                    )
                     // WAIT_LISTING usa la misma barra libre (el sheet cubre la info)
                     EspFlowState.WAIT_LISTING,
                     EspFlowState.IDLE -> FreeInputBar(
@@ -226,8 +235,6 @@ fun ESPConfigScreen(
     }
 }
 
-
-// ── Quick Commands Bar ────────────────────────────────────────────
 @Composable
 private fun QuickCommandBar(enabled: Boolean, onSend: (String) -> Unit) {
     Column(
@@ -243,14 +250,14 @@ private fun QuickCommandBar(enabled: Boolean, onSend: (String) -> Unit) {
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             quickCmds.forEach { cmd ->
                 FilledTonalButton(
                     onClick  = { onSend(cmd.cmd) },
                     enabled  = enabled,
-                    modifier = Modifier.weight(1f).height(60.dp),
+                    modifier = Modifier.width(80.dp).height(60.dp),
                     shape    = RoundedCornerShape(12.dp),
                     colors   = ButtonDefaults.filledTonalButtonColors(
                         containerColor        = cmd.color.copy(alpha = 0.15f),
@@ -342,6 +349,37 @@ private fun FormModificarDatos(
             label   = "Guardar cambios",
             enabled = form.mac.isNotBlank() && form.placa.isNotBlank(),
             color   = Color(0xFFD29922),
+            onClick = onSubmit
+        )
+    }
+}
+
+// ── Form: Config (protocolo, ip_odoo, port) ────────────────────
+@Composable
+private fun FormConfig(
+    form: FormFields,
+    onProtocolo: (String) -> Unit,
+    onIpOdoo: (String) -> Unit,
+    onPort: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onCancel: () -> Unit
+) {
+    FormContainer(
+        title     = "Configuración de red Odoo",
+        icon      = Icons.Default.Settings,
+        iconColor = Color(0xFF8957E5),
+        onCancel  = onCancel
+    ) {
+        EspField("Protocolo", value = form.protocolo, onChange = onProtocolo, placeholder = "http o https")
+        Spacer(Modifier.height(10.dp))
+        EspField("IP Odoo",   value = form.ip_odoo,   onChange = onIpOdoo,   placeholder = "192.168.1.100")
+        Spacer(Modifier.height(10.dp))
+        EspField("Puerto",    value = form.port,      onChange = onPort,     placeholder = "80")
+        Spacer(Modifier.height(14.dp))
+        SubmitButton(
+            label   = "Enviar Configuración",
+            enabled = form.ip_odoo.isNotBlank(),
+            color   = Color(0xFF8957E5),
             onClick = onSubmit
         )
     }

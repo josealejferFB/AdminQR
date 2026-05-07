@@ -38,6 +38,8 @@ enum class EspFlowState {
     WAIT_CEDULA_MODIFICAR,
     /** modificar step-2 → board awaits JSON {"mac":...,"placa":...} */
     WAIT_JSON_MODIFICAR,
+    /** config → board awaits JSON {"endpoint":..., "target_mac":..., "token":...} */
+    WAIT_JSON_CONFIG,
     /** listar → acumulando respuestas del ESP32 */
     WAIT_LISTING,
 }
@@ -49,7 +51,10 @@ enum class EspFlowState {
 data class FormFields(
     val cedula: String = "",
     val mac: String    = "",
-    val placa: String  = ""
+    val placa: String  = "",
+    val protocolo: String = "http",
+    val ip_odoo: String = "",
+    val port: String = "80"
 )
 
 data class ESPConfigUiState(
@@ -96,10 +101,11 @@ class ESPConfigViewModel @Inject constructor(
      */
     private fun advanceFlow(msg: String) {
         when (msg) {
-            "LISTO_PARA_AGREGAR"   -> enter(EspFlowState.WAIT_JSON_AGREGAR,    "Modo Agregar")
-            "LISTO_PARA_ELIMINAR"  -> enter(EspFlowState.WAIT_CEDULA_ELIMINAR, "Modo Eliminar")
-            "LISTO_PARA_CONSULTAR" -> enter(EspFlowState.WAIT_CEDULA_CONSULTAR,"Modo Consultar")
-            "LISTO_PARA_MODIFICAR" -> enter(EspFlowState.WAIT_CEDULA_MODIFICAR,"Modo Modificar — Paso 1")
+            "OK_AGREGAR"   -> enter(EspFlowState.WAIT_JSON_AGREGAR,    "Modo Agregar")
+            "OK_ELIMINAR"  -> enter(EspFlowState.WAIT_CEDULA_ELIMINAR, "Modo Eliminar")
+            "OK_CONSULTAR" -> enter(EspFlowState.WAIT_CEDULA_CONSULTAR,"Modo Consultar")
+            "OK_MODIFICAR" -> enter(EspFlowState.WAIT_CEDULA_MODIFICAR,"Modo Modificar — Paso 1")
+            "OK_CONFIG" -> enter(EspFlowState.WAIT_JSON_CONFIG, "Configurar ESP32")
             // Board sends this after receiving the cedula; we now wait for the new JSON
             "ENVIE_NUEVOS_DATOS"   -> enter(EspFlowState.WAIT_JSON_MODIFICAR,  "Modo Modificar — Paso 2")
             // Any terminal response → reset to IDLE
@@ -121,7 +127,7 @@ class ESPConfigViewModel @Inject constructor(
                         backToIdle()
                     } else {
                         // Solo agregamos a la lista de usuarios las líneas que contienen datos reales
-                        if (msg.startsWith("Cedula", ignoreCase = true)) {
+                        if (msg.contains("|")) {
                             _uiState.update { it.copy(userList = it.userList + msg) }
                         }
                     }
@@ -134,12 +140,11 @@ class ESPConfigViewModel @Inject constructor(
     }
 
     private fun isTerminal(msg: String) = msg in setOf(
-        "USUARIO_AGREGADO", "USUARIO_ELIMINADO", "USUARIO_MODIFICADO",
-        "ERROR_CEDULA_NO_EXISTE", "ERROR_JSON", "ERROR_MODIFICAR",
-        "ERROR_ELIMINAR", "USUARIO_NO_EXISTE", "TIMEOUT_MODIFICAR",
-        "TIMEOUT_CONSULTAR", "MAC_NO_REGISTRADA", "TIMEOUT",
-        "ERROR_AGREGAR"
-    ) || msg.startsWith("RESULTADO_CONSULTA:")
+        "GUARDADO_OK", "CEDULA_EXISTE", "JSON_ERROR", "ELIMINADO_OK", "NO_EXISTE",
+        "CONFIG_OK", "ERROR_IP", "TIMEOUT", "TIMEOUT_MODIFICAR", "TIMEOUT_CONSULTAR",
+        "ERROR_AGREGAR", "ERROR_ELIMINAR", "ERROR_MODIFICAR", "MAC_NO_REGISTRADA",
+        "=================="
+    ) || msg.startsWith("RESULTADO_CONSULTA:") || msg.startsWith("SISTEMA LISTO")
 
     private fun enter(state: EspFlowState, mode: String) {
         _uiState.update { it.copy(flowState = state, activeMode = mode, form = FormFields()) }
@@ -179,6 +184,9 @@ class ESPConfigViewModel @Inject constructor(
     fun onCedulaChange(v: String) = _uiState.update { it.copy(form = it.form.copy(cedula = v)) }
     fun onMacChange(v: String)    = _uiState.update { it.copy(form = it.form.copy(mac = v)) }
     fun onPlacaChange(v: String)  = _uiState.update { it.copy(form = it.form.copy(placa = v)) }
+    fun onProtocoloChange(v: String) = _uiState.update { it.copy(form = it.form.copy(protocolo = v)) }
+    fun onIpOdooChange(v: String) = _uiState.update { it.copy(form = it.form.copy(ip_odoo = v)) }
+    fun onPortChange(v: String) = _uiState.update { it.copy(form = it.form.copy(port = v)) }
     fun onFreeCommandChange(v: String) = _uiState.update { it.copy(freeCommand = v) }
 
     // ── Submit form ───────────────────────────────────────────────
@@ -196,6 +204,11 @@ class ESPConfigViewModel @Inject constructor(
             EspFlowState.WAIT_JSON_MODIFICAR -> {
                 val f = st.form
                 """{"mac":"${f.mac}","placa":"${f.placa}"}"""
+            }
+            EspFlowState.WAIT_JSON_CONFIG -> {
+                val f = st.form
+                val portInt = f.port.toIntOrNull() ?: 80
+                """{"protocolo":"${f.protocolo}","ip_odoo":"${f.ip_odoo}","port":$portInt}"""
             }
             EspFlowState.IDLE,
             EspFlowState.WAIT_LISTING -> return
