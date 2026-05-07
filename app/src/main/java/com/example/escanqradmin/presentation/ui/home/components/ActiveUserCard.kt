@@ -24,13 +24,15 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.*
 
 @Composable
 fun ActiveUserCard(
     user: ActiveUser,
     onDelete: () -> Unit,
-    onUpdate: (ActiveUser) -> Unit
+    onUpdate: (ActiveUser) -> Unit,
+    onSync: (ActiveUser) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     
@@ -225,6 +227,21 @@ fun ActiveUserCard(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Borrar")
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Botón de sincronización con la App de Usuario
+                    OutlinedButton(
+                        onClick = { onSync(user) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF7B1FA2)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B1FA2))
+                    ) {
+                        Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Sincronizar App Usuario", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

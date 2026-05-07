@@ -3,12 +3,15 @@ package com.example.escanqradmin.presentation.ui.result
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.escanqradmin.domain.model.QrContent
+import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.HistoryRepository
 import com.example.escanqradmin.domain.repository.SyncRepository
+import com.example.escanqradmin.presentation.ui.home.HomeViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -19,14 +22,13 @@ import javax.inject.Inject
 // ── Upload state ──────────────────────────────────────────────────
 sealed class EspUploadStatus {
     object Idle    : EspUploadStatus()
-    /** step = human-readable description of what is happening right now */
     data class Loading(val step: String = "Conectando con ESP32...") : EspUploadStatus()
     object Success : EspUploadStatus()
     data class Error(val message: String) : EspUploadStatus()
 }
 
 sealed class SyncStatus {
-    object Idle : SyncStatus()
+    object Idle    : SyncStatus()
     object Loading : SyncStatus()
     object Success : SyncStatus()
     data class Error(val message: String) : SyncStatus()
@@ -34,15 +36,21 @@ sealed class SyncStatus {
 
 data class ResultUiState(
     val espUploadStatus: EspUploadStatus = EspUploadStatus.Idle,
+    val userSyncCompleted: Boolean = false,
     val syncStatus: SyncStatus = SyncStatus.Idle
-)
+) {
+    /** Paso 1 terminado con éxito */
+    val step1Done get() = espUploadStatus is EspUploadStatus.Success
+    /** Pasos 2 y 3 se desbloquean sólo tras éxito del paso 1 */
+    val stepsUnlocked get() = step1Done
+}
 
 // ── ViewModel ─────────────────────────────────────────────────────
 @HiltViewModel
 class ResultViewModel @Inject constructor(
-    private val repository      : HistoryRepository,
+    private val repository       : HistoryRepository,
     private val bluetoothRepository: BluetoothRepository,
-    private val syncRepository: SyncRepository
+    private val syncRepository   : SyncRepository
 ) : ViewModel() {
 
     private val _qrData  = MutableStateFlow<QrContent?>(null)
@@ -52,61 +60,52 @@ class ResultViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
 
     fun setQrData(data: QrContent) {
+        // Solo reseteamos si es un QR genuinamente nuevo.
+        // Si el usuario vuelve de UserSyncScreen (back), el composable se re-ejecuta
+        // pero los datos son los mismos → NO reseteamos el progreso del flujo.
+        if (_qrData.value == data) return
         _qrData.value = data
-        _uiState.value = ResultUiState()          // Reset for every fresh scan
+        _uiState.value = ResultUiState()
     }
 
-    // ... (uploadToEsp32 and other helper methods remain the same) ...
-    // I will include them in the full replacement to ensure consistency
-
+    // ── Paso 1: Subir al ESP32 ────────────────────────────────────
     fun uploadToEsp32() {
         val data = _qrData.value ?: return
-        if (_uiState.value.espUploadStatus is EspUploadStatus.Loading) return   // guard double-tap
+        if (_uiState.value.espUploadStatus is EspUploadStatus.Loading) return
 
         viewModelScope.launch {
             val inbox = Channel<String>(Channel.BUFFERED)
             val collectJob: Job = launch {
-                bluetoothRepository.messages.collect { msg ->
-                    inbox.trySend(msg.trim())
-                }
+                bluetoothRepository.messages.collect { inbox.trySend(it.trim()) }
             }
-
             try {
                 setLoading("Iniciando modo agregar...")
-                val sentCmd = bluetoothRepository.sendMessage("agregar\n")
-                if (!sentCmd) {
-                    fail("No se pudo enviar el comando al ESP32. Verifica la conexión.")
+                if (!bluetoothRepository.sendMessage("agregar\n")) {
+                    fail("No se pudo enviar el comando. Verifica la conexión BT con el ESP32.")
                     return@launch
                 }
 
                 setLoading("Esperando respuesta del ESP32...")
-                val ready = waitForToken(inbox, timeoutMs = 8_000) { it == "LISTO_PARA_AGREGAR" }
+                val ready = waitFor(inbox, 8_000) { it == "LISTO_PARA_AGREGAR" }
                 if (ready == null) {
-                    fail("Tiempo de espera agotado. El ESP32 no respondió. Intenta de nuevo.")
+                    fail("Tiempo agotado. El ESP32 no respondió.")
                     return@launch
                 }
 
                 setLoading("Enviando datos del usuario...")
                 val json = buildJson(data)
-                val sentJson = bluetoothRepository.sendMessage(json + "\n")
-                if (!sentJson) {
+                if (!bluetoothRepository.sendMessage("$json\n")) {
                     fail("No se pudieron enviar los datos del usuario.")
                     return@launch
                 }
 
                 setLoading("Guardando en ESP32...")
-                val result = waitForToken(inbox, timeoutMs = 12_000) { token ->
-                    token == "USUARIO_GUARDADO" || token.startsWith("ERROR")
-                }
-
+                val result = waitFor(inbox, 12_000) { it == "USUARIO_GUARDADO" || it.startsWith("ERROR") }
                 when {
-                    result == null -> fail("Tiempo de espera agotado al guardar. Revisa la tarjeta.")
-                    result == "USUARIO_GUARDADO" ->
-                        _uiState.update { it.copy(espUploadStatus = EspUploadStatus.Success) }
-                    else ->
-                        fail("ESP32: ${friendlyError(result)}")
+                    result == null             -> fail("Tiempo agotado al guardar. Revisa la tarjeta.")
+                    result == "USUARIO_GUARDADO" -> _uiState.update { it.copy(espUploadStatus = EspUploadStatus.Success) }
+                    else                       -> fail("ESP32: ${friendlyError(result)}")
                 }
-
             } catch (e: Exception) {
                 fail("Error inesperado: ${e.message ?: "desconocido"}")
             } finally {
@@ -116,11 +115,47 @@ class ResultViewModel @Inject constructor(
         }
     }
 
-    private fun buildJson(data: QrContent): String =
+    // ── Paso 2: Marcar sincronización con App Usuario completada ──
+    fun markUserSyncCompleted() {
+        _uiState.update { it.copy(userSyncCompleted = true) }
+    }
+
+    // ── Paso 3: Registrar en servidor + reconectar ESP32 ─────────
+    fun registerEntry(onSuccess: () -> Unit) {
+        val data = _qrData.value ?: return
+        _uiState.update { it.copy(syncStatus = SyncStatus.Loading) }
+
+        viewModelScope.launch {
+            val result = syncRepository.syncEntry(data)
+            if (result.isSuccess) {
+                repository.addRecord(data)
+                _uiState.update { it.copy(syncStatus = SyncStatus.Success) }
+                onSuccess()
+                // Reconectar al ESP32 si la sincronización con el usuario lo desconectó
+                reconnectToEsp32()
+            } else {
+                val msg = result.exceptionOrNull()?.message ?: "Error al sincronizar con el servidor"
+                _uiState.update { it.copy(syncStatus = SyncStatus.Error(msg)) }
+            }
+        }
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────
+    private fun reconnectToEsp32() {
+        viewModelScope.launch {
+            delay(400)
+            val state = bluetoothRepository.connectionState.value
+            if (state !is BluetoothConnectionState.Connected) {
+                bluetoothRepository.connectToDevice(HomeViewModel.ESP32_TARGET_MAC)
+            }
+        }
+    }
+
+    private fun buildJson(data: QrContent) =
         """{"cedula":"${data.cedula}","mac":"${data.androidId}","placa":"${data.plate}"}"""
 
-    private suspend fun waitForToken(
-        inbox    : Channel<String>,
+    private suspend fun waitFor(
+        inbox: Channel<String>,
         timeoutMs: Long,
         predicate: (String) -> Boolean
     ): String? = withTimeoutOrNull(timeoutMs) {
@@ -132,36 +167,16 @@ class ResultViewModel @Inject constructor(
         found
     }
 
-    private fun setLoading(step: String) {
+    private fun setLoading(step: String) =
         _uiState.update { it.copy(espUploadStatus = EspUploadStatus.Loading(step)) }
-    }
 
-    private fun fail(msg: String) {
+    private fun fail(msg: String) =
         _uiState.update { it.copy(espUploadStatus = EspUploadStatus.Error(msg)) }
-    }
 
     private fun friendlyError(token: String) = when (token) {
-        "ERROR_JSON"        -> "JSON inválido recibido por la tarjeta."
-        "ERROR_AGREGAR"     -> "Error interno al guardar en la tarjeta."
-        "TIMEOUT_AGREGAR"   -> "La tarjeta tardó demasiado y canceló la operación."
-        else                -> "Error desconocido ($token)."
-    }
-
-    // ── Register local entry and sync with backend ───────────────
-    fun registerEntry(onSuccess: () -> Unit) {
-        val data = _qrData.value ?: return
-        _uiState.update { it.copy(syncStatus = SyncStatus.Loading) }
-
-        viewModelScope.launch {
-            val result = syncRepository.syncEntry(data)
-            if (result.isSuccess) {
-                repository.addRecord(data)
-                _uiState.update { it.copy(syncStatus = SyncStatus.Success) }
-                onSuccess()
-            } else {
-                val errorMsg = result.exceptionOrNull()?.message ?: "Error al sincronizar con el servidor"
-                _uiState.update { it.copy(syncStatus = SyncStatus.Error(errorMsg)) }
-            }
-        }
+        "ERROR_JSON"      -> "JSON inválido recibido por la tarjeta."
+        "ERROR_AGREGAR"   -> "Error interno al guardar en la tarjeta."
+        "TIMEOUT_AGREGAR" -> "La tarjeta tardó demasiado y canceló la operación."
+        else              -> "Error desconocido ($token)."
     }
 }

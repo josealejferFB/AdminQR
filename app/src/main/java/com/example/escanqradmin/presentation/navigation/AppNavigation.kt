@@ -13,6 +13,7 @@ import com.example.escanqradmin.presentation.ui.result.ResultViewModel
 import com.example.escanqradmin.presentation.ui.scanner.ScannerScreen
 import com.example.escanqradmin.presentation.ui.espconfig.ESPConfigScreen
 import com.example.escanqradmin.presentation.ui.config.ConfigScreen
+import com.example.escanqradmin.presentation.ui.usersync.UserSyncScreen
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -76,15 +77,26 @@ fun AppNavigation(navController: NavHostController) {
             val resultViewModel: ResultViewModel = hiltViewModel()
             resultViewModel.setQrData(qrContent)
 
-            ResultScreen(onScanAgain = {
-                navController.popBackStack(Home, inclusive = false)
-            })
+            ResultScreen(
+                navController = navController,
+                onScanAgain = {
+                    navController.popBackStack(Home, inclusive = false)
+                }
+            )
         }
         composable<ESPConfig> {
             ESPConfigScreen(navController = navController)
         }
         composable<Config> {
             ConfigScreen(navController = navController)
+        }
+        composable<UserSync> { backStackEntry ->
+            val args: UserSync = backStackEntry.toRoute()
+            UserSyncScreen(
+                navController = navController,
+                userName = args.userName,
+                cedula = args.cedula
+            )
         }
     }
 }
