@@ -13,10 +13,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +35,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.example.escanqradmin.presentation.navigation.Home
 import com.example.escanqradmin.presentation.navigation.Scanner
+import com.example.escanqradmin.presentation.navigation.Config
 import com.example.escanqradmin.presentation.theme.color.*
 import kotlinx.coroutines.launch
 
@@ -222,14 +223,14 @@ fun CustomBottomBar(
             Spacer(modifier = Modifier.width(32.dp))
             
             BottomNavItem(
-                icon = Icons.Default.Person, 
-                label = "Perfil", 
-                isSelected = false, // TODO: Profile check
+                icon = Icons.Default.Settings, 
+                label = "AJUSTES",
+                isSelected = false,
                 colorOnSelected = if (containerColor == Color.Transparent) Color.White else PrimaryBlue,
                 colorOnUnselected = if (containerColor == Color.Transparent) Color.White.copy(alpha = 0.6f) else Color.Gray,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    // Perfil navigation logic here
+                    navController.navigate(Config)
                 }
             )
         }

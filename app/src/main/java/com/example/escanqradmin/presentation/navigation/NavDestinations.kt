@@ -18,3 +18,6 @@ data class Result(
 
 @Serializable
 object ESPConfig
+
+@Serializable
+object Config

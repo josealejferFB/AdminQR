@@ -12,6 +12,7 @@ import com.example.escanqradmin.presentation.ui.result.ResultScreen
 import com.example.escanqradmin.presentation.ui.result.ResultViewModel
 import com.example.escanqradmin.presentation.ui.scanner.ScannerScreen
 import com.example.escanqradmin.presentation.ui.espconfig.ESPConfigScreen
+import com.example.escanqradmin.presentation.ui.config.ConfigScreen
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -81,6 +82,9 @@ fun AppNavigation(navController: NavHostController) {
         }
         composable<ESPConfig> {
             ESPConfigScreen(navController = navController)
+        }
+        composable<Config> {
+            ConfigScreen(navController = navController)
         }
     }
 }
