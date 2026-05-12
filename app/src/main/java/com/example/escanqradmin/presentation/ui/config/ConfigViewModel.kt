@@ -12,17 +12,27 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
+@Serializable
 data class ServerHistory(
+    val protocol: String = "http",
     val host: String,
     val port: String,
+    val endpointSync: String = "/api/control_acceso",
+    val endpointConductores: String = "/api/get_conductores",
     val timestamp: Long
 )
 
 data class ConfigUiState(
+    val protocol: String = "http",
     val host: String = "",
     val port: String = "",
+    val endpointSync: String = "/api/control_acceso",
+    val endpointConductores: String = "/api/get_conductores",
     val serverHistory: List<ServerHistory> = emptyList(),
     val isLoading: Boolean = false
 )
@@ -39,7 +49,7 @@ class ConfigViewModel @Inject constructor(
     val snackbarMessages = _snackbarMessages.asSharedFlow()
 
     private val prefs: android.content.SharedPreferences = context.getSharedPreferences("api_config_prefs", Context.MODE_PRIVATE)
-    private val historyKey = "server_history"
+    private val historyKey = "server_history_v2"
 
     init {
         loadCurrentConfig()
@@ -49,8 +59,11 @@ class ConfigViewModel @Inject constructor(
     private fun loadCurrentConfig() {
         _uiState.update {
             it.copy(
+                protocol = ApiConstants.getProtocol(),
                 host = ApiConstants.getHost(),
-                port = ApiConstants.getPort()
+                port = ApiConstants.getPort(),
+                endpointSync = ApiConstants.getEndpointSync(),
+                endpointConductores = ApiConstants.getEndpointConductores()
             )
         }
     }
@@ -58,38 +71,16 @@ class ConfigViewModel @Inject constructor(
     private fun loadHistory() {
         val historyJson = prefs.getString(historyKey, "[]") ?: "[]"
         try {
-            val historyList = parseHistory(historyJson)
-            _uiState.update { it.copy(serverHistory = historyList) }
+            val historyList: List<ServerHistory> = Json.decodeFromString(historyJson)
+            _uiState.update { it.copy(serverHistory = historyList.sortedByDescending { h -> h.timestamp }) }
         } catch (e: Exception) {
+            // Fallback for old history if necessary or just start fresh
             _uiState.update { it.copy(serverHistory = emptyList()) }
         }
     }
 
-    private fun parseHistory(json: String): List<ServerHistory> {
-        val list = mutableListOf<ServerHistory>()
-        if (json == "[]" || json.isEmpty()) return list
-        
-        json.removeSurrounding("[").removeSuffix("]").split("},{").forEach { item ->
-            val cleanItem = item.removePrefix("{").removeSuffix("}")
-            val parts = cleanItem.split(",")
-            var host = ""
-            var port = ""
-            var timestamp = 0L
-            parts.forEach { part ->
-                val keyValue = part.split(":")
-                if (keyValue.size == 2) {
-                    when (keyValue[0].trim().replace("\"", "")) {
-                        "host" -> host = keyValue[1].trim().replace("\"", "")
-                        "port" -> port = keyValue[1].trim().replace("\"", "")
-                        "timestamp" -> timestamp = keyValue[1].trim().toLongOrNull() ?: 0L
-                    }
-                }
-            }
-            if (host.isNotEmpty() && port.isNotEmpty()) {
-                list.add(ServerHistory(host, port, timestamp))
-            }
-        }
-        return list.sortedByDescending { it.timestamp }
+    fun onProtocolChange(value: String) {
+        _uiState.update { it.copy(protocol = value) }
     }
 
     fun onHostChange(value: String) {
@@ -100,17 +91,28 @@ class ConfigViewModel @Inject constructor(
         _uiState.update { it.copy(port = value) }
     }
 
+    fun onEndpointSyncChange(value: String) {
+        _uiState.update { it.copy(endpointSync = value) }
+    }
+
+    fun onEndpointConductoresChange(value: String) {
+        _uiState.update { it.copy(endpointConductores = value) }
+    }
+
     fun saveConfig() {
         viewModelScope.launch {
+            val protocol = _uiState.value.protocol
             val host = _uiState.value.host.trim()
             val port = _uiState.value.port.trim()
+            val endpointSync = _uiState.value.endpointSync.trim()
+            val endpointConductores = _uiState.value.endpointConductores.trim()
 
-            if (host.isEmpty() || port.isEmpty()) {
-                _snackbarMessages.emit("Por favor complete todos los campos")
+            if (host.isEmpty()) {
+                _snackbarMessages.emit("Por favor ingrese la dirección del host")
                 return@launch
             }
 
-            if (port.toIntOrNull() == null || port.toIntOrNull()!! <= 0) {
+            if (port.isNotEmpty() && (port.toIntOrNull() == null || port.toIntOrNull()!! <= 0)) {
                 _snackbarMessages.emit("El puerto debe ser un número válido")
                 return@launch
             }
@@ -118,8 +120,8 @@ class ConfigViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                ApiConstants.saveConfig(context, host, port)
-                saveToHistory(host, port)
+                ApiConstants.saveConfig(context, protocol, host, port, endpointSync, endpointConductores)
+                saveToHistory(protocol, host, port, endpointSync, endpointConductores)
                 _snackbarMessages.emit("Configuración guardada correctamente")
             } catch (e: Exception) {
                 _snackbarMessages.emit("Error al guardar: ${e.message}")
@@ -129,29 +131,40 @@ class ConfigViewModel @Inject constructor(
         }
     }
 
-    private fun saveToHistory(host: String, port: String) {
+    private fun saveToHistory(protocol: String, host: String, port: String, endpointSync: String, endpointConductores: String) {
         val currentHistory = _uiState.value.serverHistory.toMutableList()
         
-        currentHistory.removeAll { it.host == host && it.port == port }
+        currentHistory.removeAll { 
+            it.host == host && it.port == port && it.protocol == protocol && 
+            it.endpointSync == endpointSync && it.endpointConductores == endpointConductores 
+        }
         
-        currentHistory.add(0, ServerHistory(host, port, System.currentTimeMillis()))
+        currentHistory.add(0, ServerHistory(protocol, host, port, endpointSync, endpointConductores, System.currentTimeMillis()))
         
-        val limitedHistory = currentHistory.take(10)
+        val limitedHistory = currentHistory.take(15)
         
         _uiState.update { it.copy(serverHistory = limitedHistory) }
         
-        val json = limitedHistory.joinToString(",", "[", "]") { 
-            "{\"host\":\"${it.host}\",\"port\":\"${it.port}\",\"timestamp\":${it.timestamp}}" 
-        }
+        val json = Json.encodeToString(limitedHistory)
         prefs.edit().putString(historyKey, json).apply()
     }
 
     fun selectFromHistory(history: ServerHistory) {
         _uiState.update {
             it.copy(
+                protocol = history.protocol,
                 host = history.host,
-                port = history.port
+                port = history.port,
+                endpointSync = history.endpointSync,
+                endpointConductores = history.endpointConductores
             )
         }
+    }
+
+    fun removeFromHistory(history: ServerHistory) {
+        val newList = _uiState.value.serverHistory.filter { it != history }
+        _uiState.update { it.copy(serverHistory = newList) }
+        val json = Json.encodeToString(newList)
+        prefs.edit().putString(historyKey, json).apply()
     }
 }

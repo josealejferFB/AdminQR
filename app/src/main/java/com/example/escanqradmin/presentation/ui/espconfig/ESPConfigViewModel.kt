@@ -40,6 +40,10 @@ enum class EspFlowState {
     WAIT_JSON_MODIFICAR,
     /** config → board awaits JSON {"endpoint":..., "target_mac":..., "token":...} */
     WAIT_JSON_CONFIG,
+    /** wifi → board awaits SSID string */
+    WAIT_WIFI_SSID,
+    /** wifi → board awaits Password string */
+    WAIT_WIFI_PASS,
     /** listar → acumulando respuestas del ESP32 */
     WAIT_LISTING,
 }
@@ -54,7 +58,9 @@ data class FormFields(
     val placa: String  = "",
     val protocolo: String = "http",
     val ip_odoo: String = "",
-    val port: String = "80"
+    val port: String = "80",
+    val ssid: String = "",
+    val password: String = ""
 )
 
 data class ESPConfigUiState(
@@ -101,13 +107,13 @@ class ESPConfigViewModel @Inject constructor(
      */
     private fun advanceFlow(msg: String) {
         when (msg) {
-            "OK_AGREGAR"   -> enter(EspFlowState.WAIT_JSON_AGREGAR,    "Modo Agregar")
+            "AGREGAR"      -> enter(EspFlowState.WAIT_JSON_AGREGAR,    "Modo Agregar")
             "OK_ELIMINAR"  -> enter(EspFlowState.WAIT_CEDULA_ELIMINAR, "Modo Eliminar")
             "OK_CONSULTAR" -> enter(EspFlowState.WAIT_CEDULA_CONSULTAR,"Modo Consultar")
-            "OK_MODIFICAR" -> enter(EspFlowState.WAIT_CEDULA_MODIFICAR,"Modo Modificar — Paso 1")
-            "OK_CONFIG" -> enter(EspFlowState.WAIT_JSON_CONFIG, "Configurar ESP32")
-            // Board sends this after receiving the cedula; we now wait for the new JSON
-            "ENVIE_NUEVOS_DATOS"   -> enter(EspFlowState.WAIT_JSON_MODIFICAR,  "Modo Modificar — Paso 2")
+            "OK_MODIFICAR" -> enter(EspFlowState.WAIT_JSON_MODIFICAR,   "Modo Modificar")
+            "OK_CONFIG"    -> enter(EspFlowState.WAIT_JSON_CONFIG,      "Configurar ESP32")
+            "SSID:"        -> enter(EspFlowState.WAIT_WIFI_SSID,        "WiFi: Ingrese SSID")
+            "PASS:"        -> enter(EspFlowState.WAIT_WIFI_PASS,        "WiFi: Ingrese Password")
             // Any terminal response → reset to IDLE
             else -> {
                 if (msg.startsWith("DATOS_ACTUALES:")) return  // ENVIE_NUEVOS_DATOS follows, keep waiting
@@ -143,8 +149,8 @@ class ESPConfigViewModel @Inject constructor(
         "GUARDADO_OK", "CEDULA_EXISTE", "JSON_ERROR", "ELIMINADO_OK", "NO_EXISTE",
         "CONFIG_OK", "ERROR_IP", "TIMEOUT", "TIMEOUT_MODIFICAR", "TIMEOUT_CONSULTAR",
         "ERROR_AGREGAR", "ERROR_ELIMINAR", "ERROR_MODIFICAR", "MAC_NO_REGISTRADA",
-        "=================="
-    ) || msg.startsWith("RESULTADO_CONSULTA:") || msg.startsWith("SISTEMA LISTO")
+        "MODIFICADO_OK", "REINICIANDO", "=================="
+    ) || msg.startsWith("RESULTADO_CONSULTA:") || msg.startsWith("SISTEMA LISTO") || (msg.contains("|") && _uiState.value.flowState == EspFlowState.WAIT_CEDULA_CONSULTAR)
 
     private fun enter(state: EspFlowState, mode: String) {
         _uiState.update { it.copy(flowState = state, activeMode = mode, form = FormFields()) }
@@ -187,6 +193,8 @@ class ESPConfigViewModel @Inject constructor(
     fun onProtocoloChange(v: String) = _uiState.update { it.copy(form = it.form.copy(protocolo = v)) }
     fun onIpOdooChange(v: String) = _uiState.update { it.copy(form = it.form.copy(ip_odoo = v)) }
     fun onPortChange(v: String) = _uiState.update { it.copy(form = it.form.copy(port = v)) }
+    fun onSsidChange(v: String) = _uiState.update { it.copy(form = it.form.copy(ssid = v)) }
+    fun onPasswordChange(v: String) = _uiState.update { it.copy(form = it.form.copy(password = v)) }
     fun onFreeCommandChange(v: String) = _uiState.update { it.copy(freeCommand = v) }
 
     // ── Submit form ───────────────────────────────────────────────
@@ -203,13 +211,15 @@ class ESPConfigViewModel @Inject constructor(
             EspFlowState.WAIT_CEDULA_MODIFICAR -> st.form.cedula.trim()
             EspFlowState.WAIT_JSON_MODIFICAR -> {
                 val f = st.form
-                """{"mac":"${f.mac}","placa":"${f.placa}"}"""
+                """{"cedula":"${f.cedula}","mac":"${f.mac}","placa":"${f.placa}"}"""
             }
             EspFlowState.WAIT_JSON_CONFIG -> {
                 val f = st.form
-                val portInt = f.port.toIntOrNull() ?: 80
+                val portInt = f.port.toIntOrNull() ?: 0
                 """{"protocolo":"${f.protocolo}","ip_odoo":"${f.ip_odoo}","port":$portInt}"""
             }
+            EspFlowState.WAIT_WIFI_SSID -> st.form.ssid.trim()
+            EspFlowState.WAIT_WIFI_PASS -> st.form.password.trim()
             EspFlowState.IDLE,
             EspFlowState.WAIT_LISTING -> return
         }

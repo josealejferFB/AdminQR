@@ -44,7 +44,10 @@ private data class QuickCmd(val label: String, val cmd: String, val icon: ImageV
 private val quickCmds = listOf(
     QuickCmd("Agregar",   "agregar",   Icons.Default.PersonAdd,    Color(0xFF238636)),
     QuickCmd("Eliminar",  "eliminar",  Icons.Default.PersonRemove, Color(0xFFDA3633)),
-    QuickCmd("Config",    "config",    Icons.Default.Settings,     Color(0xFF8957E5))
+    QuickCmd("Modificar", "modificar", Icons.Default.Edit,         Color(0xFFD29922)),
+    QuickCmd("Consultar", "consultar", Icons.Default.Search,       Color(0xFF1F6FEB)),
+    QuickCmd("Config",    "config",    Icons.Default.Settings,     Color(0xFF8957E5)),
+    QuickCmd("WiFi",      "wifi",      Icons.Default.Wifi,         Color(0xFF58A6FF))
 )
 
 // ── Screen ────────────────────────────────────────────────────────
@@ -200,6 +203,7 @@ fun ESPConfigScreen(
                     )
                     EspFlowState.WAIT_JSON_MODIFICAR -> FormModificarDatos(
                         form     = st.form,
+                        onCedula = viewModel::onCedulaChange,
                         onMac    = viewModel::onMacChange,
                         onPlaca  = viewModel::onPlacaChange,
                         onSubmit = viewModel::submitForm,
@@ -212,6 +216,24 @@ fun ESPConfigScreen(
                         onPort       = viewModel::onPortChange,
                         onSubmit     = viewModel::submitForm,
                         onCancel     = viewModel::dismissForm
+                    )
+                    EspFlowState.WAIT_WIFI_SSID -> FormCedula(
+                        label    = "Nombre de la Red (SSID)",
+                        icon     = Icons.Default.Wifi,
+                        iconColor = Color(0xFF58A6FF),
+                        value    = st.form.ssid,
+                        onChange = viewModel::onSsidChange,
+                        onSubmit = viewModel::submitForm,
+                        onCancel = viewModel::dismissForm
+                    )
+                    EspFlowState.WAIT_WIFI_PASS -> FormCedula(
+                        label    = "Contraseña de WiFi",
+                        icon     = Icons.Default.Lock,
+                        iconColor = Color(0xFF58A6FF),
+                        value    = st.form.password,
+                        onChange = viewModel::onPasswordChange,
+                        onSubmit = viewModel::submitForm,
+                        onCancel = viewModel::dismissForm
                     )
                     // WAIT_LISTING usa la misma barra libre (el sheet cubre la info)
                     EspFlowState.WAIT_LISTING,
@@ -330,24 +352,27 @@ private fun FormCedula(
 @Composable
 private fun FormModificarDatos(
     form: FormFields,
+    onCedula: (String) -> Unit,
     onMac: (String) -> Unit,
     onPlaca: (String) -> Unit,
     onSubmit: () -> Unit,
     onCancel: () -> Unit
 ) {
     FormContainer(
-        title     = "Nuevos datos del usuario",
+        title     = "Modificar datos del usuario",
         icon      = Icons.Default.Edit,
         iconColor = Color(0xFFD29922),
         onCancel  = onCancel
     ) {
+        EspField("Cédula del usuario", value = form.cedula, onChange = onCedula, placeholder = "12345678")
+        Spacer(Modifier.height(10.dp))
         EspField("Nueva MAC",   value = form.mac,   onChange = onMac,   placeholder = "AA:BB:CC:DD:EE:FF")
         Spacer(Modifier.height(10.dp))
         EspField("Nueva Placa", value = form.placa, onChange = onPlaca, placeholder = "ABC-123")
         Spacer(Modifier.height(14.dp))
         SubmitButton(
             label   = "Guardar cambios",
-            enabled = form.mac.isNotBlank() && form.placa.isNotBlank(),
+            enabled = form.cedula.isNotBlank() && form.mac.isNotBlank() && form.placa.isNotBlank(),
             color   = Color(0xFFD29922),
             onClick = onSubmit
         )

@@ -156,7 +156,7 @@ void loop() {
         
         if(msg == "agregar") {
           pantalla("AGREGAR", "Envie JSON:");
-          SerialBT.println("OK_AGREGAR");
+          SerialBT.println("AGREGAR");
           sistema.estado = MODO_AGREGAR;
           sistema.timeout = millis();
         }

@@ -77,7 +77,7 @@ class ResultViewModel @Inject constructor(
                 setLoading("Iniciando modo agregar...")
                 if (!bluetoothRepository.sendMessage("agregar\n")) { fail("No se pudo conectar. Verifica BT."); return@launch }
                 setLoading("Esperando ESP32...")
-                val ready = waitFor(inbox, 8_000) { it == "OK_AGREGAR" }
+                val ready = waitFor(inbox, 8_000) { it == "AGREGAR" }
                 if (ready == null) { fail("ESP32 no respondió."); return@launch }
                 setLoading("Enviando datos...")
                 
