@@ -113,7 +113,7 @@ fun ResultScreen(
                         unlocked    = uiState.qrUnlocked,
                         showQr      = uiState.showQrCode,
                         onToggleQr  = { viewModel.toggleQr() },
-                        qrPayload   = data.toProvisioningJson()
+                        qrPayload   = buildProvisioningJson()
                     )
                 }
 
@@ -134,9 +134,9 @@ fun ResultScreen(
     }
 }
 
-/** Builds the QR payload that the user app will scan to receive their credentials. */
-private fun QrContent.toProvisioningJson(): String =
-    """{"cedula":"$cedula","nombre":"$userName","placa":"$plate"}"""
+/** Builds the provisioning QR payload for the User App. */
+private fun buildProvisioningJson(): String =
+    """{"endpoint":"${com.example.escanqradmin.data.network.ApiConstants.BASE_URL}","target_mac":"${com.example.escanqradmin.presentation.ui.home.HomeViewModel.ESP32_TARGET_MAC}","token":"${com.example.escanqradmin.domain.model.SecurityConstants.PROVISIONING_TOKEN}"}"""
 
 // ── Componentes de apoyo ──────────────────────────────────────────
 
