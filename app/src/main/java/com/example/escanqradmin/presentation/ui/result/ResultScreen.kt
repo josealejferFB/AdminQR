@@ -34,12 +34,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 // ── Design tokens ─────────────────────────────────────────────────
-private val StepGreen = Color(0xFF2E7D32)
-private val StepRed = Color(0xFFC62828)
-private val StepGray = Color(0xFFBDBDBD)
+private val StepGreen  = Color(0xFF2E7D32)
+private val StepRed    = Color(0xFFC62828)
+private val StepGray   = Color(0xFFBDBDBD)
 private val StepPurple = Color(0xFF7B1FA2)
 private val SurfaceCard = Color.White
-private val PageBg = Color(0xFFF5F7FA)
+private val PageBg      = Color(0xFFF5F7FA)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,11 +48,11 @@ fun ResultScreen(
     onScanAgain: () -> Unit,
     viewModel: ResultViewModel = hiltViewModel()
 ) {
-    val qrData by viewModel.qrData.collectAsState()
+    val qrData  by viewModel.qrData.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
-        containerColor = PageBg,
+        containerColor      = PageBg,
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
@@ -80,66 +80,49 @@ fun ResultScreen(
                 UserInfoCard(data)
                 Spacer(Modifier.height(24.dp))
 
-                // PASO 1: ESP32
+                // PASO 1: SERVIDOR
                 StepCard(
-                    number = 1,
-                    title = "Registrar en ESP32",
-                    subtitle = "Guarda el acceso en la tarjeta de control físico",
-                    stepColor = PrimaryBlue,
-                    status = when (val s = uiState.espUploadStatus) {
-                        is EspUploadStatus.Idle -> StepStatus.Pending
-                        is EspUploadStatus.Loading -> StepStatus.Loading(s.step)
-                        is EspUploadStatus.Success -> StepStatus.Done
-                        is EspUploadStatus.Error -> StepStatus.Failed(s.message)
-                    }
-                ) {
-                    Esp32StepContent(uiState, viewModel)
-                }
-
-                StepConnector(done = uiState.step1Done)
-
-                // PASO 2: SERVIDOR
-                StepCard(
-                    number = 2,
-                    title = "Registrar en servidor",
-                    subtitle = "Guarda el registro en el backend de Alcaraván",
+                    number    = 1,
+                    title     = "Registrar en servidor",
+                    subtitle  = "Guarda el registro en el backend de Alcaraván",
                     stepColor = StepGreen,
-                    isLocked = !uiState.step2Unlocked,
-                    status = when (val s = uiState.syncStatus) {
-                        is SyncStatus.Idle -> if (uiState.step2Unlocked) StepStatus.Pending else StepStatus.Locked
+                    status    = when (val s = uiState.syncStatus) {
+                        is SyncStatus.Idle    -> StepStatus.Pending
                         is SyncStatus.Loading -> StepStatus.Loading("Sincronizando...")
                         is SyncStatus.Success -> StepStatus.Done
-                        is SyncStatus.Error -> StepStatus.Failed(s.message)
+                        is SyncStatus.Error   -> StepStatus.Failed(s.message)
                     }
                 ) {
                     ServerStepContent(uiState.syncStatus, viewModel)
                 }
 
-                StepConnector(done = uiState.step2Done)
+                StepConnector(done = uiState.syncDone)
 
-                // PASO 3: MOSTRAR QR
+                // PASO 2: MOSTRAR QR
                 StepCard(
-                    number = 3,
-                    title = "Vincular App de Usuario",
+                    number   = 2,
+                    title    = "Vincular App de Usuario",
                     subtitle = "Muestra el código QR para que el usuario lo escanee",
                     stepColor = StepPurple,
-                    isLocked = !uiState.qrUnlocked,
-                    status = if (uiState.qrUnlocked && uiState.showQrCode) StepStatus.Done else if (uiState.qrUnlocked) StepStatus.Pending else StepStatus.Locked
+                    isLocked  = !uiState.qrUnlocked,
+                    status    = if (uiState.qrUnlocked && uiState.showQrCode) StepStatus.Done
+                                else if (uiState.qrUnlocked) StepStatus.Pending
+                                else StepStatus.Locked
                 ) {
                     QrStepContent(
-                        unlocked = uiState.qrUnlocked,
-                        showQr = uiState.showQrCode,
-                        onToggleQr = { viewModel.toggleQr() },
-                        qrPayload = viewModel.buildProvisioningJson()
+                        unlocked    = uiState.qrUnlocked,
+                        showQr      = uiState.showQrCode,
+                        onToggleQr  = { viewModel.toggleQr() },
+                        qrPayload   = data.toProvisioningJson()
                     )
                 }
 
                 Spacer(Modifier.height(24.dp))
                 OutlinedButton(
-                    onClick = onScanAgain,
+                    onClick  = onScanAgain,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.5f))
+                    shape    = RoundedCornerShape(16.dp),
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.5f))
                 ) {
                     Icon(Icons.Default.QrCodeScanner, null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
@@ -151,18 +134,25 @@ fun ResultScreen(
     }
 }
 
+/** Builds the QR payload that the user app will scan to receive their credentials. */
+private fun QrContent.toProvisioningJson(): String =
+    """{"cedula":"$cedula","nombre":"$userName","placa":"$plate"}"""
+
 // ── Componentes de apoyo ──────────────────────────────────────────
 
 @Composable
 private fun UserInfoCard(data: QrContent) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(20.dp),
+        colors    = CardDefaults.cardColors(containerColor = SurfaceCard),
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(52.dp).background(PrimaryBlue.copy(alpha = 0.1f), CircleShape), contentAlignment = Alignment.Center) {
+            Box(
+                modifier        = Modifier.size(52.dp).background(PrimaryBlue.copy(alpha = 0.1f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(Icons.Default.Person, null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
             }
             Spacer(Modifier.width(16.dp))
@@ -171,40 +161,57 @@ private fun UserInfoCard(data: QrContent) {
                 Text("Cédula: ${data.cedula}", fontSize = 13.sp, color = Color.Gray)
             }
             Surface(shape = RoundedCornerShape(8.dp), color = StepGreen.copy(alpha = 0.12f)) {
-                Text("VÁLIDO", color = StepGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                Text(
+                    "VÁLIDO", color = StepGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
             }
         }
     }
 }
 
 private sealed class StepStatus {
-    object Locked : StepStatus()
+    object Locked  : StepStatus()
     object Pending : StepStatus()
     data class Loading(val msg: String) : StepStatus()
-    object Done : StepStatus()
+    object Done    : StepStatus()
     data class Failed(val msg: String) : StepStatus()
 }
 
 @Composable
-private fun StepCard(number: Int, title: String, subtitle: String, stepColor: Color, isLocked: Boolean = false, status: StepStatus, content: @Composable ColumnScope.() -> Unit) {
+private fun StepCard(
+    number: Int,
+    title: String,
+    subtitle: String,
+    stepColor: Color,
+    isLocked: Boolean = false,
+    status: StepStatus,
+    content: @Composable ColumnScope.() -> Unit
+) {
     val badgeColor = when (status) {
-        StepStatus.Locked -> StepGray
-        StepStatus.Done -> StepGreen
+        StepStatus.Locked    -> StepGray
+        StepStatus.Done      -> StepGreen
         is StepStatus.Failed -> StepRed
-        else -> stepColor
+        else                 -> stepColor
     }
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = if (isLocked) SurfaceCard.copy(alpha = 0.6f) else SurfaceCard),
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(20.dp),
+        colors    = CardDefaults.cardColors(containerColor = if (isLocked) SurfaceCard.copy(alpha = 0.6f) else SurfaceCard),
         elevation = CardDefaults.cardElevation(if (isLocked) 0.dp else 2.dp)
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(36.dp).background(badgeColor, CircleShape), contentAlignment = Alignment.Center) {
-                    if (status is StepStatus.Loading) CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
-                    else if (status is StepStatus.Done) Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                    else Text("$number", color = Color.White, fontWeight = FontWeight.Bold)
+                Box(
+                    modifier        = Modifier.size(36.dp).background(badgeColor, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (status is StepStatus.Loading)
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    else if (status is StepStatus.Done)
+                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    else
+                        Text("$number", color = Color.White, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
@@ -224,33 +231,29 @@ private fun StepCard(number: Int, title: String, subtitle: String, stepColor: Co
 
 @Composable
 private fun StepConnector(done: Boolean) {
-    Box(modifier = Modifier.padding(start = 37.dp).width(2.dp).height(24.dp).background(if (done) StepGreen else StepGray.copy(alpha = 0.3f)))
-}
-
-@Composable
-private fun Esp32StepContent(uiState: ResultUiState, viewModel: ResultViewModel) {
-    if (uiState.step1Done) StepDoneChip("Datos guardados en ESP32")
-    else Button(
-        onClick = { viewModel.uploadToEsp32() },
-        modifier = Modifier.fillMaxWidth().height(48.dp),
-        shape = RoundedCornerShape(12.dp),
-        enabled = uiState.espUploadStatus !is EspUploadStatus.Loading
-    ) {
-        Text("SUBIR AL ESP32")
-    }
+    Box(
+        modifier = Modifier
+            .padding(start = 37.dp)
+            .width(2.dp)
+            .height(24.dp)
+            .background(if (done) StepGreen else StepGray.copy(alpha = 0.3f))
+    )
 }
 
 @Composable
 private fun ServerStepContent(syncStatus: SyncStatus, viewModel: ResultViewModel) {
-    if (syncStatus is SyncStatus.Success) StepDoneChip("Registro en servidor exitoso")
-    else Button(
-        onClick = { viewModel.registerEntry() },
-        modifier = Modifier.fillMaxWidth().height(48.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = StepGreen),
-        enabled = syncStatus !is SyncStatus.Loading
-    ) {
-        Text("REGISTRAR EN SERVIDOR")
+    if (syncStatus is SyncStatus.Success) {
+        StepDoneChip("Registro en servidor exitoso")
+    } else {
+        Button(
+            onClick  = { viewModel.registerEntry() },
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+            shape    = RoundedCornerShape(12.dp),
+            colors   = ButtonDefaults.buttonColors(containerColor = StepGreen),
+            enabled  = syncStatus !is SyncStatus.Loading
+        ) {
+            Text("REGISTRAR EN SERVIDOR")
+        }
     }
 }
 
@@ -258,10 +261,10 @@ private fun ServerStepContent(syncStatus: SyncStatus, viewModel: ResultViewModel
 private fun QrStepContent(unlocked: Boolean, showQr: Boolean, onToggleQr: () -> Unit, qrPayload: String) {
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Button(
-            onClick = onToggleQr,
+            onClick  = onToggleQr,
             modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = StepPurple)
+            shape    = RoundedCornerShape(12.dp),
+            colors   = ButtonDefaults.buttonColors(containerColor = StepPurple)
         ) {
             Icon(Icons.Default.QrCode, null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -270,8 +273,8 @@ private fun QrStepContent(unlocked: Boolean, showQr: Boolean, onToggleQr: () -> 
 
         AnimatedVisibility(
             visible = showQr,
-            enter = expandVertically(animationSpec = tween(400)) + fadeIn(animationSpec = tween(400)),
-            exit = shrinkVertically(animationSpec = tween(400)) + fadeOut(animationSpec = tween(400))
+            enter   = expandVertically(animationSpec = tween(400)) + fadeIn(animationSpec = tween(400)),
+            exit    = shrinkVertically(animationSpec = tween(400)) + fadeOut(animationSpec = tween(400))
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(top = 16.dp)) {
                 Box(
@@ -287,10 +290,10 @@ private fun QrStepContent(unlocked: Boolean, showQr: Boolean, onToggleQr: () -> 
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Pide al usuario que escanee este código desde su aplicación para recibir la configuración.",
-                    fontSize = 12.sp,
-                    color = Color.Gray,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    fontSize    = 12.sp,
+                    color       = Color.Gray,
+                    textAlign   = TextAlign.Center,
+                    modifier    = Modifier.padding(horizontal = 16.dp)
                 )
             }
         }
@@ -304,11 +307,11 @@ private fun QrCodeImage(content: String, size: Int) {
     LaunchedEffect(content) {
         withContext(Dispatchers.Default) {
             try {
-                val writer = QRCodeWriter()
+                val writer    = QRCodeWriter()
                 val bitMatrix = writer.encode(content, BarcodeFormat.QR_CODE, size, size)
-                val width = bitMatrix.width
-                val height = bitMatrix.height
-                val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+                val width     = bitMatrix.width
+                val height    = bitMatrix.height
+                val bmp       = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
                 for (x in 0 until width) {
                     for (y in 0 until height) {
                         bmp.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
@@ -330,7 +333,13 @@ private fun QrCodeImage(content: String, size: Int) {
 
 @Composable
 private fun StepDoneChip(msg: String) {
-    Row(modifier = Modifier.fillMaxWidth().background(StepGreen.copy(alpha = 0.1f), RoundedCornerShape(8.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier          = Modifier
+            .fillMaxWidth()
+            .background(StepGreen.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Icon(Icons.Default.CheckCircle, null, tint = StepGreen, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text(msg, color = StepGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)

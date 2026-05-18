@@ -111,11 +111,10 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = com.example.escanqradmin.R.drawable.ic_app_logo),
                         contentDescription = null,
-                        tint = PrimaryBlue,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -269,11 +268,10 @@ fun HomeScreen(
             }
 
             if (showDeleteDialog && userToDelete != null) {
-                val connected = bluetoothConnectionState is BluetoothConnectionState.Connected
                 AlertDialog(
                     onDismissRequest = { showDeleteDialog = false },
                     title = { Text("Confirmar eliminación", fontWeight = FontWeight.Bold) },
-                    text = { Text("¿Eliminar registro de ${userToDelete?.name}? ${if(connected) "Se eliminará del ESP32 también." else ""}") },
+                    text = { Text("¿Eliminar el registro de ${userToDelete?.name} del servidor?") },
                     confirmButton = {
                         TextButton(onClick = {
                             userToDelete?.let { viewModel.deleteUser(it.id, it.document) }

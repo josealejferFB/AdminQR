@@ -15,38 +15,38 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.escanqradmin.presentation.ui.result.EspUploadStatus
+import com.example.escanqradmin.presentation.ui.result.SyncStatus
 
 @Composable
 fun ResultSnackbar(
-    status  : EspUploadStatus,
+    status  : SyncStatus,
     modifier: Modifier = Modifier
 ) {
-    val visible = status !is EspUploadStatus.Idle
+    val visible = status !is SyncStatus.Idle
 
     AnimatedVisibility(
-        visible = visible,
-        enter   = slideInVertically { -it } + fadeIn(),
-        exit    = slideOutVertically { -it } + fadeOut(),
+        visible  = visible,
+        enter    = slideInVertically { -it } + fadeIn(),
+        exit     = slideOutVertically { -it } + fadeOut(),
         modifier = modifier
     ) {
         val (bgColor, icon, message) = when (status) {
-            is EspUploadStatus.Loading -> Triple(
+            is SyncStatus.Loading -> Triple(
                 Color(0xFF0D47A1),
                 Icons.Default.Sync,
-                status.step
+                "Sincronizando con el servidor..."
             )
-            is EspUploadStatus.Success -> Triple(
+            is SyncStatus.Success -> Triple(
                 Color(0xFF1B5E20),
                 Icons.Default.CheckCircle,
-                "✓ Usuario registrado correctamente en el ESP32"
+                "✓ Registro completado correctamente"
             )
-            is EspUploadStatus.Error -> Triple(
+            is SyncStatus.Error -> Triple(
                 Color(0xFFB71C1C),
                 Icons.Default.Error,
                 "✗ ${status.message}"
             )
-            EspUploadStatus.Idle -> return@AnimatedVisibility
+            SyncStatus.Idle -> return@AnimatedVisibility
         }
 
         Card(
@@ -58,10 +58,10 @@ fun ResultSnackbar(
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
         ) {
             Row(
-                modifier            = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment   = Alignment.CenterVertically
+                modifier          = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (status is EspUploadStatus.Loading) {
+                if (status is SyncStatus.Loading) {
                     CircularProgressIndicator(
                         color       = Color.White,
                         modifier    = Modifier.size(20.dp),

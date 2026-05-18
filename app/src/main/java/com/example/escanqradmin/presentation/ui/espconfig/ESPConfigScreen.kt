@@ -38,16 +38,12 @@ private val RxColor        = Color(0xFF238636)
 private val PromptColor    = Color(0xFF58A6FF)
 private val MutedText      = Color(0xFF8B949E)
 
-// ── Quick command definitions ─────────────────────────────────────
+// ── Quick command definitions (solo config y wifi) ─────────────────
 private data class QuickCmd(val label: String, val cmd: String, val icon: ImageVector, val color: Color)
 
 private val quickCmds = listOf(
-    QuickCmd("Agregar",   "agregar",   Icons.Default.PersonAdd,    Color(0xFF238636)),
-    QuickCmd("Eliminar",  "eliminar",  Icons.Default.PersonRemove, Color(0xFFDA3633)),
-    QuickCmd("Modificar", "modificar", Icons.Default.Edit,         Color(0xFFD29922)),
-    QuickCmd("Consultar", "consultar", Icons.Default.Search,       Color(0xFF1F6FEB)),
-    QuickCmd("Config",    "config",    Icons.Default.Settings,     Color(0xFF8957E5)),
-    QuickCmd("WiFi",      "wifi",      Icons.Default.Wifi,         Color(0xFF58A6FF))
+    QuickCmd("Config", "config", Icons.Default.Settings, Color(0xFF8957E5)),
+    QuickCmd("WiFi",   "wifi",   Icons.Default.Wifi,     Color(0xFF58A6FF))
 )
 
 // ── Screen ────────────────────────────────────────────────────────
@@ -93,36 +89,6 @@ fun ESPConfigScreen(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
-                        // Botón Listar usuarios
-                        val isListing = st.flowState == EspFlowState.WAIT_LISTING
-                        FilledTonalIconButton(
-                            onClick  = { viewModel.sendListCommand() },
-                            enabled  = isIdle || isListing,
-                            modifier = Modifier.size(36.dp),
-                            shape    = RoundedCornerShape(10.dp),
-                            colors   = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor          = Color(0xFF58A6FF).copy(alpha = 0.15f),
-                                contentColor            = Color(0xFF58A6FF),
-                                disabledContainerColor  = ConsoleBorder.copy(alpha = 0.12f),
-                                disabledContentColor    = MutedText
-                            )
-                        ) {
-                            if (isListing) {
-                                CircularProgressIndicator(
-                                    modifier  = Modifier.size(16.dp),
-                                    color     = Color(0xFF58A6FF),
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.FormatListBulleted,
-                                    contentDescription = "Listar usuarios",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        // Indicador Conectado
                         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(RxColor))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Conectado", color = RxColor, fontSize = 12.sp)
@@ -166,49 +132,6 @@ fun ESPConfigScreen(
                 label = "form_panel"
             ) { flow ->
                 when (flow) {
-                    EspFlowState.WAIT_JSON_AGREGAR -> FormAgregar(
-                        form     = st.form,
-                        onCedula = viewModel::onCedulaChange,
-                        onMac    = viewModel::onMacChange,
-                        onPlaca  = viewModel::onPlacaChange,
-                        onSubmit = viewModel::submitForm,
-                        onCancel = viewModel::dismissForm
-                    )
-                    EspFlowState.WAIT_CEDULA_ELIMINAR -> FormCedula(
-                        label    = "Cédula del usuario a eliminar",
-                        icon     = Icons.Default.PersonRemove,
-                        iconColor = Color(0xFFDA3633),
-                        value    = st.form.cedula,
-                        onChange = viewModel::onCedulaChange,
-                        onSubmit = viewModel::submitForm,
-                        onCancel = viewModel::dismissForm
-                    )
-                    EspFlowState.WAIT_CEDULA_CONSULTAR -> FormCedula(
-                        label    = "Cédula del usuario a consultar",
-                        icon     = Icons.Default.Search,
-                        iconColor = Color(0xFF1F6FEB),
-                        value    = st.form.cedula,
-                        onChange = viewModel::onCedulaChange,
-                        onSubmit = viewModel::submitForm,
-                        onCancel = viewModel::dismissForm
-                    )
-                    EspFlowState.WAIT_CEDULA_MODIFICAR -> FormCedula(
-                        label    = "Cédula del usuario a modificar",
-                        icon     = Icons.Default.Edit,
-                        iconColor = Color(0xFFD29922),
-                        value    = st.form.cedula,
-                        onChange = viewModel::onCedulaChange,
-                        onSubmit = viewModel::submitForm,
-                        onCancel = viewModel::dismissForm
-                    )
-                    EspFlowState.WAIT_JSON_MODIFICAR -> FormModificarDatos(
-                        form     = st.form,
-                        onCedula = viewModel::onCedulaChange,
-                        onMac    = viewModel::onMacChange,
-                        onPlaca  = viewModel::onPlacaChange,
-                        onSubmit = viewModel::submitForm,
-                        onCancel = viewModel::dismissForm
-                    )
                     EspFlowState.WAIT_JSON_CONFIG -> FormConfig(
                         form         = st.form,
                         onProtocolo  = viewModel::onProtocoloChange,
@@ -217,26 +140,24 @@ fun ESPConfigScreen(
                         onSubmit     = viewModel::submitForm,
                         onCancel     = viewModel::dismissForm
                     )
-                    EspFlowState.WAIT_WIFI_SSID -> FormCedula(
-                        label    = "Nombre de la Red (SSID)",
-                        icon     = Icons.Default.Wifi,
+                    EspFlowState.WAIT_WIFI_SSID -> FormSingleField(
+                        label     = "Nombre de la Red (SSID)",
+                        icon      = Icons.Default.Wifi,
                         iconColor = Color(0xFF58A6FF),
-                        value    = st.form.ssid,
-                        onChange = viewModel::onSsidChange,
-                        onSubmit = viewModel::submitForm,
-                        onCancel = viewModel::dismissForm
+                        value     = st.form.ssid,
+                        onChange  = viewModel::onSsidChange,
+                        onSubmit  = viewModel::submitForm,
+                        onCancel  = viewModel::dismissForm
                     )
-                    EspFlowState.WAIT_WIFI_PASS -> FormCedula(
-                        label    = "Contraseña de WiFi",
-                        icon     = Icons.Default.Lock,
+                    EspFlowState.WAIT_WIFI_PASS -> FormSingleField(
+                        label     = "Contraseña de WiFi",
+                        icon      = Icons.Default.Lock,
                         iconColor = Color(0xFF58A6FF),
-                        value    = st.form.password,
-                        onChange = viewModel::onPasswordChange,
-                        onSubmit = viewModel::submitForm,
-                        onCancel = viewModel::dismissForm
+                        value     = st.form.password,
+                        onChange  = viewModel::onPasswordChange,
+                        onSubmit  = viewModel::submitForm,
+                        onCancel  = viewModel::dismissForm
                     )
-                    // WAIT_LISTING usa la misma barra libre (el sheet cubre la info)
-                    EspFlowState.WAIT_LISTING,
                     EspFlowState.IDLE -> FreeInputBar(
                         value    = st.freeCommand,
                         onChange = viewModel::onFreeCommandChange,
@@ -244,15 +165,6 @@ fun ESPConfigScreen(
                     )
                 }
             }
-        }
-
-        // ── Modal Bottom Sheet: Lista de usuarios ────────────────────────
-        if (st.showUserList) {
-            UserListSheet(
-                users     = st.userList,
-                isLoading = st.flowState == EspFlowState.WAIT_LISTING,
-                onDismiss = { viewModel.dismissUserList() }
-            )
         }
     }
 }
@@ -279,7 +191,7 @@ private fun QuickCommandBar(enabled: Boolean, onSend: (String) -> Unit) {
                 FilledTonalButton(
                     onClick  = { onSend(cmd.cmd) },
                     enabled  = enabled,
-                    modifier = Modifier.width(80.dp).height(60.dp),
+                    modifier = Modifier.width(100.dp).height(60.dp),
                     shape    = RoundedCornerShape(12.dp),
                     colors   = ButtonDefaults.filledTonalButtonColors(
                         containerColor        = cmd.color.copy(alpha = 0.15f),
@@ -299,87 +211,7 @@ private fun QuickCommandBar(enabled: Boolean, onSend: (String) -> Unit) {
     }
 }
 
-// ── Form: Agregar (cedula + mac + placa) ──────────────────────────
-@Composable
-private fun FormAgregar(
-    form: FormFields,
-    onCedula: (String) -> Unit,
-    onMac: (String) -> Unit,
-    onPlaca: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onCancel: () -> Unit
-) {
-    FormContainer(
-        title     = "Agregar usuario",
-        icon      = Icons.Default.PersonAdd,
-        iconColor = Color(0xFF238636),
-        onCancel  = onCancel
-    ) {
-        EspField("Cédula",     value = form.cedula,  onChange = onCedula, placeholder = "12345678")
-        Spacer(Modifier.height(10.dp))
-        EspField("MAC",        value = form.mac,     onChange = onMac,    placeholder = "AA:BB:CC:DD:EE:FF")
-        Spacer(Modifier.height(10.dp))
-        EspField("Placa",      value = form.placa,   onChange = onPlaca,  placeholder = "ABC-123")
-        Spacer(Modifier.height(14.dp))
-        SubmitButton(
-            label   = "Agregar en ESP32",
-            enabled = form.cedula.isNotBlank() && form.mac.isNotBlank() && form.placa.isNotBlank(),
-            color   = Color(0xFF238636),
-            onClick = onSubmit
-        )
-    }
-}
-
-// ── Form: single cedula ───────────────────────────────────────────
-@Composable
-private fun FormCedula(
-    label: String,
-    icon: ImageVector,
-    iconColor: Color,
-    value: String,
-    onChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onCancel: () -> Unit
-) {
-    FormContainer(title = label, icon = icon, iconColor = iconColor, onCancel = onCancel) {
-        EspField("Cédula", value = value, onChange = onChange, placeholder = "12345678")
-        Spacer(Modifier.height(14.dp))
-        SubmitButton(label = "Enviar", enabled = value.isNotBlank(), color = iconColor, onClick = onSubmit)
-    }
-}
-
-// ── Form: Modificar datos (mac + placa) ───────────────────────────
-@Composable
-private fun FormModificarDatos(
-    form: FormFields,
-    onCedula: (String) -> Unit,
-    onMac: (String) -> Unit,
-    onPlaca: (String) -> Unit,
-    onSubmit: () -> Unit,
-    onCancel: () -> Unit
-) {
-    FormContainer(
-        title     = "Modificar datos del usuario",
-        icon      = Icons.Default.Edit,
-        iconColor = Color(0xFFD29922),
-        onCancel  = onCancel
-    ) {
-        EspField("Cédula del usuario", value = form.cedula, onChange = onCedula, placeholder = "12345678")
-        Spacer(Modifier.height(10.dp))
-        EspField("Nueva MAC",   value = form.mac,   onChange = onMac,   placeholder = "AA:BB:CC:DD:EE:FF")
-        Spacer(Modifier.height(10.dp))
-        EspField("Nueva Placa", value = form.placa, onChange = onPlaca, placeholder = "ABC-123")
-        Spacer(Modifier.height(14.dp))
-        SubmitButton(
-            label   = "Guardar cambios",
-            enabled = form.cedula.isNotBlank() && form.mac.isNotBlank() && form.placa.isNotBlank(),
-            color   = Color(0xFFD29922),
-            onClick = onSubmit
-        )
-    }
-}
-
-// ── Form: Config (protocolo, ip_odoo, port) ────────────────────
+// ── Form: Config (protocolo, ip_odoo, port) ────────────────────────
 @Composable
 private fun FormConfig(
     form: FormFields,
@@ -407,6 +239,24 @@ private fun FormConfig(
             color   = Color(0xFF8957E5),
             onClick = onSubmit
         )
+    }
+}
+
+// ── Form: single text field (SSID / Password) ─────────────────────
+@Composable
+private fun FormSingleField(
+    label: String,
+    icon: ImageVector,
+    iconColor: Color,
+    value: String,
+    onChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onCancel: () -> Unit
+) {
+    FormContainer(title = label, icon = icon, iconColor = iconColor, onCancel = onCancel) {
+        EspField(label, value = value, onChange = onChange, placeholder = "")
+        Spacer(Modifier.height(14.dp))
+        SubmitButton(label = "Enviar", enabled = value.isNotBlank(), color = iconColor, onClick = onSubmit)
     }
 }
 
@@ -603,192 +453,6 @@ private fun EmptyConsole() {
             Spacer(Modifier.height(10.dp))
             Text("Consola vacía", color = MutedText, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
             Text("Selecciona un comando arriba", color = ConsoleBorder, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-        }
-    }
-}
-
-// ── User List Modal Bottom Sheet ──────────────────────────────────
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun UserListSheet(
-    users: List<String>,
-    isLoading: Boolean,
-    onDismiss: () -> Unit
-) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-
-    ModalBottomSheet(
-        onDismissRequest  = onDismiss,
-        sheetState        = sheetState,
-        containerColor    = ConsolePanel,
-        dragHandle        = {
-            // Handle personalizado con header
-            Column(
-                modifier            = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Spacer(Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .size(width = 36.dp, height = 4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(ConsoleBorder)
-                )
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    modifier             = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    verticalAlignment    = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.FormatListBulleted,
-                            contentDescription = null,
-                            tint     = PromptColor,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "Usuarios en ESP32",
-                            color      = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize   = 16.sp
-                        )
-                        if (isLoading) {
-                            Spacer(Modifier.width(10.dp))
-                            CircularProgressIndicator(
-                                modifier    = Modifier.size(14.dp),
-                                color       = PromptColor,
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Spacer(Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = PromptColor.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    "${users.size}",
-                                    color    = PromptColor,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = "Cerrar",
-                            tint     = MutedText,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                HorizontalDivider(color = ConsoleBorder)
-            }
-        }
-    ) {
-        if (isLoading && users.isEmpty()) {
-            // Estado: esperando la primera respuesta
-            Box(
-                modifier            = Modifier
-                    .fillMaxWidth()
-                    .padding(48.dp),
-                contentAlignment    = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = PromptColor)
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "Cargando usuarios del ESP32...",
-                        color      = MutedText,
-                        fontSize   = 13.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-        } else if (!isLoading && users.isEmpty()) {
-            // Estado: respuesta recibida pero sin usuarios
-            Box(
-                modifier         = Modifier
-                    .fillMaxWidth()
-                    .padding(48.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Default.PersonOff,
-                        contentDescription = null,
-                        tint     = ConsoleBorder,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text("Sin usuarios registrados", color = MutedText, fontFamily = FontFamily.Monospace)
-                }
-            }
-        } else {
-            // Estado: mostrando la lista
-            LazyColumn(
-                modifier        = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding(),
-                contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(users) { line ->
-                    Surface(
-                        shape         = RoundedCornerShape(12.dp),
-                        color         = FormBg,
-                        tonalElevation = 2.dp,
-                        modifier      = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier          = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier          = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(RxColor),
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                text       = line,
-                                color      = Color.White,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize   = 13.sp,
-                                modifier   = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-                if (isLoading) {
-                    item {
-                        Row(
-                            modifier          = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.Center,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CircularProgressIndicator(
-                                modifier    = Modifier.size(14.dp),
-                                color       = PromptColor,
-                                strokeWidth = 2.dp
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("Recibiendo...", color = MutedText, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-                }
-                item { Spacer(Modifier.height(8.dp)) }
-            }
         }
     }
 }

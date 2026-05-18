@@ -3,7 +3,6 @@ package com.example.escanqradmin.presentation.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,15 +39,15 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     val scannedDevices = bluetoothRepository.scannedDevices
-    val pairedDevices = bluetoothRepository.pairedDevices
-    val isScanning = bluetoothRepository.isScanning
+    val pairedDevices  = bluetoothRepository.pairedDevices
+    val isScanning     = bluetoothRepository.isScanning
     val bluetoothConnectionState = bluetoothRepository.connectionState
 
     companion object {
         // MAC del ESP32_Seguro activo. Actualizar si se cambia el hardware.
         const val ESP32_TARGET_MAC = "E0:5A:1B:31:29:6E"
     }
-    
+
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState = _uiState.asStateFlow()
 
@@ -56,18 +55,15 @@ class HomeViewModel @Inject constructor(
     private val _snackbarMessages = MutableSharedFlow<String>()
     val snackbarMessages = _snackbarMessages.asSharedFlow()
 
-    // true = la desconexión fue iniciada por el usuario o por una reconexión
-    // false = la desconexión fue inesperada (timeout del ESP32, pérdida de señal)
+    // true = la desconexión fue iniciada por el usuario
     @Volatile private var isManualDisconnect = false
-    // true = estamos en medio de un intento de conexión (evita falso snackbar)
+    // true = estamos en medio de un intento de conexión
     @Volatile private var isConnecting = false
     private var previousConnectionState: BluetoothConnectionState = BluetoothConnectionState.Idle
-    private var isDeleteInProgress = false
 
     init {
         observeHistory()
         observeBluetoothConnection()
-        observeBluetoothMessages()
     }
 
     private fun observeHistory() {
@@ -75,99 +71,19 @@ class HomeViewModel @Inject constructor(
             repository.getHistory().collect { history ->
                 val activeUsers = history.map { qr ->
                     ActiveUser(
-                        id = qr.androidId,
-                        name = qr.userName,
+                        id       = qr.androidId,
+                        name     = qr.userName,
                         document = qr.cedula,
-                        status = "VALIDADO",
-                        plate = qr.plate
+                        status   = "VALIDADO",
+                        plate    = qr.plate
                     )
                 }
-                
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         activeUsers = activeUsers,
-                        totalUsers = activeUsers.size,
-                        totalScans = activeUsers.size
+                        totalUsers  = activeUsers.size,
+                        totalScans  = activeUsers.size
                     )
-                }
-            }
-        }
-    }
-
-    private fun observeBluetoothMessages() {
-        viewModelScope.launch {
-            bluetoothRepository.messages.collect { raw ->
-                val msg = raw.trim()
-                handleBluetoothDeleteResponse(msg)
-            }
-        }
-    }
-
-    private var pendingDeleteCedula: String? = null
-    private var pendingDeleteId: String? = null
-    private var pendingUpdateUser: ActiveUser? = null
-
-    private fun handleBluetoothDeleteResponse(msg: String) {
-        when (msg) {
-            "OK_ELIMINAR" -> {
-                pendingDeleteCedula?.let { cedula ->
-                    viewModelScope.launch {
-                        bluetoothRepository.sendMessage("$cedula\n")
-                    }
-                }
-            }
-            "ELIMINADO_OK" -> {
-                val id = pendingDeleteId
-                val cedula = pendingDeleteCedula
-                pendingDeleteId = null
-                pendingDeleteCedula = null
-                isDeleteInProgress = false
-                
-                if (id != null && cedula != null) {
-                    viewModelScope.launch {
-                        deleteFromServer(id, cedula)
-                    }
-                }
-            }
-            "ERROR_ELIMINAR", "NO_EXISTE" -> {
-                pendingDeleteId = null
-                pendingDeleteCedula = null
-                isDeleteInProgress = false
-                viewModelScope.launch {
-                    _snackbarMessages.emit("Error al eliminar en ESP32: $msg")
-                }
-            }
-            "LISTO_PARA_MODIFICAR" -> {
-                pendingUpdateUser?.let { user ->
-                    viewModelScope.launch {
-                        bluetoothRepository.sendMessage("${user.document}\n")
-                    }
-                }
-            }
-            "ENVIE_NUEVOS_DATOS" -> {
-                pendingUpdateUser?.let { user ->
-                    viewModelScope.launch {
-                        val json = """{"mac":"${user.plate}","placa":"${user.name}"}"""
-                        bluetoothRepository.sendMessage("$json\n")
-                    }
-                }
-            }
-            "USUARIO_MODIFICADO" -> {
-                val user = pendingUpdateUser
-                pendingUpdateUser = null
-                isDeleteInProgress = false
-                
-                if (user != null) {
-                    viewModelScope.launch {
-                        updateOnServer(user)
-                    }
-                }
-            }
-            "ERROR_MODIFICAR", "ERROR_JSON" -> {
-                pendingUpdateUser = null
-                isDeleteInProgress = false
-                viewModelScope.launch {
-                    _snackbarMessages.emit("Error al modificar en ESP32: $msg")
                 }
             }
         }
@@ -176,8 +92,7 @@ class HomeViewModel @Inject constructor(
     private fun observeBluetoothConnection() {
         viewModelScope.launch {
             bluetoothConnectionState.collect { state ->
-                // Detectamos si se desconectó automáticamente.
-                // Solo emitimos si veníamos de Connected, y no fue manual ni parte de una reconexión.
+                // Notificamos desconexión inesperada (solo si veníamos de Connected)
                 if (previousConnectionState is BluetoothConnectionState.Connected &&
                     state !is BluetoothConnectionState.Connected &&
                     !isManualDisconnect &&
@@ -190,19 +105,8 @@ class HomeViewModel @Inject constructor(
                     is BluetoothConnectionState.Connected -> {
                         isManualDisconnect = false
                         isConnecting = false
-
-                        if (pendingDeleteId != null && pendingDeleteCedula != null && !isDeleteInProgress) {
-                            isDeleteInProgress = true
-                            delay(500)
-                            bluetoothRepository.sendMessage("eliminar\n")
-                        }
                     }
-                    is BluetoothConnectionState.Connecting -> {
-                        // No hacemos nada especial
-                    }
-                    else -> {
-                        isDeleteInProgress = false
-                    }
+                    else -> { /* nada especial */ }
                 }
 
                 previousConnectionState = state
@@ -210,21 +114,20 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-
-
-    // Métodos delegados del Repositorio
+    // ── Métodos delegados del Repositorio BT ─────────────────────
     fun startDiscovery() { bluetoothRepository.startDiscovery() }
-    fun stopDiscovery() { bluetoothRepository.stopDiscovery() }
-    fun connectToDevice(address: String) { 
-        // Marcamos que estamos en reconexión para no disparar snackbar falso
+    fun stopDiscovery()  { bluetoothRepository.stopDiscovery() }
+
+    fun connectToDevice(address: String) {
         isConnecting = true
         isManualDisconnect = false
-        bluetoothRepository.connectToDevice(address) 
+        bluetoothRepository.connectToDevice(address)
     }
-    fun disconnect() { 
+
+    fun disconnect() {
         isManualDisconnect = true
         isConnecting = false
-        bluetoothRepository.disconnect() 
+        bluetoothRepository.disconnect()
     }
 
     /**
@@ -241,12 +144,10 @@ class HomeViewModel @Inject constructor(
     fun connectToEsp32() {
         viewModelScope.launch {
             val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
-            
             if (isConnected) {
                 _snackbarMessages.emit("Ya estás conectado al ESP32")
             } else {
                 val esp32Address = findEsp32Address()
-                
                 if (esp32Address != null) {
                     _snackbarMessages.emit("Conectando al ESP32...")
                     connectToDevice(esp32Address)
@@ -257,97 +158,33 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    // ── Gestión de usuarios (solo vía servidor) ───────────────────
 
-    // Métodos de gestión de usuarios
     fun deleteUser(id: String, document: String) {
         viewModelScope.launch {
-            val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
-            
-            if (isConnected) {
-                startDeleteProcess(id, document)
-            } else {
-                val esp32Address = findEsp32Address()
-                
-                if (esp32Address != null) {
-                    _snackbarMessages.emit("Conectando al ESP32...")
-                    connectToDevice(esp32Address)
-                    delay(2000)
-                    val connected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
-                    if (connected) {
-                        startDeleteProcess(id, document)
-                    } else {
-                        _snackbarMessages.emit("No se pudo conectar al ESP32. No se puede eliminar.")
-                    }
-                } else {
-                    _snackbarMessages.emit("No hay ESP32 vinculado. Conecta uno primero.")
-                }
+            syncRepository.deleteEntry(document).onSuccess {
+                repository.deleteRecord(id)
+                _snackbarMessages.emit("Usuario eliminado correctamente")
+            }.onFailure { e ->
+                _snackbarMessages.emit("Error al eliminar del servidor: ${e.message}")
             }
-        }
-    }
-
-    private fun startDeleteProcess(id: String, document: String) {
-        pendingDeleteId = id
-        pendingDeleteCedula = document
-        isDeleteInProgress = true
-        viewModelScope.launch {
-            delay(500)
-            bluetoothRepository.sendMessage("eliminar\n")
-        }
-    }
-
-    private suspend fun deleteFromServer(id: String, cedula: String) {
-        syncRepository.deleteEntry(cedula).onSuccess {
-            repository.deleteRecord(id)
-            _snackbarMessages.emit("Usuario eliminado correctamente")
-        }.onFailure { e ->
-            _snackbarMessages.emit("Error al eliminar del servidor: ${e.message}")
         }
     }
 
     fun updateUser(user: ActiveUser) {
         viewModelScope.launch {
-            val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
-            
-            if (isConnected) {
-                startUpdateProcess(user)
-            } else {
-                val esp32Address = findEsp32Address()
-                
-                if (esp32Address != null) {
-                    _snackbarMessages.emit("Conectando al ESP32...")
-                    connectToDevice(esp32Address)
-                    delay(2000)
-                    val connected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
-                    if (connected) {
-                        startUpdateProcess(user)
-                    } else {
-                        _snackbarMessages.emit("No se pudo conectar al ESP32. No se puede modificar.")
-                    }
-                } else {
-                    _snackbarMessages.emit("No hay ESP32 vinculado. Conecta uno primero.")
-                }
+            val qrContent = com.example.escanqradmin.domain.model.QrContent(
+                androidId = user.id,
+                userName  = user.name,
+                cedula    = user.document,
+                plate     = user.plate
+            )
+            syncRepository.updateEntry(qrContent).onSuccess {
+                repository.updateRecord(qrContent)
+                _snackbarMessages.emit("Usuario modificado correctamente")
+            }.onFailure { e ->
+                _snackbarMessages.emit("Error al modificar en servidor: ${e.message}")
             }
-        }
-    }
-
-    private fun startUpdateProcess(user: ActiveUser) {
-        pendingUpdateUser = user
-        isDeleteInProgress = true
-        viewModelScope.launch {
-            delay(500)
-            bluetoothRepository.sendMessage("modificar\n")
-        }
-    }
-
-    private suspend fun updateOnServer(user: ActiveUser) {
-        val qrContent = com.example.escanqradmin.domain.model.QrContent(
-            androidId = user.id, userName = user.name, cedula = user.document, plate = user.plate
-        )
-        syncRepository.updateEntry(qrContent).onSuccess {
-            repository.updateRecord(qrContent)
-            _snackbarMessages.emit("Usuario modificado correctamente")
-        }.onFailure { e ->
-            _snackbarMessages.emit("Error al modificar en servidor: ${e.message}")
         }
     }
 
