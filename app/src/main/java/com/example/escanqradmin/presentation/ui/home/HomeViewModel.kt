@@ -44,8 +44,7 @@ class HomeViewModel @Inject constructor(
     val bluetoothConnectionState = bluetoothRepository.connectionState
 
     companion object {
-        // MAC del ESP32_Seguro activo. Actualizar si se cambia el hardware.
-        const val ESP32_TARGET_MAC = "E0:5A:1B:31:29:6E"
+        // El portón se descubre por nombre en lugar de MAC fija.
     }
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -132,13 +131,11 @@ class HomeViewModel @Inject constructor(
 
     /**
      * Busca la dirección del ESP32 objetivo.
-     * Prioriza la MAC exacta configurada; si no está vinculada,
-     * cae en el primer dispositivo cuyo nombre empiece con "ESP32".
+     * Descubre dinámicamente el primer dispositivo cuyo nombre empiece con "ESP32".
      */
     private fun findEsp32Address(): String? {
         val devices = pairedDevices.value
-        return devices.firstOrNull { it.address.equals(ESP32_TARGET_MAC, ignoreCase = true) }?.address
-            ?: devices.firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }?.address
+        return devices.firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }?.address
     }
 
     fun connectToEsp32() {

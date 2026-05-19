@@ -29,6 +29,10 @@ import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import androidx.compose.ui.text.style.TextAlign
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomBottomBar
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnackbar
 import com.example.escanqradmin.presentation.navigation.Config
@@ -57,6 +61,7 @@ fun HomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showBluetoothDialog by remember { mutableStateOf(false) }
+    var showProvisioningDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
 
     // Observe snackbar messages
@@ -138,12 +143,15 @@ fun HomeScreen(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Box(
-                        modifier = Modifier.size(36.dp).background(SecondaryOrange.copy(alpha = 0.15f), CircleShape),
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape)
+                            .clickable { showProvisioningDialog = true },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.PhoneAndroid,
-                            contentDescription = null,
+                            imageVector = Icons.Default.QrCode,
+                            contentDescription = "Aprovisionamiento QR",
                             tint = SecondaryOrange,
                             modifier = Modifier.size(20.dp)
                         )
@@ -300,6 +308,12 @@ fun HomeScreen(
                 )
             }
 
+            if (showProvisioningDialog) {
+                ProvisioningQrDialog(
+                    onDismiss = { showProvisioningDialog = false }
+                )
+            }
+
             CustomBottomBar(
                 navController = navController,
                 isFloating = true,
@@ -320,5 +334,139 @@ fun HomeScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun ProvisioningQrDialog(
+    onDismiss: () -> Unit
+) {
+    val payload = remember {
+        """{"endpoint":"${com.example.escanqradmin.data.network.ApiConstants.BASE_URL}","token":"${com.example.escanqradmin.domain.model.SecurityConstants.PROVISIONING_TOKEN}"}"""
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCode,
+                        contentDescription = null,
+                        tint = SecondaryOrange,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Aprovisionar Conductor",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Escanea este código QR desde la App de Conductor para sincronizar el servidor y la configuración de red automáticamente.",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.White)
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    HomeScreenQrImage(content = payload, size = 180)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = SurfaceGrey.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "Servidor configurado:",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Gray
+                        )
+                        Text(
+                            text = com.example.escanqradmin.data.network.ApiConstants.BASE_URL,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = PrimaryBlue,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("CERRAR", fontWeight = FontWeight.Bold, color = PrimaryBlue)
+            }
+        },
+        containerColor = Color.White,
+        shape = RoundedCornerShape(24.dp)
+    )
+}
+
+@Composable
+fun HomeScreenQrImage(content: String, size: Int) {
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(content) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            try {
+                val writer = com.google.zxing.qrcode.QRCodeWriter()
+                val bitMatrix = writer.encode(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size)
+                val width = bitMatrix.width
+                val height = bitMatrix.height
+                val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+                for (x in 0 until width) {
+                    for (y in 0 until height) {
+                        bmp.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
+                    }
+                }
+                bitmap = bmp
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    bitmap?.let {
+        Image(
+            bitmap = it.asImageBitmap(),
+            contentDescription = "QR Code",
+            modifier = Modifier.size(size.dp)
+        )
+    } ?: Box(modifier = Modifier.size(size.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = SecondaryOrange)
     }
 }

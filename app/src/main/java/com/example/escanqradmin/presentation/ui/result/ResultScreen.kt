@@ -136,7 +136,7 @@ fun ResultScreen(
 
 /** Builds the provisioning QR payload for the User App. */
 private fun buildProvisioningJson(): String =
-    """{"endpoint":"${com.example.escanqradmin.data.network.ApiConstants.BASE_URL}","target_mac":"${com.example.escanqradmin.presentation.ui.home.HomeViewModel.ESP32_TARGET_MAC}","token":"${com.example.escanqradmin.domain.model.SecurityConstants.PROVISIONING_TOKEN}"}"""
+    """{"endpoint":"${com.example.escanqradmin.data.network.ApiConstants.BASE_URL}","token":"${com.example.escanqradmin.domain.model.SecurityConstants.PROVISIONING_TOKEN}"}"""
 
 // ── Componentes de apoyo ──────────────────────────────────────────
 
