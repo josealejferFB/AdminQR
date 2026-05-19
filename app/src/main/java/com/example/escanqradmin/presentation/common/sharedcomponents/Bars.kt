@@ -3,6 +3,7 @@ package com.example.escanqradmin.presentation.common.sharedcomponents
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -75,11 +76,12 @@ fun CustomTopBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Security,
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.example.escanqradmin.R.drawable.ic_app_logo),
                     contentDescription = "Logo",
-                    tint = contentColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(

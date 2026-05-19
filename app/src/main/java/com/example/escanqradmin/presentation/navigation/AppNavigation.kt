@@ -16,12 +16,13 @@ import com.example.escanqradmin.presentation.ui.home.HomeScreen
 import com.example.escanqradmin.presentation.ui.result.ResultScreen
 import com.example.escanqradmin.presentation.ui.result.ResultViewModel
 import com.example.escanqradmin.presentation.ui.scanner.ScannerScreen
+import com.example.escanqradmin.presentation.ui.splash.SplashScreen
 
 @Composable
 fun AppNavigation(navController: NavHostController) {
     NavHost(
         navController = navController,
-        startDestination = Home,
+        startDestination = Splash,
         enterTransition = {
             slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(400, easing = FastOutSlowInEasing)) + fadeIn(tween(400))
         },
@@ -35,6 +36,15 @@ fun AppNavigation(navController: NavHostController) {
             slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(400, easing = FastOutSlowInEasing)) + fadeOut(tween(400))
         }
     ) {
+        composable<Splash> {
+            SplashScreen(
+                onNavigateToHome = {
+                    navController.navigate(Home) {
+                        popUpTo(Splash) { inclusive = true }
+                    }
+                }
+            )
+        }
         composable<Home> {
             HomeScreen(navController = navController)
         }

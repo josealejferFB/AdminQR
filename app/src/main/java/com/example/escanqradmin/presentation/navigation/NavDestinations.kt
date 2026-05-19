@@ -22,3 +22,6 @@ object ESPConfig
 @Serializable
 object Config
 
+@Serializable
+object Splash
+
