@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.escanqradmin.presentation.theme.color.SurfaceGrey
 
+import androidx.compose.material3.MaterialTheme
+
 @Composable
 fun StatCard(
     modifier: Modifier = Modifier,
@@ -21,7 +23,7 @@ fun StatCard(
 ) {
     Box(
         modifier = modifier
-            .background(SurfaceGrey, RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
             .padding(16.dp)
     ) {
         Column {

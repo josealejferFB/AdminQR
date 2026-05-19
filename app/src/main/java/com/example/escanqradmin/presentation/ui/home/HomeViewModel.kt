@@ -9,11 +9,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import com.example.escanqradmin.domain.repository.BluetoothConnectionState
+import com.example.escanqradmin.domain.repository.ThemeRepository
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.HistoryRepository
 import com.example.escanqradmin.domain.repository.SyncRepository
+import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import javax.inject.Inject
 
 data class ActiveUser(
@@ -28,15 +31,29 @@ data class HomeUiState(
     val totalScans: Int = 0,
     val totalUsers: Int = 0,
     val activeUsers: List<ActiveUser> = emptyList(),
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    val isServerOnline: Boolean = true
 )
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: HistoryRepository,
     private val bluetoothRepository: BluetoothRepository,
-    private val syncRepository: SyncRepository
+    private val syncRepository: SyncRepository,
+    private val themeRepository: ThemeRepository
 ) : ViewModel() {
+
+    val isDarkMode = themeRepository.isDarkMode().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = false
+    )
+
+    fun toggleTheme() {
+        viewModelScope.launch {
+            themeRepository.setDarkMode(!isDarkMode.value)
+        }
+    }
 
     val scannedDevices = bluetoothRepository.scannedDevices
     val pairedDevices  = bluetoothRepository.pairedDevices
@@ -63,6 +80,7 @@ class HomeViewModel @Inject constructor(
     init {
         observeHistory()
         observeBluetoothConnection()
+        refreshData()
     }
 
     private fun observeHistory() {
@@ -162,8 +180,10 @@ class HomeViewModel @Inject constructor(
             syncRepository.deleteEntry(document).onSuccess {
                 repository.deleteRecord(id)
                 _snackbarMessages.emit("Usuario eliminado correctamente")
+                _uiState.update { it.copy(isServerOnline = true) }
             }.onFailure { e ->
                 _snackbarMessages.emit("Error al eliminar del servidor: ${e.message}")
+                _uiState.update { it.copy(isServerOnline = false) }
             }
         }
     }
@@ -179,8 +199,10 @@ class HomeViewModel @Inject constructor(
             syncRepository.updateEntry(qrContent).onSuccess {
                 repository.updateRecord(qrContent)
                 _snackbarMessages.emit("Usuario modificado correctamente")
+                _uiState.update { it.copy(isServerOnline = true) }
             }.onFailure { e ->
                 _snackbarMessages.emit("Error al modificar en servidor: ${e.message}")
+                _uiState.update { it.copy(isServerOnline = false) }
             }
         }
     }
@@ -188,9 +210,14 @@ class HomeViewModel @Inject constructor(
     fun refreshData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            syncRepository.refreshConductores().onSuccess { records ->
-                repository.syncWithServer(records)
-            }
+            syncRepository.refreshConductores()
+                .onSuccess { records ->
+                    repository.syncWithServer(records)
+                    _uiState.update { it.copy(isServerOnline = true) }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isServerOnline = false) }
+                }
             delay(500)
             _uiState.update { it.copy(isRefreshing = false) }
         }

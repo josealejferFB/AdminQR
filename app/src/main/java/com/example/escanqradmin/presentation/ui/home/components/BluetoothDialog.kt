@@ -21,7 +21,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.escanqradmin.domain.model.BluetoothDeviceDomain
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.example.escanqradmin.presentation.theme.color.*
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 
 @Composable
 fun BluetoothDialog(
@@ -47,7 +50,7 @@ fun BluetoothDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape          = RoundedCornerShape(28.dp),
-            color          = Color.White,
+            color          = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp,
             modifier       = Modifier
                 .fillMaxWidth()
@@ -67,7 +70,7 @@ fun BluetoothDialog(
                             text       = "Vincular ESP32",
                             style      = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.ExtraBold,
-                            color      = PrimaryBlue
+                            color      = MaterialTheme.colorScheme.primary
                         )
                         Text(
                             text  = "Busca y conecta tu tarjeta",
@@ -77,7 +80,7 @@ fun BluetoothDialog(
                     }
                     IconButton(
                         onClick  = onDismiss,
-                        modifier = Modifier.background(SurfaceGrey, CircleShape)
+                        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                     ) {
                         Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.Gray, modifier = Modifier.size(20.dp))
                     }
@@ -87,10 +90,11 @@ fun BluetoothDialog(
 
                 // Error feedback
                 if (connectionState is BluetoothConnectionState.Error) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDECEA)),
+                    AppCard(
+                        colors = AppCardDefaults.colors(containerColor = if (isSystemInDarkTheme()) Color(0xFFD32F2F).copy(alpha = 0.2f) else Color(0xFFFDECEA)),
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        border = null
                     ) {
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Error, contentDescription = null, tint = Color(0xFFD32F2F), modifier = Modifier.size(16.dp))
@@ -127,10 +131,10 @@ fun BluetoothDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             DeviceSectionHeader(title = "Otros Dispositivos", modifier = Modifier.weight(1f))
                             if (isScanning) {
-                                CircularProgressIndicator(color = PrimaryBlue, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             } else {
                                 IconButton(onClick = onStartScan, modifier = Modifier.size(32.dp)) {
-                                    Icon(Icons.Default.Refresh, contentDescription = "Escanear", tint = PrimaryBlue, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.Refresh, contentDescription = "Escanear", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                                 }
                             }
                         }
@@ -167,7 +171,7 @@ fun BluetoothDialog(
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape    = RoundedCornerShape(16.dp),
                     colors   = ButtonDefaults.buttonColors(
-                        containerColor = if (isScanning) Color.Gray else PrimaryBlue
+                        containerColor = if (isScanning) Color.Gray else MaterialTheme.colorScheme.primary
                     )
                 ) {
                     if (isScanning) {
@@ -219,15 +223,14 @@ private fun DeviceItem(
     
     // For now, let's keep it simple.
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = !isConnecting && !isDeviceConnected) { onClick() },
-        shape  = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isDeviceConnected) Color(0xFFE8F5E9) else SurfaceGrey.copy(alpha = 0.5f)
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = if (!isConnecting && !isDeviceConnected) onClick else null,
+        shape = RoundedCornerShape(16.dp),
+        colors = AppCardDefaults.colors(
+            containerColor = if (isDeviceConnected) (if (isSystemInDarkTheme()) Color(0xFF1B5E20).copy(alpha = 0.2f) else Color(0xFFE8F5E9)) else MaterialTheme.colorScheme.surfaceVariant
         ),
-        border = if (isDeviceConnected) BorderStroke(1.dp, Color(0xFF4CAF50)) else null
+        border = if (isDeviceConnected) AppCardDefaults.border(color = Color(0xFF4CAF50)) else null
     ) {
         Row(
             modifier          = Modifier.padding(14.dp).fillMaxWidth(),
@@ -236,7 +239,7 @@ private fun DeviceItem(
             Icon(
                 imageVector        = if (isDeviceConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
                 contentDescription = null,
-                tint               = if (isDeviceConnected) Color(0xFF2E7D32) else PrimaryBlue,
+                tint               = if (isDeviceConnected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
                 modifier           = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(14.dp))
@@ -245,7 +248,7 @@ private fun DeviceItem(
                     text       = device.name ?: "Desconocido",
                     style      = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color      = if (isDeviceConnected) Color(0xFF1B5E20) else Color.Black
+                    color      = if (isDeviceConnected) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text  = device.address,
@@ -266,12 +269,12 @@ private fun DeviceItem(
                     }
                 }
                 isConnecting -> {
-                    CircularProgressIndicator(color = PrimaryBlue, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                 }
                 else -> {
                     Text(
                         "CONECTAR", 
-                        color      = PrimaryBlue, 
+                        color      = MaterialTheme.colorScheme.primary, 
                         fontSize   = 11.sp, 
                         fontWeight = FontWeight.Bold
                     )

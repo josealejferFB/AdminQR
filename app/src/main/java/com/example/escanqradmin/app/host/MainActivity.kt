@@ -18,13 +18,23 @@ import dagger.hilt.android.AndroidEntryPoint
 
 import com.example.escanqradmin.presentation.common.util.SetSystemBarsVisibility
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import com.example.escanqradmin.domain.repository.ThemeRepository
+import javax.inject.Inject
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var themeRepository: ThemeRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            EscanQRAdminTheme {
+            val isDarkMode by themeRepository.isDarkMode().collectAsState(initial = false)
+            EscanQRAdminTheme(darkTheme = isDarkMode) {
                 // Global Immersive Mode: Hide system HUD across all screens
                 SetSystemBarsVisibility(visible = false)
                 

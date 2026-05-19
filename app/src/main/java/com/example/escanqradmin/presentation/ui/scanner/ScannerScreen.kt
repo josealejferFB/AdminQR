@@ -104,9 +104,9 @@ fun ScannerScreen(
             }
         }
 
-        // Floating App TopBar (Semi-transparent White)
+        // Floating App TopBar (Semi-transparent Surface)
         CustomTopBar(
-            containerColor = Color.White.copy(alpha = 0.85f),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
             isFloating = true,
             applyPrivacyPadding = true,
             modifier = Modifier
@@ -114,10 +114,10 @@ fun ScannerScreen(
                 .zIndex(1f)
         )
 
-        // Floating App BottomBar (Semi-transparent White)
+        // Floating App BottomBar (Semi-transparent Surface)
         CustomBottomBar(
             navController = navController,
-            containerColor = Color.White.copy(alpha = 0.85f),
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
             isFloating = true,
             modifier = Modifier
                 .align(Alignment.BottomCenter)

@@ -3,9 +3,11 @@ package com.example.escanqradmin.di.modules
 import com.example.escanqradmin.data.repository.BluetoothRepositoryImpl
 import com.example.escanqradmin.data.repository.HistoryRepositoryImpl
 import com.example.escanqradmin.data.repository.SyncRepositoryImpl
+import com.example.escanqradmin.data.repository.ThemeRepositoryImpl
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.HistoryRepository
 import com.example.escanqradmin.domain.repository.SyncRepository
+import com.example.escanqradmin.domain.repository.ThemeRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -36,6 +38,12 @@ abstract class RepositoryModule {
     abstract fun bindSyncRepository(
         syncRepositoryImpl: SyncRepositoryImpl
     ): SyncRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindThemeRepository(
+        themeRepositoryImpl: ThemeRepositoryImpl
+    ): ThemeRepository
 
     companion object {
         @Provides

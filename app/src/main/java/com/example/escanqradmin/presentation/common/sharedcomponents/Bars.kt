@@ -37,13 +37,15 @@ import com.example.escanqradmin.presentation.navigation.Home
 import com.example.escanqradmin.presentation.navigation.Scanner
 import com.example.escanqradmin.presentation.navigation.Config
 import com.example.escanqradmin.presentation.theme.color.*
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import kotlinx.coroutines.launch
 
 @Composable
 fun CustomTopBar(
     modifier: Modifier = Modifier,
-    containerColor: Color = Color.White,
-    contentColor: Color = PrimaryBlue,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
+    contentColor: Color = MaterialTheme.colorScheme.primary,
     applyPrivacyPadding: Boolean = false,
     isFloating: Boolean = false
 ) {
@@ -109,7 +111,7 @@ fun CustomTopBar(
 fun CustomBottomBar(
     navController: NavHostController,
     modifier: Modifier = Modifier,
-    containerColor: Color = Color.White,
+    containerColor: Color = MaterialTheme.colorScheme.surface,
     applyPrivacyPadding: Boolean = false,
     isFloating: Boolean = false,
     isBluetoothConnected: Boolean = false,
@@ -157,7 +159,7 @@ fun CustomBottomBar(
                 icon = Icons.Default.Home, 
                 label = "INICIO", 
                 isSelected = destination?.hasRoute<Home>() == true,
-                colorOnSelected = if (containerColor == Color.Transparent) Color.White else PrimaryBlue,
+                colorOnSelected = if (containerColor == Color.Transparent) Color.White else MaterialTheme.colorScheme.primary,
                 colorOnUnselected = if (containerColor == Color.Transparent) Color.White.copy(alpha = 0.6f) else Color.Gray,
                 onClick = { 
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -180,20 +182,11 @@ fun CustomBottomBar(
                 modifier = Modifier
                     .size(60.dp)
                     .background(
-                        if (isBluetoothConnected) PrimaryBlue else Color(0xFF9E9E9E),
+                        MaterialTheme.colorScheme.primary,
                         RoundedCornerShape(20.dp)
                     )
                     .clickable {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        if (!isBluetoothConnected) {
-                            scope.launch {
-                                effectiveSnackbarHostState.showSnackbar(
-                                    "Conecta el ESP32 primero 🔒",
-                                    duration = SnackbarDuration.Short
-                                )
-                            }
-                            return@clickable
-                        }
                         if (destination?.hasRoute<Scanner>() != true) {
                             navController.navigate(Scanner) {
                                 launchSingleTop = true
@@ -203,21 +196,12 @@ fun CustomBottomBar(
                     },
                 contentAlignment = Alignment.Center
             ) {
-                if (isBluetoothConnected) {
-                    Icon(
-                        imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = "Scanner",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Bloqueado",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.QrCodeScanner,
+                    contentDescription = "Scanner",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
             }
             
             Spacer(modifier = Modifier.width(32.dp))
@@ -226,7 +210,7 @@ fun CustomBottomBar(
                 icon = Icons.Default.Settings, 
                 label = "AJUSTES",
                 isSelected = false,
-                colorOnSelected = if (containerColor == Color.Transparent) Color.White else PrimaryBlue,
+                colorOnSelected = if (containerColor == Color.Transparent) Color.White else MaterialTheme.colorScheme.primary,
                 colorOnUnselected = if (containerColor == Color.Transparent) Color.White.copy(alpha = 0.6f) else Color.Gray,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -244,13 +228,14 @@ fun CustomSnackbar(
     containerColor: Color = SecondaryOrange,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    AppCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+        colors = AppCardDefaults.colors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+        border = null
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),

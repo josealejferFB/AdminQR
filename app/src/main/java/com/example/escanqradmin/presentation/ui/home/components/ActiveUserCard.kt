@@ -1,5 +1,6 @@
 package com.example.escanqradmin.presentation.ui.home.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,17 +15,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.escanqradmin.presentation.ui.home.ActiveUser
-import com.example.escanqradmin.presentation.theme.color.*
-
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.clickable
+import androidx.compose.runtime.*
+import com.example.escanqradmin.presentation.ui.home.ActiveUser
+import com.example.escanqradmin.presentation.theme.color.*
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
-import androidx.compose.runtime.*
 
 @Composable
 fun ActiveUserCard(
@@ -38,7 +39,7 @@ fun ActiveUserCard(
     var name by remember(user) { mutableStateOf(user.name) }
     var plate by remember(user) { mutableStateOf(user.plate) }
 
-    Card(
+    AppCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize(
@@ -46,11 +47,8 @@ fun ActiveUserCard(
                     dampingRatio = Spring.DampingRatioLowBouncy,
                     stiffness = Spring.StiffnessLow
                 )
-            )
-            .clickable { isExpanded = !isExpanded },
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ),
+        onClick = { isExpanded = !isExpanded }
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(
@@ -63,7 +61,7 @@ fun ActiveUserCard(
                         modifier = Modifier
                             .size(48.dp)
                             .background(
-                                color = SurfaceGrey.copy(alpha = 0.5f),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 shape = RoundedCornerShape(12.dp)
                             ),
                         contentAlignment = Alignment.Center
@@ -71,7 +69,7 @@ fun ActiveUserCard(
                         Icon(
                             imageVector = Icons.Default.Security,
                             contentDescription = null,
-                            tint = if (user.status == "VALIDADO") PrimaryBlue else Color.Gray,
+                            tint = if (user.status == "VALIDADO") MaterialTheme.colorScheme.primary else Color.Gray,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -80,7 +78,7 @@ fun ActiveUserCard(
                         if (isExpanded) {
                             Text(
                                 text = "EDITANDO USUARIO",
-                                color = PrimaryBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -88,7 +86,7 @@ fun ActiveUserCard(
                             Text(
                                 text = user.name,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.Black,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 fontSize = 15.sp
                             )
                         }
@@ -107,7 +105,7 @@ fun ActiveUserCard(
                 if (!isExpanded) {
                     Text(
                         text = user.status,
-                        color = if (user.status == "VALIDADO") PrimaryBlue else SecondaryOrange,
+                        color = if (user.status == "VALIDADO") MaterialTheme.colorScheme.primary else SecondaryOrange,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 10.sp
                     )
@@ -139,7 +137,7 @@ fun ActiveUserCard(
                             )
                             Text(
                                 text = user.plate,
-                                color = PrimaryBlue,
+                                color = MaterialTheme.colorScheme.primary,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -208,7 +206,7 @@ fun ActiveUserCard(
                             },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                         ) {
                             Icon(Icons.Default.Done, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))

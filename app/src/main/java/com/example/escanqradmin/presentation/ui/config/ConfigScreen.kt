@@ -2,6 +2,7 @@ package com.example.escanqradmin.presentation.ui.config
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.theme.color.PrimaryBlue
 import com.example.escanqradmin.presentation.theme.color.SecondaryOrange
 import com.example.escanqradmin.presentation.theme.color.SurfaceGrey
@@ -64,7 +67,7 @@ fun ConfigScreen(
                         "Configuración de Red",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 22.sp,
-                        color = Color.DarkGray
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
@@ -72,14 +75,14 @@ fun ConfigScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Volver",
-                            tint = PrimaryBlue
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
-        containerColor = Color(0xFFF8F9FA) // Subtle off-white for better contrast
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
@@ -129,13 +132,13 @@ fun ConfigScreen(
                             "Catálogo de Servidores",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = Color.DarkGray
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                     }
                     TextButton(onClick = { showHistory = !showHistory }) {
                         Text(
                             if (showHistory) "Ocultar" else "Ver todo",
-                            color = PrimaryBlue,
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Medium
                         )
                     }
@@ -180,10 +183,8 @@ fun ConfigurationCard(
     onEndpointConductoresChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
-    Card(
+    AppCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -195,15 +196,15 @@ fun ConfigurationCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(PrimaryBlue.copy(alpha = 0.05f))
-                    .border(1.dp, PrimaryBlue.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                     .padding(16.dp)
             ) {
                 Column {
                     Text(
                         "Resumen de conexión",
                         style = MaterialTheme.typography.labelSmall,
-                        color = PrimaryBlue,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -212,7 +213,7 @@ fun ConfigurationCard(
                         text = previewUrl,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = if (host.isEmpty()) Color.Gray else Color.DarkGray,
+                        color = if (host.isEmpty()) Color.Gray else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -242,7 +243,7 @@ fun ConfigurationCard(
                         .fillMaxWidth()
                         .height(44.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(SurfaceGrey.copy(alpha = 0.5f))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(4.dp)
                 ) {
                     ProtocolOption(
@@ -274,7 +275,7 @@ fun ConfigurationCard(
                     Icon(
                         if (host.matches(Regex("^\\d.*"))) Icons.Default.Router else Icons.Default.Language,
                         contentDescription = null,
-                        tint = if (host.isNotEmpty()) PrimaryBlue else Color.Gray
+                        tint = if (host.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
                     )
                 }
             )
@@ -339,7 +340,7 @@ fun ConfigurationCard(
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 enabled = !isLoading
             ) {
                 if (isLoading) {
@@ -365,7 +366,7 @@ fun ProtocolOption(
         modifier = modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isSelected) Color.White else Color.Transparent)
+            .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
             .clickable { onClick() }
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center
@@ -373,7 +374,7 @@ fun ProtocolOption(
         Text(
             text = label,
             fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-            color = if (isSelected) PrimaryBlue else Color.Gray,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
             fontSize = 14.sp
         )
     }
@@ -385,13 +386,10 @@ fun HistoryCatalogItem(
     onSelect: (ServerHistory) -> Unit,
     onDelete: (ServerHistory) -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onSelect(history) },
+    AppCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { onSelect(history) },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
@@ -405,7 +403,13 @@ fun HistoryCatalogItem(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(if (history.protocol == "https") Color(0xFFE8F5E9) else Color(0xFFFFF3E0)),
+                    .background(
+                        if (history.protocol == "https") {
+                            if (isSystemInDarkTheme()) Color(0xFF1B5E20).copy(alpha = 0.2f) else Color(0xFFE8F5E9)
+                        } else {
+                            if (isSystemInDarkTheme()) Color(0xFFE65100).copy(alpha = 0.2f) else Color(0xFFFFF3E0)
+                        }
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -423,7 +427,7 @@ fun HistoryCatalogItem(
                     text = history.host,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Color.DarkGray,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

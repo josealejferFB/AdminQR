@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -13,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -34,6 +36,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.ui.text.style.TextAlign
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomBottomBar
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnackbar
 import com.example.escanqradmin.presentation.navigation.Config
 import com.example.escanqradmin.presentation.navigation.ESPConfig
@@ -51,6 +55,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
     val pairedDevices by viewModel.pairedDevices.collectAsState()
     val scannedDevices by viewModel.scannedDevices.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
@@ -104,7 +109,7 @@ fun HomeScreen(
     }
 
     Scaffold(
-        containerColor = BackgroundLight,
+        containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             Row(
@@ -124,38 +129,21 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "EscanQR",
-                        color = PrimaryBlue,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = requestBluetoothAction,
-                        modifier = Modifier.size(36.dp).background(PrimaryBlue.copy(alpha = 0.15f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Bluetooth,
-                            contentDescription = null,
-                            tint = PrimaryBlue,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape)
-                            .clickable { showProvisioningDialog = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.QrCode,
-                            contentDescription = "Aprovisionamiento QR",
-                            tint = SecondaryOrange,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                IconButton(
+                    onClick = { viewModel.toggleTheme() },
+                    modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = "Alternar Modo Oscuro",
+                        tint = if (isDarkMode) SecondaryOrange else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
@@ -178,100 +166,329 @@ fun HomeScreen(
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp, start = 24.dp, end = 24.dp)
+                    contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp, start = 24.dp, end = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
                         Column(modifier = Modifier.padding(top = 8.dp)) {
-                            Text(text = "ESTÁS EN LÍNEA", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "Registros Activos", color = PrimaryBlue, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = 8.dp, bottom = 16.dp))
-                        }
-
-                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            StatCard(modifier = Modifier.weight(1f), value = uiState.totalScans.toString(), label = "ESCANEOS TOTALES", valueColor = PrimaryBlue)
-                            StatCard(modifier = Modifier.weight(1f), value = uiState.totalUsers.toString(), label = "USUARIOS TOTALES", valueColor = SecondaryOrange)
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-                        SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "Usuarios Activos", color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            Box(modifier = Modifier.background(SurfaceGrey.copy(alpha = 0.5f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                                Text(text = "${uiState.activeUsers.size} En línea", color = PrimaryBlue, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            if (uiState.isServerOnline) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(Color.Green, CircleShape)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "ESTÁS EN LÍNEA",
+                                        color = Color.Gray,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Text(
+                                    text = "Panel de Control",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                                )
+                            } else {
+                                AppCard(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    colors = AppCardDefaults.colors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
+                                    border = AppCardDefaults.border(color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+                                ) {
+                                    Column(modifier = Modifier.padding(16.dp)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .background(MaterialTheme.colorScheme.error, CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "SIN CONEXIÓN AL SERVIDOR",
+                                                color = MaterialTheme.colorScheme.error,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "No se pudo establecer comunicación con el servidor Odoo. Por favor, comprueba tu conexión de red o la configuración de tus endpoints.",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Button(
+                                            onClick = { navController.navigate(Config) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.error
+                                            ),
+                                            shape = RoundedCornerShape(12.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Settings,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "CONFIGURAR ENDPOINT",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Panel de Control",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                                )
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Card(
+                    // 1. ESP32 Connection Panel
+                    item {
+                        AppCard(
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.White),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            border = AppCardDefaults.border(
+                                if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
+                                    Color.Green.copy(alpha = 0.3f) 
+                                else 
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(44.dp)
+                                                .background(
+                                                    if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
+                                                        Color.Green.copy(alpha = 0.15f) 
+                                                    else 
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), 
+                                                    CircleShape
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
+                                                    Icons.Default.BluetoothConnected 
+                                                else 
+                                                    Icons.Default.Bluetooth,
+                                                contentDescription = null,
+                                                tint = if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
+                                                    Color.Green 
+                                                else 
+                                                    MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Column {
+                                            Text(
+                                                "Lector Físico (ESP32)", 
+                                                fontWeight = FontWeight.Bold, 
+                                                fontSize = 15.sp, 
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = when (val s = bluetoothConnectionState) {
+                                                    is BluetoothConnectionState.Connected -> "CONECTADO: ${s.deviceAddress}"
+                                                    is BluetoothConnectionState.Connecting -> "CONECTANDO..."
+                                                    is BluetoothConnectionState.Error -> "ERROR EN CONEXIÓN"
+                                                    else -> "DESCONECTADO"
+                                                },
+                                                fontSize = 12.sp,
+                                                color = if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
+                                                    Color.Green.copy(alpha = 0.8f) 
+                                                else 
+                                                    Color.Gray,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .background(
+                                                color = when (bluetoothConnectionState) {
+                                                    is BluetoothConnectionState.Connected -> Color.Green
+                                                    is BluetoothConnectionState.Connecting -> SecondaryOrange
+                                                    else -> Color.Gray
+                                                },
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    if (bluetoothConnectionState is BluetoothConnectionState.Connected) {
+                                        OutlinedButton(
+                                            onClick = { viewModel.disconnect() },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(14.dp),
+                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
+                                            border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f))
+                                        ) {
+                                            Icon(Icons.Default.BluetoothDisabled, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Desconectar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    } else {
+                                        Button(
+                                            onClick = requestBluetoothAction,
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(14.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                        ) {
+                                            Icon(Icons.Default.Bluetooth, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Vincular", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    
+                                    FilledTonalButton(
+                                        onClick = { navController.navigate(ESPConfig) },
+                                        enabled = bluetoothConnectionState is BluetoothConnectionState.Connected,
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(14.dp)
+                                    ) {
+                                        Icon(Icons.Default.SettingsInputComponent, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Ajustar Red", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Metrics Card
+                    item {
+                        AppCard(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(text = uiState.totalScans.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
+                                    Text(text = "ESCANEOS TOTALES", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                                }
+                                
+                                Box(modifier = Modifier.width(1.dp).height(50.dp).background(Color.LightGray.copy(alpha = 0.5f)))
+                                
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.People, contentDescription = null, tint = SecondaryOrange, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(text = uiState.totalUsers.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = SecondaryOrange)
+                                    Text(text = "USUARIOS REGISTRADOS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+
+                    // 3. Aprovisionamiento Card
+                    item {
+                        AppCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            border = AppCardDefaults.border(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
+                            onClick = { showProvisioningDialog = true }
                         ) {
                             Row(
                                 modifier = Modifier.padding(16.dp).fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column(
-                                    modifier = Modifier.weight(1f).clickable {
-                                        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) arrayOf(Manifest.permission.BLUETOOTH_CONNECT)
-                                        else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-                                        
-                                        val allGranted = permissions.all { perm ->
-                                            androidx.core.content.ContextCompat.checkSelfPermission(navController.context, perm) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                                        }
-                                        if (allGranted) viewModel.connectToEsp32() else permissionLauncher.launch(permissions)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(Icons.Default.QrCode, contentDescription = null, tint = SecondaryOrange, modifier = Modifier.size(20.dp))
                                     }
-                                ) {
-                                    Text(text = "Estado ESP32", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(if (bluetoothConnectionState is BluetoothConnectionState.Connected) Color.Green else Color.Red))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = when (val s = bluetoothConnectionState) {
-                                                is BluetoothConnectionState.Connected -> "CONECTADO (${s.deviceAddress})"
-                                                is BluetoothConnectionState.Connecting -> "CONECTANDO..."
-                                                is BluetoothConnectionState.Error -> "ERROR"
-                                                else -> "DESCONECTADO"
-                                            },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (bluetoothConnectionState is BluetoothConnectionState.Connected) Color.Black else Color.Gray,
-                                            fontSize = if (bluetoothConnectionState is BluetoothConnectionState.Connected) 11.sp else 12.sp
-                                        )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column {
+                                        Text("Aprovisionar Conductor", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        Text("Generar código de configuración", fontSize = 12.sp, color = Color.Gray)
                                     }
                                 }
-                                
-                                Button(
-                                    onClick = { navController.navigate(ESPConfig) },
-                                    enabled = bluetoothConnectionState is BluetoothConnectionState.Connected,
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Icon(Icons.Default.SettingsInputComponent, contentDescription = null, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("CONFIG")
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    // 4. Search and List Header
+                    item {
+                        Column {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "Usuarios Activos", color = MaterialTheme.colorScheme.onBackground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Box(modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                                    Text(text = "${uiState.activeUsers.size} En línea", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
                     }
 
+                    // 5. User Feed
                     val filteredUsers = uiState.activeUsers.filter {
                         it.name.contains(searchQuery, ignoreCase = true) || it.document.contains(searchQuery, ignoreCase = true)
                     }
 
-                    items(filteredUsers) { user ->
-                        ActiveUserCard(
-                            user = user, 
-                            onDelete = { userToDelete = user; showDeleteDialog = true }, 
-                            onUpdate = { viewModel.updateUser(it) }
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                    if (filteredUsers.isEmpty()) {
+                        item {
+                            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                                Text("No hay usuarios activos que coincidan", color = Color.Gray, fontSize = 14.sp)
+                            }
+                        }
+                    } else {
+                        items(filteredUsers, key = { it.id }) { user ->
+                            ActiveUserCard(
+                                user = user, 
+                                onDelete = { userToDelete = user; showDeleteDialog = true }, 
+                                onUpdate = { viewModel.updateUser(it) }
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                        }
                     }
-
                 }
             }
 
@@ -289,7 +506,7 @@ fun HomeScreen(
                     dismissButton = {
                         TextButton(onClick = { showDeleteDialog = false }) { Text("CANCELAR", color = Color.Gray) }
                     },
-                    containerColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(24.dp)
                 )
             }
@@ -330,7 +547,7 @@ fun HomeScreen(
                 CustomSnackbar(
                     message = data.visuals.message,
                     icon = if (isBluetooth) Icons.Default.BluetoothDisabled else Icons.Default.Lock,
-                    containerColor = if (isBluetooth) PrimaryBlue else SecondaryOrange
+                    containerColor = if (isBluetooth) MaterialTheme.colorScheme.primary else SecondaryOrange
                 )
             }
         }
@@ -402,7 +619,7 @@ fun ProvisioningQrDialog(
 
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = SurfaceGrey.copy(alpha = 0.4f),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
@@ -416,7 +633,7 @@ fun ProvisioningQrDialog(
                             text = com.example.escanqradmin.data.network.ApiConstants.BASE_URL,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = PrimaryBlue,
+                            color = MaterialTheme.colorScheme.primary,
                             maxLines = 1
                         )
                     }
@@ -428,10 +645,10 @@ fun ProvisioningQrDialog(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("CERRAR", fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                Text("CERRAR", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
         },
-        containerColor = Color.White,
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(24.dp)
     )
 }

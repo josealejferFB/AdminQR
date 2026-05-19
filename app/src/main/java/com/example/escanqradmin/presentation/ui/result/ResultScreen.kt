@@ -28,6 +28,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.escanqradmin.domain.model.QrContent
 import com.example.escanqradmin.presentation.theme.color.PrimaryBlue
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.Dispatchers
@@ -38,8 +40,6 @@ private val StepGreen  = Color(0xFF2E7D32)
 private val StepRed    = Color(0xFFC62828)
 private val StepGray   = Color(0xFFBDBDBD)
 private val StepPurple = Color(0xFF7B1FA2)
-private val SurfaceCard = Color.White
-private val PageBg      = Color(0xFFF5F7FA)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,25 +52,25 @@ fun ResultScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
-        containerColor      = PageBg,
+        containerColor      = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
             TopAppBar(
                 modifier = Modifier.statusBarsPadding().displayCutoutPadding(),
-                title = { Text("Activación de Usuario", fontWeight = FontWeight.Bold, color = Color.White) },
+                title = { Text("Activación de Usuario", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                 navigationIcon = {
                     IconButton(onClick = onScanAgain) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = MaterialTheme.colorScheme.onSurface)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryBlue)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         }
-    ) { padding ->
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)
                 .navigationBarsPadding(),
@@ -122,11 +122,11 @@ fun ResultScreen(
                     onClick  = onScanAgain,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     shape    = RoundedCornerShape(16.dp),
-                    border   = androidx.compose.foundation.BorderStroke(1.dp, PrimaryBlue.copy(alpha = 0.5f))
+                    border   = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                 ) {
-                    Icon(Icons.Default.QrCodeScanner, null, tint = PrimaryBlue, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.QrCodeScanner, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("ESCANEAR OTRO QR", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                    Text("ESCANEAR OTRO QR", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.height(16.dp))
             }
@@ -142,22 +142,19 @@ private fun buildProvisioningJson(): String =
 
 @Composable
 private fun UserInfoCard(data: QrContent) {
-    Card(
-        modifier  = Modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(20.dp),
-        colors    = CardDefaults.cardColors(containerColor = SurfaceCard),
-        elevation = CardDefaults.cardElevation(2.dp)
+    AppCard(
+        modifier  = Modifier.fillMaxWidth()
     ) {
         Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                modifier        = Modifier.size(52.dp).background(PrimaryBlue.copy(alpha = 0.1f), CircleShape),
+                modifier        = Modifier.size(52.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, null, tint = PrimaryBlue, modifier = Modifier.size(28.dp))
+                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(data.userName, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Text(data.userName, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
                 Text("Cédula: ${data.cedula}", fontSize = 13.sp, color = Color.Gray)
             }
             Surface(shape = RoundedCornerShape(8.dp), color = StepGreen.copy(alpha = 0.12f)) {
@@ -194,11 +191,10 @@ private fun StepCard(
         is StepStatus.Failed -> StepRed
         else                 -> stepColor
     }
-    Card(
+    AppCard(
         modifier  = Modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(20.dp),
-        colors    = CardDefaults.cardColors(containerColor = if (isLocked) SurfaceCard.copy(alpha = 0.6f) else SurfaceCard),
-        elevation = CardDefaults.cardElevation(if (isLocked) 0.dp else 2.dp)
+        colors    = AppCardDefaults.colors(containerColor = if (isLocked) MaterialTheme.colorScheme.surface.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surface),
+        elevation = if (isLocked) CardDefaults.cardElevation(defaultElevation = 0.dp) else AppCardDefaults.Elevation
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -215,7 +211,7 @@ private fun StepCard(
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = if (isLocked) Color.Gray else Color.Black)
+                    Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = if (isLocked) Color.Gray else MaterialTheme.colorScheme.onSurface)
                     Text(subtitle, fontSize = 12.sp, color = Color.Gray)
                 }
             }

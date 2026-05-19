@@ -14,13 +14,13 @@ import com.example.escanqradmin.presentation.theme.type.Typography
 import com.example.escanqradmin.presentation.theme.color.*
 
 private val DarkColorScheme = darkColorScheme(
-    primary = PrimaryBlue,
+    primary = Color(0xFF8FA9FF),
     secondary = SecondaryOrange,
-    tertiary = SurfaceGrey,
+    tertiary = Color(0xFF2E2E2E), // A darker grey for dark mode tertiary
     background = Color(0xFF121212),
     surface = Color(0xFF1E1E1E),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
+    onPrimary = Color.Black,
+    onSecondary = Color.Black,
     onBackground = Color.White,
     onSurface = Color.White
 )
