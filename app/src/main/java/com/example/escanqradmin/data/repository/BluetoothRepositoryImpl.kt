@@ -24,7 +24,8 @@ import javax.inject.Singleton
 
 @Singleton
 class BluetoothRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val scope: CoroutineScope
 ) : BluetoothRepository {
 
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -47,7 +48,6 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     private var socket: BluetoothSocket? = null
     private var connectionJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val readBuffer = StringBuilder()
 
     private val receiver = object : BroadcastReceiver() {

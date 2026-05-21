@@ -12,6 +12,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -78,6 +79,17 @@ fun ScannerScreen(
     val scannedData by viewModel.scannedData.collectAsState()
     var isNavigating by remember { mutableStateOf(false) }
 
+    var torchEnabled by remember { mutableStateOf(false) }
+    var showManualDialog by remember { mutableStateOf(false) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.errorEvents.collect { msg ->
+            snackbarHostState.showSnackbar(message = msg, duration = SnackbarDuration.Short)
+        }
+    }
+
     LaunchedEffect(scannedData) {
         if (scannedData != null && !isNavigating) {
             isNavigating = true
@@ -90,9 +102,14 @@ fun ScannerScreen(
         if (hasCameraPermission) {
             CameraPreview(
                 lifecycleOwner = lifecycleOwner,
-                onBarcodeDetected = { viewModel.processBarcode(it) }
+                onBarcodeDetected = { viewModel.processBarcode(it) },
+                torchEnabled = torchEnabled
             )
-            ScannerOverlay()
+            ScannerOverlay(
+                torchEnabled = torchEnabled,
+                onToggleTorch = { torchEnabled = !torchEnabled },
+                onManualEntry = { showManualDialog = true }
+            )
         } else {
             Box(
                 modifier = Modifier
@@ -123,14 +140,38 @@ fun ScannerScreen(
                 .align(Alignment.BottomCenter)
                 .zIndex(1f)
         )
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 100.dp)
+                .zIndex(10f)
+        )
+    }
+
+    if (showManualDialog) {
+        ManualEntryDialog(
+            onDismiss = { showManualDialog = false },
+            onConfirm = { androidId, userName, cedula, plate ->
+                showManualDialog = false
+                if (!isNavigating) {
+                    isNavigating = true
+                    onQrScanned(QrContent(androidId, userName, cedula, plate))
+                }
+            }
+        )
     }
 }
 
 @Composable
 fun CameraPreview(
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
-    onBarcodeDetected: (String) -> Unit
+    onBarcodeDetected: (String) -> Unit,
+    torchEnabled: Boolean = false
 ) {
+    var camera by remember { mutableStateOf<Camera?>(null) }
+
     AndroidView(
         factory = { ctx ->
             val previewView = PreviewView(ctx)
@@ -163,7 +204,7 @@ fun CameraPreview(
 
                 try {
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
+                    camera = cameraProvider.bindToLifecycle(
                         lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
@@ -178,10 +219,24 @@ fun CameraPreview(
         },
         modifier = Modifier.fillMaxSize()
     )
+
+    LaunchedEffect(torchEnabled) {
+        val cam = camera ?: return@LaunchedEffect
+        try {
+            if (cam.cameraInfo.hasFlashUnit()) {
+                cam.cameraControl.enableTorch(torchEnabled)
+            }
+        } catch (_: Exception) {
+        }
+    }
 }
 
 @Composable
-fun ScannerOverlay() {
+fun ScannerOverlay(
+    torchEnabled: Boolean = false,
+    onToggleTorch: () -> Unit = {},
+    onManualEntry: () -> Unit = {}
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "scanLine")
     val lineOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -323,13 +378,18 @@ fun ScannerOverlay() {
                 Box(
                     modifier = Modifier
                         .size(56.dp)
-                        .background(Color.White.copy(alpha = 0.2f), CircleShape),
+                        .background(
+                            if (torchEnabled) PrimaryBlue.copy(alpha = 0.5f) 
+                            else Color.White.copy(alpha = 0.2f), 
+                            CircleShape
+                        )
+                        .clickable { onToggleTorch() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.FlashlightOn,
-                        contentDescription = "Flashlight",
-                        tint = Color.White,
+                        imageVector = if (torchEnabled) Icons.Default.FlashlightOff else Icons.Default.FlashlightOn,
+                        contentDescription = if (torchEnabled) "Apagar linterna" else "Encender linterna",
+                        tint = if (torchEnabled) PrimaryBlue else Color.White,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -338,6 +398,7 @@ fun ScannerOverlay() {
                 Row(
                     modifier = Modifier
                         .height(56.dp)
+                        .clickable { onManualEntry() }
                         .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp))
                         .padding(horizontal = 24.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -361,4 +422,71 @@ fun ScannerOverlay() {
             }
         }
     }
+}
+
+@Composable
+private fun ManualEntryDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (androidId: String, userName: String, cedula: String, plate: String) -> Unit
+) {
+    var androidId by remember { mutableStateOf("") }
+    var userName by remember { mutableStateOf("") }
+    var cedula by remember { mutableStateOf("") }
+    var plate by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ingreso Manual", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = androidId,
+                    onValueChange = { androidId = it },
+                    label = { Text("Android ID") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = userName,
+                    onValueChange = { userName = it },
+                    label = { Text("Nombre") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = cedula,
+                    onValueChange = { cedula = it },
+                    label = { Text("Cédula") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                OutlinedTextField(
+                    value = plate,
+                    onValueChange = { plate = it },
+                    label = { Text("Placa") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(androidId, userName, cedula, plate) },
+                enabled = userName.isNotBlank() && cedula.isNotBlank()
+            ) {
+                Text("CONTINUAR", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCELAR", color = Color.Gray)
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(24.dp)
+    )
 }

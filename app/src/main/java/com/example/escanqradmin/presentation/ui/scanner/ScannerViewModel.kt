@@ -2,7 +2,10 @@ package com.example.escanqradmin.presentation.ui.scanner
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import com.example.escanqradmin.domain.model.QrContent
@@ -11,6 +14,9 @@ import com.example.escanqradmin.domain.model.QrContent
 class ScannerViewModel @Inject constructor() : ViewModel() {
     private val _scannedData = MutableStateFlow<QrContent?>(null)
     val scannedData = _scannedData.asStateFlow()
+
+    private val _errorEvents = MutableSharedFlow<String>()
+    val errorEvents: SharedFlow<String> = _errorEvents.asSharedFlow()
 
     fun processBarcode(rawValue: String?) {
         if (rawValue == null || _scannedData.value != null) return
@@ -30,7 +36,7 @@ class ScannerViewModel @Inject constructor() : ViewModel() {
             )
             
         } catch (e: Exception) {
-            e.printStackTrace()
+            _errorEvents.tryEmit("QR inválido: ${e.message}")
         }
     }
     

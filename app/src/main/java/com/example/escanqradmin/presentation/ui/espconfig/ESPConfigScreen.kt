@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 
 // ── Design tokens ─────────────────────────────────────────────────
 private val ConsoleBg      = Color(0xFF0D1117)
@@ -54,11 +55,18 @@ fun ESPConfigScreen(
     viewModel: ESPConfigViewModel = hiltViewModel()
 ) {
     val st by viewModel.uiState.collectAsState()
+    val btState by viewModel.connectionState.collectAsState()
     val listState = rememberLazyListState()
     val isIdle = st.flowState == EspFlowState.IDLE
 
     LaunchedEffect(st.messages.size) {
         if (st.messages.isNotEmpty()) listState.animateScrollToItem(st.messages.size - 1)
+    }
+
+    LaunchedEffect(btState) {
+        if (btState !is BluetoothConnectionState.Connected && st.flowState != EspFlowState.IDLE) {
+            viewModel.dismissForm()
+        }
     }
 
     Scaffold(
@@ -89,9 +97,20 @@ fun ESPConfigScreen(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
-                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(RxColor))
+                        val statusColor = when (btState) {
+                            is BluetoothConnectionState.Connected -> RxColor
+                            is BluetoothConnectionState.Error -> Color(0xFFD32F2F)
+                            else -> MutedText
+                        }
+                        val statusText = when (btState) {
+                            is BluetoothConnectionState.Connected -> "Conectado"
+                            is BluetoothConnectionState.Error -> "Error"
+                            is BluetoothConnectionState.Connecting -> "Conectando..."
+                            else -> "Desconectado"
+                        }
+                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(statusColor))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Conectado", color = RxColor, fontSize = 12.sp)
+                        Text(statusText, color = statusColor, fontSize = 12.sp)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = ConsolePanel)

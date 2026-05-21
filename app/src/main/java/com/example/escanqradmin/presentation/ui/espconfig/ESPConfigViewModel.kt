@@ -2,12 +2,18 @@ package com.example.escanqradmin.presentation.ui.espconfig
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
@@ -64,6 +70,13 @@ class ESPConfigViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ESPConfigUiState())
     val uiState = _uiState.asStateFlow()
+
+    val connectionState: StateFlow<BluetoothConnectionState> =
+        bluetoothRepository.connectionState.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = BluetoothConnectionState.Idle
+        )
 
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
@@ -125,7 +138,11 @@ class ESPConfigViewModel @Inject constructor(
             EspFlowState.WAIT_JSON_CONFIG -> {
                 val f = st.form
                 val portInt = f.port.toIntOrNull() ?: 0
-                """{"protocolo":"${f.protocolo}","ip_odoo":"${f.ip_odoo}","port":$portInt}"""
+                buildJsonObject {
+                    put("protocolo", f.protocolo)
+                    put("ip_odoo", f.ip_odoo)
+                    put("port", portInt)
+                }.toString()
             }
             EspFlowState.WAIT_WIFI_SSID -> st.form.ssid.trim()
             EspFlowState.WAIT_WIFI_PASS -> st.form.password.trim()

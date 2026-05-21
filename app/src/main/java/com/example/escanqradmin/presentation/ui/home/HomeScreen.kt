@@ -46,6 +46,9 @@ import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
 import com.example.escanqradmin.presentation.ui.home.components.SearchBar
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
+import com.example.escanqradmin.presentation.common.sharedcomponents.QrCodeBox
+import com.example.escanqradmin.presentation.common.util.buildProvisioningJson
+import com.example.escanqradmin.data.network.ApiConstants
 import kotlinx.coroutines.flow.collectLatest
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -558,9 +561,7 @@ fun HomeScreen(
 fun ProvisioningQrDialog(
     onDismiss: () -> Unit
 ) {
-    val payload = remember {
-        """{"endpoint":"${com.example.escanqradmin.data.network.ApiConstants.BASE_URL}","token":"${com.example.escanqradmin.domain.model.SecurityConstants.PROVISIONING_TOKEN}"}"""
-    }
+    val payload = remember { buildProvisioningJson() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -604,16 +605,7 @@ fun ProvisioningQrDialog(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                Box(
-                    modifier = Modifier
-                        .size(200.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.White)
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    HomeScreenQrImage(content = payload, size = 180)
-                }
+                QrCodeBox(content = payload, size = 180.dp)
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -630,7 +622,7 @@ fun ProvisioningQrDialog(
                             color = Color.Gray
                         )
                         Text(
-                            text = com.example.escanqradmin.data.network.ApiConstants.BASE_URL,
+                            text = ApiConstants.BASE_URL,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
@@ -653,37 +645,4 @@ fun ProvisioningQrDialog(
     )
 }
 
-@Composable
-fun HomeScreenQrImage(content: String, size: Int) {
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
 
-    LaunchedEffect(content) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            try {
-                val writer = com.google.zxing.qrcode.QRCodeWriter()
-                val bitMatrix = writer.encode(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size)
-                val width = bitMatrix.width
-                val height = bitMatrix.height
-                val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-                for (x in 0 until width) {
-                    for (y in 0 until height) {
-                        bmp.setPixel(x, y, if (bitMatrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
-                    }
-                }
-                bitmap = bmp
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    bitmap?.let {
-        Image(
-            bitmap = it.asImageBitmap(),
-            contentDescription = "QR Code",
-            modifier = Modifier.size(size.dp)
-        )
-    } ?: Box(modifier = Modifier.size(size.dp), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = SecondaryOrange)
-    }
-}
