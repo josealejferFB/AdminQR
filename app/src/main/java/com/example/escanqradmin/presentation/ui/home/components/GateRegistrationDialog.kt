@@ -140,7 +140,7 @@ fun GateRegistrationDialog(
 }
 
 @Composable
-private fun SelectBluetoothContent(
+private fun ColumnScope.SelectBluetoothContent(
     scannedDevices: List<BluetoothDeviceDomain>,
     pairedDevices: List<BluetoothDeviceDomain>,
     isScanning: Boolean,

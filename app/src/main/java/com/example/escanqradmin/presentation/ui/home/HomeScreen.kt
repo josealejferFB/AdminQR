@@ -4,8 +4,15 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,32 +31,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.foundation.Image
-import androidx.compose.ui.text.style.TextAlign
-import com.example.escanqradmin.presentation.common.sharedcomponents.CustomBottomBar
+import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnackbar
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
-import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnackbar
 import com.example.escanqradmin.presentation.navigation.Config
 import com.example.escanqradmin.presentation.navigation.ESPConfig
 import com.example.escanqradmin.presentation.theme.color.*
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
+import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
 import com.example.escanqradmin.presentation.ui.home.components.SearchBar
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.QrCodeBox
 import com.example.escanqradmin.presentation.common.util.buildProvisioningJson
 import com.example.escanqradmin.data.network.ApiConstants
 import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.Image
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,15 +69,18 @@ fun HomeScreen(
     val isScanning by viewModel.isScanning.collectAsState()
     val bluetoothConnectionState by viewModel.bluetoothConnectionState.collectAsState()
 
+    val gateRegistrationViewModel: GateRegistrationViewModel = hiltViewModel()
+
     val snackbarHostState = remember { SnackbarHostState() }
 
     var searchQuery by remember { mutableStateOf("") }
+    var showActiveUsers by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showBluetoothDialog by remember { mutableStateOf(false) }
     var showProvisioningDialog by remember { mutableStateOf(false) }
+    var showGateRegistrationDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
 
-    // Observe snackbar messages
     LaunchedEffect(Unit) {
         viewModel.refreshData()
         viewModel.snackbarMessages.collectLatest { message ->
@@ -98,7 +106,7 @@ fun HomeScreen(
         } else {
             arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         }
-        
+
         val allGranted = permissions.all { perm ->
             androidx.core.content.ContextCompat.checkSelfPermission(navController.context, perm) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }
@@ -115,86 +123,91 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.foundation.Image(
-                        painter = androidx.compose.ui.res.painterResource(id = com.example.escanqradmin.R.drawable.ic_app_logo),
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "EscanQR",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp
-                    )
-                }
-                IconButton(
-                    onClick = { viewModel.toggleTheme() },
-                    modifier = Modifier.size(36.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = "Alternar Modo Oscuro",
-                        tint = if (isDarkMode) SecondaryOrange else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+            TopAppBar(
+                windowInsets = WindowInsets(0.dp),
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = com.example.escanqradmin.R.drawable.ic_app_logo),
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "EscanQR",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.toggleTheme() },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = "Alternar modo oscuro",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState) { data ->
+                val isBluetooth = data.visuals.message.contains("Bluetooth", ignoreCase = true)
+                CustomSnackbar(
+                    message = data.visuals.message,
+                    icon = if (isBluetooth) Icons.Default.BluetoothDisabled else Icons.Default.Lock,
+                    containerColor = if (isBluetooth) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                )
             }
         }
-    ) { _ ->
-        Box(modifier = Modifier.fillMaxSize()) {
+    ) { paddingValues ->
+        Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             val refreshState = rememberPullToRefreshState()
-            
+
             PullToRefreshBox(
                 state = refreshState,
                 isRefreshing = uiState.isRefreshing,
                 onRefresh = { viewModel.refreshData() },
-                modifier = Modifier.fillMaxSize(),
-                indicator = {
-                    PullToRefreshDefaults.Indicator(
-                        state = refreshState,
-                        isRefreshing = uiState.isRefreshing,
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 80.dp)
-                    )
-                }
+                modifier = Modifier.fillMaxSize()
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 80.dp, bottom = 120.dp, start = 24.dp, end = 24.dp),
+                    contentPadding = PaddingValues(start = 24.dp, top = 0.dp, end = 24.dp, bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
-                        Column(modifier = Modifier.padding(top = 8.dp)) {
-                            if (uiState.isServerOnline) {
+                        if (uiState.isServerOnline) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .size(8.dp)
-                                            .background(Color.Green, CircleShape)
+                                            .size(10.dp)
+                                            .background(Color(0xFF22C55E), CircleShape)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "ESTÁS EN LÍNEA",
-                                        color = Color.Gray,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
+                                        text = "Sistema en línea",
+                                        color = Color(0xFF22C55E),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
                                     )
                                 }
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
                                     text = "Panel de Control",
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onBackground,
                                     fontSize = 28.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                                    fontWeight = FontWeight.Bold,
                                 )
                             } else {
                                 AppCard(
@@ -202,7 +215,7 @@ fun HomeScreen(
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp),
                                     colors = AppCardDefaults.colors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
-                                    border = AppCardDefaults.border(color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
+                                    border = AppCardDefaults.border(color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
                                 ) {
                                     Column(modifier = Modifier.padding(16.dp)) {
                                         Row(
@@ -253,24 +266,21 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "Panel de Control",
-                                    color = MaterialTheme.colorScheme.primary,
+                                    color = MaterialTheme.colorScheme.onBackground,
                                     fontSize = 28.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
+                                    fontWeight = FontWeight.Bold,
                                 )
                             }
-                        }
                     }
 
-                    // 1. ESP32 Connection Panel
                     item {
                         AppCard(
                             modifier = Modifier.fillMaxWidth(),
                             border = AppCardDefaults.border(
-                                if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
-                                    Color.Green.copy(alpha = 0.3f) 
-                                else 
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                if (bluetoothConnectionState is BluetoothConnectionState.Connected)
+                                    Color.Green.copy(alpha = 0.1f)
+                                else
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                             )
                         ) {
                             Column(modifier = Modifier.padding(20.dp)) {
@@ -284,23 +294,23 @@ fun HomeScreen(
                                             modifier = Modifier
                                                 .size(44.dp)
                                                 .background(
-                                                    if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
-                                                        Color.Green.copy(alpha = 0.15f) 
-                                                    else 
-                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), 
+                                                    if (bluetoothConnectionState is BluetoothConnectionState.Connected)
+                                                        Color.Green.copy(alpha = 0.15f)
+                                                    else
+                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                                                     CircleShape
                                                 ),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
-                                                imageVector = if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
-                                                    Icons.Default.BluetoothConnected 
-                                                else 
+                                                imageVector = if (bluetoothConnectionState is BluetoothConnectionState.Connected)
+                                                    Icons.Default.BluetoothConnected
+                                                else
                                                     Icons.Default.Bluetooth,
                                                 contentDescription = null,
-                                                tint = if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
-                                                    Color.Green 
-                                                else 
+                                                tint = if (bluetoothConnectionState is BluetoothConnectionState.Connected)
+                                                    Color.Green
+                                                else
                                                     MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(22.dp)
                                             )
@@ -308,9 +318,9 @@ fun HomeScreen(
                                         Spacer(modifier = Modifier.width(16.dp))
                                         Column {
                                             Text(
-                                                "Lector Físico (ESP32)", 
-                                                fontWeight = FontWeight.Bold, 
-                                                fontSize = 15.sp, 
+                                                "Lector Físico (ESP32)",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp,
                                                 color = MaterialTheme.colorScheme.onSurface
                                             )
                                             Text(
@@ -321,30 +331,52 @@ fun HomeScreen(
                                                     else -> "DESCONECTADO"
                                                 },
                                                 fontSize = 12.sp,
-                                                color = if (bluetoothConnectionState is BluetoothConnectionState.Connected) 
-                                                    Color.Green.copy(alpha = 0.8f) 
-                                                else 
+                                                color = if (bluetoothConnectionState is BluetoothConnectionState.Connected)
+                                                    Color.Green.copy(alpha = 0.8f)
+                                                else
                                                     Color.Gray,
                                                 fontWeight = FontWeight.Medium
                                             )
                                         }
                                     }
                                     Box(
-                                        modifier = Modifier
-                                            .size(10.dp)
-                                            .background(
-                                                color = when (bluetoothConnectionState) {
-                                                    is BluetoothConnectionState.Connected -> Color.Green
-                                                    is BluetoothConnectionState.Connecting -> SecondaryOrange
-                                                    else -> Color.Gray
-                                                },
-                                                shape = CircleShape
+                                        modifier = Modifier.size(10.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (bluetoothConnectionState is BluetoothConnectionState.Connected) {
+                                            val pulseTransition = rememberInfiniteTransition(label = "btPulse")
+                                            val pulseAlpha by pulseTransition.animateFloat(
+                                                initialValue = 0.5f,
+                                                targetValue = 0f,
+                                                animationSpec = infiniteRepeatable(
+                                                    animation = tween(1000, easing = EaseOutCubic),
+                                                    repeatMode = RepeatMode.Restart
+                                                ),
+                                                label = "pulseAlpha"
                                             )
-                                    )
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .background(Color.Green.copy(alpha = pulseAlpha), CircleShape)
+                                            )
+                                        }
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .background(
+                                                    color = when (bluetoothConnectionState) {
+                                                        is BluetoothConnectionState.Connected -> Color.Green
+                                                        is BluetoothConnectionState.Connecting -> MaterialTheme.colorScheme.secondary
+                                                        else -> Color.Gray
+                                                    },
+                                                    shape = CircleShape
+                                                )
+                                        )
+                                    }
                                 }
-                                
+
                                 Spacer(modifier = Modifier.height(16.dp))
-                                
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -366,14 +398,14 @@ fun HomeScreen(
                                             onClick = requestBluetoothAction,
                                             modifier = Modifier.weight(1f),
                                             shape = RoundedCornerShape(14.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
                                         ) {
                                             Icon(Icons.Default.Bluetooth, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Vincular", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text("Vincular", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
                                         }
                                     }
-                                    
+
                                     FilledTonalButton(
                                         onClick = { navController.navigate(ESPConfig) },
                                         enabled = bluetoothConnectionState is BluetoothConnectionState.Connected,
@@ -389,107 +421,164 @@ fun HomeScreen(
                         }
                     }
 
-                    // 2. Metrics Card
                     item {
-                        AppCard(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(20.dp).fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(text = uiState.totalScans.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                                    Text(text = "ESCANEOS TOTALES", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                                }
-                                
-                                Box(modifier = Modifier.width(1.dp).height(50.dp).background(Color.LightGray.copy(alpha = 0.5f)))
-                                
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(Icons.Default.People, contentDescription = null, tint = SecondaryOrange, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(text = uiState.totalUsers.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = SecondaryOrange)
-                                    Text(text = "USUARIOS REGISTRADOS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                                }
-                            }
-                        }
-                    }
-
-                    // 3. Aprovisionamiento Card
-                    item {
-                        AppCard(
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            border = AppCardDefaults.border(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                            onClick = { showProvisioningDialog = true }
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp).fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                            AppCard(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(120.dp)
+                                    .border(
+                                        BorderStroke(1.dp, MaterialTheme.colorScheme.secondary),
+                                        shape = AppCardDefaults.Shape
+                                    ),
+                                onClick = { showProvisioningDialog = true },
+                                border = null
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.QrCode, contentDescription = null, tint = SecondaryOrange, modifier = Modifier.size(20.dp))
-                                    }
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                    Column {
-                                        Text("Aprovisionar Conductor", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface)
-                                        Text("Generar código de configuración", fontSize = 12.sp, color = Color.Gray)
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.QrCode, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("Aprovisionar", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        Text("QR", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
                                     }
                                 }
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(18.dp))
+                            }
+
+                            AppCard(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(120.dp)
+                                    .border(
+                                        BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary),
+                                        shape = AppCardDefaults.Shape
+                                    ),
+                                onClick = { showGateRegistrationDialog = true },
+                                border = null
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(Icons.Default.Router, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(20.dp))
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text("Registrar", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                        Text("Portón", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.tertiary)
+                                    }
+                                }
+                            }
+
+                            AppCard(
+                                modifier = Modifier.weight(1f).height(120.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Icon(Icons.Default.People, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(text = uiState.totalUsers.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.secondary)
+                                    Text(text = "USUARIOS REGISTRADOS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
+                                }
                             }
                         }
                     }
-
-                    // 4. Search and List Header
+                    
                     item {
                         Column {
-                            Spacer(modifier = Modifier.height(8.dp))
                             SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
                             Spacer(modifier = Modifier.height(20.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "Usuarios Activos", color = MaterialTheme.colorScheme.onBackground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                Box(modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                                    Text(text = "${uiState.activeUsers.size} En línea", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable { showActiveUsers = !showActiveUsers },
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = "Usuarios Activos", color = MaterialTheme.colorScheme.onBackground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Box(modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
+                                        Text(text = "${uiState.activeUsers.size} En línea", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
+                                Icon(
+                                    imageVector = if (showActiveUsers) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = if (showActiveUsers) "Contraer sección" else "Expandir sección",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(24.dp)
+                                )
                             }
                         }
                     }
 
-                    // 5. User Feed
                     val filteredUsers = uiState.activeUsers.filter {
                         it.name.contains(searchQuery, ignoreCase = true) || it.document.contains(searchQuery, ignoreCase = true)
                     }
 
-                    if (filteredUsers.isEmpty()) {
-                        item {
-                            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
-                                Text("No hay usuarios activos que coincidan", color = Color.Gray, fontSize = 14.sp)
+                    item {
+                        if (filteredUsers.isEmpty()) {
+                            AnimatedVisibility(
+                                visible = showActiveUsers,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
+                                AppCard(modifier = Modifier.fillMaxWidth()) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Icon(
+                                            Icons.Default.PeopleOutline,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.outline,
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+                                        Text(
+                                            "No hay usuarios activos",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
                             }
                         }
-                    } else {
-                        items(filteredUsers, key = { it.id }) { user ->
-                            ActiveUserCard(
-                                user = user, 
-                                onDelete = { userToDelete = user; showDeleteDialog = true }, 
-                                onUpdate = { viewModel.updateUser(it) }
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    items(filteredUsers, key = { it.id }) { user ->
+                        AnimatedVisibility(
+                            visible = showActiveUsers,
+                            enter = fadeIn() + expandVertically(),
+                            exit = fadeOut() + shrinkVertically()
+                        ) {
+                            Column {
+                                ActiveUserCard(
+                                    user = user,
+                                    onDelete = { userToDelete = user; showDeleteDialog = true },
+                                    onUpdate = { viewModel.updateUser(it) }
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
                         }
                     }
                 }
@@ -534,23 +623,41 @@ fun HomeScreen(
                 )
             }
 
-            CustomBottomBar(
-                navController = navController,
-                isFloating = true,
-                isBluetoothConnected = bluetoothConnectionState is BluetoothConnectionState.Connected,
-                snackbarHostState = snackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter).zIndex(1f)
-            )
+            if (showGateRegistrationDialog) {
+                val gateUiState by gateRegistrationViewModel.uiState.collectAsState()
 
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp).zIndex(100f)
-            ) { data ->
-                val isBluetooth = data.visuals.message.contains("Bluetooth", ignoreCase = true)
-                CustomSnackbar(
-                    message = data.visuals.message,
-                    icon = if (isBluetooth) Icons.Default.BluetoothDisabled else Icons.Default.Lock,
-                    containerColor = if (isBluetooth) MaterialTheme.colorScheme.primary else SecondaryOrange
+                LaunchedEffect(Unit) {
+                    gateRegistrationViewModel.events.collectLatest { event ->
+                        when (event) {
+                            GateRegistrationEvent.CloseDialog -> {
+                                showGateRegistrationDialog = false
+                            }
+                        }
+                    }
+                }
+
+                GateRegistrationDialog(
+                    uiState = gateUiState,
+                    scannedDevices = scannedDevices.filter { it.name?.startsWith("ESP32", ignoreCase = true) == true },
+                    pairedDevices = pairedDevices.filter { it.name?.startsWith("ESP32", ignoreCase = true) == true },
+                    isScanning = isScanning,
+                    connectionState = bluetoothConnectionState,
+                    onStartScan = { viewModel.startDiscovery() },
+                    onStopScan = { viewModel.stopDiscovery() },
+                    onConnectToDevice = { address -> gateRegistrationViewModel.connectToBluetoothDevice(address) },
+                    onCancelConnection = { viewModel.disconnect() },
+                    onSsidChange = { gateRegistrationViewModel.setSsid(it) },
+                    onPasswordChange = { gateRegistrationViewModel.setPassword(it) },
+                    onSendWiFiConfig = { gateRegistrationViewModel.sendWiFiConfig() },
+                    onGateNameChange = { gateRegistrationViewModel.setGateName(it) },
+                    onGateDescriptionChange = { gateRegistrationViewModel.setGateDescription(it) },
+                    onRegisterGate = { gateRegistrationViewModel.registerGate() },
+                    onDismissError = { gateRegistrationViewModel.dismissError() },
+                    onDismiss = {
+                        gateRegistrationViewModel.closeDialog()
+                        showGateRegistrationDialog = false
+                    },
+                    onReset = { gateRegistrationViewModel.resetToSelectBluetooth() }
                 )
             }
         }
@@ -573,13 +680,13 @@ fun ProvisioningQrDialog(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .background(SecondaryOrange.copy(alpha = 0.15f), CircleShape),
+                        .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.QrCode,
                         contentDescription = null,
-                        tint = SecondaryOrange,
+                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -588,7 +695,7 @@ fun ProvisioningQrDialog(
                     text = "Aprovisionar Conductor",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
-                    textAlign = TextAlign.Center
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
             }
         },
@@ -601,7 +708,7 @@ fun ProvisioningQrDialog(
                     text = "Escanea este código QR desde la App de Conductor para sincronizar el servidor y la configuración de red automáticamente.",
                     fontSize = 12.sp,
                     color = Color.Gray,
-                    textAlign = TextAlign.Center,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
@@ -644,5 +751,3 @@ fun ProvisioningQrDialog(
         shape = RoundedCornerShape(24.dp)
     )
 }
-
-
