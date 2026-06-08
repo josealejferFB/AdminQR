@@ -168,7 +168,7 @@ void loop() {
 
       if (SerialBT.hasClient()) {
         digitalWrite(PIN_LED_WAIT, HIGH);
-        pantalla("BT CONECTADO", "Comandos:", "  config", "  wifi");
+        pantalla("BT CONECTADO", "Comandos:", "  config / wifi", "  o JSON");
         // Limpiar basura de conexión anterior
         while (SerialBT.available()) SerialBT.read();
         sistema.estado  = MODO_CONFIG_BT;
@@ -416,35 +416,30 @@ void pantalla(const char* l1, const char* l2, const char* l3, const char* l4) {
   display.display();
 }
 
-// Pantalla de estado idle: IP destacada con separador visual
+// Pantalla de estado idle: IP + MAC + BT
 void mostrarIdle() {
   display.clearDisplay();
   display.setTextSize(1);
 
   if (WiFi.status() == WL_CONNECTED) {
-    // --- Título ---
     display.setCursor(0, 0);
     display.println("SISTEMA LISTO");
-
-    // --- Separador horizontal ---
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
-    // --- IP destacada ---
     display.setCursor(0, 14);
     display.println("IP:");
     display.println(WiFi.localIP().toString());
 
-    // --- Separador inferior ---
-    display.drawLine(0, 39, 127, 39, SSD1306_WHITE);
+    display.setCursor(0, 33);
+    display.println("MAC:");
+    display.println(obtenerMacAddress());
 
-    // --- Info Bluetooth al pie ---
-    display.setCursor(0, 43);
-    display.println("BT: ESP32_Seguro");
+    display.drawLine(0, 53, 127, 53, SSD1306_WHITE);
+    display.setCursor(0, 55);
     display.print("WiFi: ");
     display.println(config.ssid);
 
-  } else {
-    // --- Sin WiFi ---
+  } else if (sistema.estado != MODO_CONECTANDO_WIFI) {
     display.setCursor(0, 0);
     display.println("SISTEMA LISTO");
     display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
@@ -452,7 +447,7 @@ void mostrarIdle() {
     display.println("WiFi: No conectado");
     display.println("");
     display.println("Configure via BT:");
-    display.println("  Envie 'wifi'");
+    display.println("  'wifi' o JSON");
   }
 
   display.display();
