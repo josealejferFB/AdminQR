@@ -60,6 +60,13 @@ struct {
   bool          ledState;
   String        ssidTemp;         // SSID temporal durante config WiFi vía BT
 
+  // [V7] Control asíncrono de WiFi
+  unsigned long wifiStartTime;
+  bool          wifiConnecting;
+
+  // [V7] Almacenar última respuesta MAC para /status
+  String        macAddress;
+
   // Control asíncrono del relé
   unsigned long releActivoDesde;
   bool          releActivo;
@@ -75,6 +82,7 @@ struct {
 #define MODO_CONFIG_ODOO  2   // Espera JSON con datos de Odoo
 #define MODO_WIFI_SSID    3   // Espera SSID por BT
 #define MODO_WIFI_PASS    4   // Espera contraseña WiFi por BT
+#define MODO_CONECTANDO_WIFI 5   // [V7] WiFi.begin no bloqueante
 
 // ========== PROTOTIPOS ==========
 void pantalla(const char* l1, const char* l2 = "", const char* l3 = "", const char* l4 = "");
@@ -84,6 +92,13 @@ void guardarConfigOdoo(const char* url);
 void construirUrlOdoo(const char* proto, const char* ip, int puerto);
 void conectarWiFi();
 void reportarIP();
+
+// [V7] Prototipos nuevos
+void reportarIPyMAC();
+void manejarConexionWiFiAsync();
+void agregarEndpointStatus();
+String obtenerMacAddress();
+
 void manejarAsincronos();
 
 // ============================================================
@@ -125,6 +140,10 @@ void setup() {
   sistema.mostrandoMsj = false;
   sistema.lastBlink    = 0;
   sistema.ledState     = false;
+
+  // [V7] Inicializar campos nuevos
+  sistema.wifiConnecting = false;
+  sistema.macAddress     = obtenerMacAddress();
 
   conectarWiFi();
   mostrarIdle();
