@@ -1,8 +1,10 @@
 package com.example.escanqradmin.data.repository
 
+import com.example.escanqradmin.data.network.ApiConstants
 import com.example.escanqradmin.data.network.ApiConstants.Endpoints.GET_CONDUCTORES
 import com.example.escanqradmin.data.network.ApiConstants.Endpoints.SYNC_VEHICULAR
 import com.example.escanqradmin.data.network.model.ConductoresResponse
+import com.example.escanqradmin.data.network.model.GateRegisterResponse
 import com.example.escanqradmin.domain.model.QrContent
 import com.example.escanqradmin.domain.repository.SyncRepository
 import kotlinx.coroutines.Dispatchers
@@ -76,10 +78,6 @@ class SyncRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    override suspend fun fetchEntries(): Result<List<QrContent>> = withContext(Dispatchers.IO) {
-        Result.success(emptyList())
     }
 
     override suspend fun refreshConductores(): Result<List<QrContent>> = withContext(Dispatchers.IO) {
@@ -213,6 +211,52 @@ class SyncRepositoryImpl @Inject constructor(
                         } else {
                             val msg = resultObj["message"]?.jsonPrimitive?.content ?: "Error desconocido"
                             Result.failure(Exception(msg))
+                        }
+                    }
+                } else {
+                    Result.failure(Exception("Error ${response.code}: ${response.message}"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun registerGate(name: String, macAddress: String, description: String): Result<GateRegisterResponse> = withContext(Dispatchers.IO) {
+        try {
+            val jsonBody = buildJsonObject {
+                put("jsonrpc", "2.0")
+                put("method", "call")
+                put("params", buildJsonObject {
+                    put("name", name)
+                    put("mac_address", macAddress)
+                    put("description", description)
+                })
+            }.toString()
+
+            val request = Request.Builder()
+                .url(ApiConstants.Endpoints.REGISTER_GATE)
+                .addHeader("Content-Type", "application/json")
+                .post(jsonBody.toRequestBody(mediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val bodyString = response.body?.string() ?: throw Exception("Empty body")
+                    val jsonElement = json.parseToJsonElement(bodyString)
+                    val jsonObject = jsonElement.jsonObject
+
+                    if (jsonObject.containsKey("error")) {
+                        val errObj = jsonObject["error"]
+                        Result.failure(Exception("Odoo Error: $errObj"))
+                    } else {
+                        val resultElement = jsonObject["result"] ?: throw Exception("Missing result in response")
+                        val gateResponse = json.decodeFromJsonElement<GateRegisterResponse>(resultElement)
+
+                        if (gateResponse.success) {
+                            Result.success(gateResponse)
+                        } else {
+                            Result.failure(Exception(gateResponse.message ?: "Error desconocido"))
                         }
                     }
                 } else {
