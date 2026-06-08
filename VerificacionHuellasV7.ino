@@ -202,7 +202,66 @@ void loop() {
         String cmd = SerialBT.readStringUntil('\n');
         cmd.trim();
 
-        if (cmd == "config") {
+        // ── [V7] Auto-detección: JSON vs texto ─────────────────
+        if (cmd.length() > 0 && cmd.charAt(0) == '{') {
+          StaticJsonDocument<256> doc;
+          DeserializationError error = deserializeJson(doc, cmd);
+
+          if (error) {
+            SerialBT.println("{\"status\":\"error\",\"message\":\"JSON inválido\"}");
+            pantalla("ERROR JSON", "Formato inválido");
+            sistema.msjDesde = millis();
+            sistema.mostrandoMsj = true;
+            sistema.estado = ESPERA_CONEXION;
+          } else {
+            const char* action = doc["action"] | "";
+
+            if (strcmp(action, "config_network") == 0) {
+              const char* ssid = doc["ssid"] | "";
+              const char* password = doc["password"] | "";
+
+              if (strlen(ssid) == 0) {
+                SerialBT.println("{\"status\":\"error\",\"message\":\"SSID requerido\"}");
+                pantalla("ERROR JSON", "SSID requerido");
+                sistema.msjDesde = millis();
+                sistema.mostrandoMsj = true;
+                sistema.estado = ESPERA_CONEXION;
+              } else {
+                prefs.begin("cfg", false);
+                prefs.putString("ssid", ssid);
+                prefs.putString("pass", password);
+                prefs.end();
+                config.ssid = String(ssid);
+                config.pass = String(password);
+                config.wifiConfigurado = true;
+
+                String mac = obtenerMacAddress();
+
+                String jsonResp = "{\"status\":\"success\",\"mac_address\":\""
+                                  + mac + "\",\"message\":\"Red configurada\"}";
+                SerialBT.println(jsonResp);
+
+                pantalla("CONFIG JSON OK", ("MAC: " + mac).c_str());
+
+                SerialBT.end();
+
+                sistema.wifiConnecting = true;
+                sistema.wifiStartTime = millis();
+                sistema.estado = MODO_CONECTANDO_WIFI;
+
+                Serial.println("[V7] JSON config_network OK. MAC: " + mac);
+              }
+            } else {
+              SerialBT.println("{\"status\":\"error\",\"message\":\"Acción desconocida\"}");
+              pantalla("ERROR JSON", ("Acción: " + String(action)));
+              sistema.msjDesde = millis();
+              sistema.mostrandoMsj = true;
+              sistema.estado = ESPERA_CONEXION;
+            }
+          }
+        }
+        // ── V6 Legacy: comandos texto ──────────────────────────
+        else if (cmd == "config") {
           pantalla("CONFIG ODOO", "Envie JSON:");
           SerialBT.println("OK_CONFIG");
           sistema.estado  = MODO_CONFIG_ODOO;
@@ -216,7 +275,7 @@ void loop() {
         }
         else {
           SerialBT.println("CMD_DESCONOCIDO");
-          sistema.timeout = millis(); // Resetear timeout en cada intento
+          sistema.timeout = millis();
         }
       }
       break;
@@ -511,4 +570,20 @@ void reportarIP() {
   else          Serial.println("[HTTP] Error reportando IP. Codigo: " + String(code));
 
   http.end();
+}
+
+// ============================================================
+//  [V7] OBTENER MAC ADDRESS
+// ============================================================
+String obtenerMacAddress() {
+    uint64_t chipid = ESP.getEfuseMac();
+    char mac[18];
+    snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+             (uint8_t)(chipid >> 40) & 0xFF,
+             (uint8_t)(chipid >> 32) & 0xFF,
+             (uint8_t)(chipid >> 24) & 0xFF,
+             (uint8_t)(chipid >> 16) & 0xFF,
+             (uint8_t)(chipid >> 8) & 0xFF,
+             (uint8_t)chipid & 0xFF);
+    return String(mac);
 }
