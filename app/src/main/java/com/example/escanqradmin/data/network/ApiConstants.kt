@@ -9,6 +9,7 @@ object ApiConstants {
     private var basePort: String = "8059"
     private var endpointSync: String = "/api/control_acceso"
     private var endpointConductores: String = "/api/get_conductores"
+    private var endpointRegisterGate: String = "/api/v1/gates/register"
 
     private const val PREFS_NAME = "api_config_prefs"
     private const val KEY_PROTOCOL = "base_protocol"
@@ -16,6 +17,7 @@ object ApiConstants {
     private const val KEY_PORT = "base_port"
     private const val KEY_ENDPOINT_SYNC = "endpoint_sync"
     private const val KEY_ENDPOINT_CONDUCTORES = "endpoint_conductores"
+    private const val KEY_ENDPOINT_REGISTER_GATE = "endpoint_register_gate"
 
     fun init(context: Context) {
         val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -24,6 +26,7 @@ object ApiConstants {
         basePort = prefs.getString(KEY_PORT, "8059") ?: "8059"
         endpointSync = prefs.getString(KEY_ENDPOINT_SYNC, "/api/control_acceso") ?: "/api/control_acceso"
         endpointConductores = prefs.getString(KEY_ENDPOINT_CONDUCTORES, "/api/get_conductores") ?: "/api/get_conductores"
+        endpointRegisterGate = prefs.getString(KEY_ENDPOINT_REGISTER_GATE, "/api/v1/gates/register") ?: "/api/v1/gates/register"
     }
 
     fun saveConfig(
@@ -32,7 +35,8 @@ object ApiConstants {
         host: String,
         port: String,
         syncPath: String = "/api/control_acceso",
-        conductoresPath: String = "/api/get_conductores"
+        conductoresPath: String = "/api/get_conductores",
+        registerGatePath: String = "/api/v1/gates/register"
     ) {
         val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         
@@ -45,6 +49,7 @@ object ApiConstants {
         // Ensure paths start with /
         val cleanSync = if (syncPath.startsWith("/")) syncPath else "/$syncPath"
         val cleanConductores = if (conductoresPath.startsWith("/")) conductoresPath else "/$conductoresPath"
+        val cleanRegister = if (registerGatePath.startsWith("/")) registerGatePath else "/$registerGatePath"
 
         prefs.edit()
             .putString(KEY_PROTOCOL, protocol)
@@ -52,6 +57,7 @@ object ApiConstants {
             .putString(KEY_PORT, port)
             .putString(KEY_ENDPOINT_SYNC, cleanSync)
             .putString(KEY_ENDPOINT_CONDUCTORES, cleanConductores)
+            .putString(KEY_ENDPOINT_REGISTER_GATE, cleanRegister)
             .apply()
 
         baseProtocol = protocol
@@ -59,6 +65,7 @@ object ApiConstants {
         basePort = port
         endpointSync = cleanSync
         endpointConductores = cleanConductores
+        endpointRegisterGate = cleanRegister
     }
 
     fun getProtocol(): String = baseProtocol
@@ -66,6 +73,7 @@ object ApiConstants {
     fun getPort(): String = basePort
     fun getEndpointSync(): String = endpointSync
     fun getEndpointConductores(): String = endpointConductores
+    fun getEndpointRegisterGate(): String = endpointRegisterGate
 
     val BASE_URL: String
         get() {
@@ -78,5 +86,7 @@ object ApiConstants {
             get() = "$BASE_URL${endpointSync}"
         val GET_CONDUCTORES: String
             get() = "$BASE_URL${endpointConductores}"
+        val REGISTER_GATE: String
+            get() = "$BASE_URL${endpointRegisterGate}"
     }
 }
