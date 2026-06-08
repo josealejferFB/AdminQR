@@ -251,7 +251,7 @@ void loop() {
               }
             } else {
               SerialBT.println("{\"status\":\"error\",\"message\":\"Acción desconocida\"}");
-              pantalla("ERROR JSON", ("Acción: " + String(action)));
+              pantalla("ERROR JSON", (String("Acción: ") + action).c_str());
               sistema.msjDesde = millis();
               sistema.mostrandoMsj = true;
               sistema.estado = ESPERA_CONEXION;
