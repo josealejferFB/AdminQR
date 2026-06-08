@@ -371,6 +371,13 @@ void loop() {
         ESP.restart();
       }
       break;
+
+    // ----------------------------------------------------------
+    // [V7] MODO_CONECTANDO_WIFI — WiFi no bloqueante
+    // ----------------------------------------------------------
+    case MODO_CONECTANDO_WIFI:
+      manejarConexionWiFiAsync();
+      break;
   }
 
   delay(10);
@@ -586,4 +593,72 @@ String obtenerMacAddress() {
              (uint8_t)(chipid >> 8) & 0xFF,
              (uint8_t)chipid & 0xFF);
     return String(mac);
+}
+
+// ============================================================
+//  [V7] CONEXIÓN WIFI ASÍNCRONA (no bloqueante)
+// ============================================================
+void manejarConexionWiFiAsync() {
+  static bool wifiStarted = false;
+  if (!wifiStarted) {
+    WiFi.begin(config.ssid.c_str(), config.pass.c_str());
+    wifiStarted = true;
+    pantalla("CONECTANDO WIFI", config.ssid.c_str());
+    Serial.println("[V7] Conectando WiFi async: " + config.ssid);
+  }
+
+  if (millis() - sistema.lastBlink > 250) {
+    sistema.lastBlink = millis();
+    sistema.ledState = !sistema.ledState;
+    digitalWrite(PIN_LED_WAIT, sistema.ledState);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiStarted = false;
+    sistema.wifiConnecting = false;
+    digitalWrite(PIN_LED_WAIT, LOW);
+
+    pantalla("WIFI CONECTADO", WiFi.localIP().toString().c_str());
+    Serial.println("[V7] WiFi conectado: " + WiFi.localIP().toString());
+
+    server.on("/abrir", HTTP_GET, []() {
+      if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
+        server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
+        Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
+        return;
+      }
+      server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
+      pantalla("SENAL ODOO", "Abriendo porton...");
+      digitalWrite(PIN_LED_OK, HIGH);
+      digitalWrite(PIN_RELAY_OK, HIGH);
+      sistema.releActivo = true;
+      sistema.releActivoDesde = millis();
+      sistema.msjDesde = millis();
+      sistema.mostrandoMsj = true;
+      Serial.println("[RELE] Activado por Odoo");
+    });
+
+    agregarEndpointStatus();
+
+    server.begin();
+    Serial.println("[HTTP] Servidor iniciado en puerto 80");
+
+    reportarIPyMAC();
+
+    sistema.estado = ESPERA_CONEXION;
+    sistema.msjDesde = millis();
+    sistema.mostrandoMsj = true;
+  }
+  else if (millis() - sistema.wifiStartTime > TIEMPO_WIFI_MAX) {
+    wifiStarted = false;
+    sistema.wifiConnecting = false;
+    digitalWrite(PIN_LED_WAIT, LOW);
+    digitalWrite(PIN_LED_ERROR, HIGH);
+
+    pantalla("ERROR WIFI", "Timeout 30s");
+    Serial.println("[V7] WiFi timeout");
+    sistema.msjDesde = millis();
+    sistema.mostrandoMsj = true;
+    sistema.estado = ESPERA_CONEXION;
+  }
 }
