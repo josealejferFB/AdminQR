@@ -13,11 +13,19 @@
 ## Architecture
 Clean Architecture: `domain/model/`, `domain/repository/` (interfaces), `data/repository/` (impls), `data/network/`, `di/modules/`, `presentation/ui/` (per feature).
 
+## Documentation
+Full docs in `docs/`:
+- `Arquitectura.md` — stack, MVVM, folder structure, design guidelines
+- `Contrato-Odoo.md` — endpoints, JSON-RPC payloads, URL construction
+- `Contrato-App-Usuario.md` — QR format, AES/GCM encryption, provisioning tokens
+- `Contrato-ESP32.md` — Bluetooth SPP, V6 state machine, commands, timeouts
+- `directrices_de_diseno.md` — color tokens, AppCard, animations
+
 ## Key conventions
 - `ApiConstants` is a singleton with `init(context)` — must be called before use (done in `EscanQRApp.onCreate`)
 - All API config (protocol, host, port, endpoints) is stored in SharedPreferences `api_config_prefs`
 - ESP32 discovery matches devices whose name starts with `"ESP32"` (case-insensitive)
-- Design tokens defined in `directrices_de_diseno.md` — use `AppCard`/`AppCardDefaults` consistently; no hardcoded colors for backgrounds/text
+- Design tokens defined in `docs/directrices_de_diseno.md` — use `AppCard`/`AppCardDefaults` consistently; no hardcoded colors for backgrounds/text
 - `ThemeRepository` persists dark mode to `theme_prefs`; exposed as `Flow<Boolean>`
 - `HistoryRepository` is **in-memory only** (MutableStateFlow), not persisted
 - Server history (config endpoints) persisted in SharedPreferences as JSON array under `server_history_v2`
@@ -29,6 +37,8 @@ Clean Architecture: `domain/model/`, `domain/repository/` (interfaces), `data/re
 - AES key `SHARED_AES_KEY` and provisioning `PROVISIONING_TOKEN` are hardcoded in `SecurityConstants.kt`
 - App uses immersive mode (`SetSystemBarsVisibility(false)`) in `MainActivity` — system bars hidden across all screens
 - The repo includes an Arduino companion sketch (`VerificacionHuellasV6.ino`) for the ESP32 gate controller
+- ESP32 V6 firmware uses a state machine: `ESPERA_CONEXION → MODO_CONFIG_BT → {ODOO | WIFI}` with 30-60s timeouts
+- QR between apps uses AES-256-GCM with shared key (`SecurityConstants.SHARED_AES_KEY`)
 - Spanish language throughout the codebase (UI strings, comments, variable names)
 - `material-icons-extended` is a direct dependency (not via BOM)
 - Gradle version catalog at `gradle/libs.versions.toml` — add deps there first
