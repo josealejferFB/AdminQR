@@ -513,37 +513,30 @@ void conectarWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n[WiFi] Conectado: " + WiFi.localIP().toString());
 
-    // --------------------------------------------------------
-    // Endpoint /abrir — Odoo llama aquí cuando la huella es OK
-    // Requiere: GET /abrir?token=secreto123
-    // --------------------------------------------------------
+    // ── Endpoint /abrir ──
     server.on("/abrir", HTTP_GET, []() {
-      // Validación del token de seguridad
       if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
         server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
         Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
         return;
       }
-
-      // Respuesta inmediata a Odoo antes de activar el hardware
       server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
-
-      // Feedback visual en pantalla y activación asíncrona del relé
       pantalla("SENAL ODOO", "Abriendo porton...");
-      digitalWrite(PIN_LED_OK,   HIGH);
+      digitalWrite(PIN_LED_OK, HIGH);
       digitalWrite(PIN_RELAY_OK, HIGH);
-      sistema.releActivo      = true;
+      sistema.releActivo = true;
       sistema.releActivoDesde = millis();
-      sistema.msjDesde        = millis();
-      sistema.mostrandoMsj    = true;
-
+      sistema.msjDesde = millis();
+      sistema.mostrandoMsj = true;
       Serial.println("[RELE] Activado por Odoo");
     });
+
+    // ── [V7] Endpoint /status ──
+    agregarEndpointStatus();
 
     server.begin();
     Serial.println("[HTTP] Servidor iniciado en puerto 80");
 
-    // Reportar la IP + MAC al Odoo para que sepa dónde llamar
     reportarIPyMAC();
 
   } else {
