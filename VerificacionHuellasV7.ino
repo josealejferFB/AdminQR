@@ -91,8 +91,6 @@ void cargarConfig();
 void guardarConfigOdoo(const char* url);
 void construirUrlOdoo(const char* proto, const char* ip, int puerto);
 void conectarWiFi();
-void reportarIP();
-
 // [V7] Prototipos nuevos
 void reportarIPyMAC();
 void manejarConexionWiFiAsync();
@@ -306,7 +304,7 @@ void loop() {
             construirUrlOdoo(proto, ip, puerto);
             pantalla("CONFIG OK", "URL guardada");
             SerialBT.println("CONFIG_OK");
-            if (WiFi.status() == WL_CONNECTED) reportarIP();
+            if (WiFi.status() == WL_CONNECTED) reportarIPyMAC();
           } else {
             pantalla("ERROR", "IP requerida");
             SerialBT.println("ERROR_IP");
@@ -550,8 +548,8 @@ void conectarWiFi() {
     server.begin();
     Serial.println("[HTTP] Servidor iniciado en puerto 80");
 
-    // Reportar la IP al Odoo para que sepa dónde llamar
-    reportarIP();
+    // Reportar la IP + MAC al Odoo para que sepa dónde llamar
+    reportarIPyMAC();
 
   } else {
     pantalla("ERROR WIFI", "No conectado");
@@ -561,20 +559,28 @@ void conectarWiFi() {
   }
 }
 
-// Notifica a Odoo la IP actual del ESP32 (se llama al arrancar y al reconfigurar)
-void reportarIP() {
+// ============================================================
+//  [V7] AUTO-DISCOVERY: Reporta IP + MAC a Odoo
+//  Se llama al conectar WiFi (inicio o post-JSON config)
+// ============================================================
+void reportarIPyMAC() {
   if (WiFi.status() != WL_CONNECTED || config.odooUrl.length() == 0) return;
 
   HTTPClient http;
   http.begin(config.odooUrl);
   http.addHeader("Content-Type", "application/json");
 
-  String payload = "{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":{\"ip\":\""
-                   + WiFi.localIP().toString() + "\"}}";
+  String mac = obtenerMacAddress();
+  String payload = "{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":{"
+                   "\"ip\":\"" + WiFi.localIP().toString()
+                   + "\",\"mac_address\":\"" + mac + "\"}}";
 
   int code = http.POST(payload);
-  if (code > 0) Serial.println("[HTTP] IP reportada a Odoo. Codigo: " + String(code));
-  else          Serial.println("[HTTP] Error reportando IP. Codigo: " + String(code));
+  if (code > 0) {
+    Serial.println("[HTTP] IP+MAC reportada a Odoo. Codigo: " + String(code));
+  } else {
+    Serial.println("[HTTP] Error reportando IP+MAC. Codigo: " + String(code));
+  }
 
   http.end();
 }
