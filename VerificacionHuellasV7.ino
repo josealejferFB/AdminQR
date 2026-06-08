@@ -1,7 +1,13 @@
 // ============================================================
-//  SISTEMA VEHICULAR - VERSIÓN 6
+//  SISTEMA VEHICULAR - VERSIÓN 7
 //  Apertura de portón: señal HTTP desde Odoo → relé
-//  Bluetooth: exclusivo para configuración de red
+//  Bluetooth: Protocolo dual (JSON + texto V6 legacy)
+//  Novedades V7:
+//    - Nuevo comando JSON {"action":"config_network",...}
+//    - Reporte de MAC address post-configuración WiFi
+//    - Conexión WiFi asíncrona (no bloqueante)
+//    - Endpoint GET /status con info del ESP32
+//    - Auto-discovery mejorado (MAC + IP a Odoo)
 // ============================================================
 
 #include <BluetoothSerial.h>
