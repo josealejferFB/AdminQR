@@ -662,3 +662,24 @@ void manejarConexionWiFiAsync() {
     sistema.estado = ESPERA_CONEXION;
   }
 }
+
+// ============================================================
+//  [V7] ENDPOINT GET /status
+// ============================================================
+void agregarEndpointStatus() {
+  server.on("/status", HTTP_GET, []() {
+    String wifiStatus;
+    if (WiFi.status() == WL_CONNECTED) wifiStatus = "connected";
+    else if (sistema.wifiConnecting) wifiStatus = "connecting";
+    else wifiStatus = "disconnected";
+
+    String json = "{\"mac\":\"" + obtenerMacAddress()
+                  + "\",\"wifi\":\"" + wifiStatus + "\"";
+    if (WiFi.status() == WL_CONNECTED) {
+      json += ",\"ip\":\"" + WiFi.localIP().toString() + "\"";
+    }
+    json += ",\"uptime\":" + String(millis() / 1000) + "}";
+
+    server.send(200, "application/json", json);
+  });
+}
