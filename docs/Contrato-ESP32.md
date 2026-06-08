@@ -59,7 +59,7 @@ socket?.outputStream?.write("$message\n".toByteArray())
 
 Se lee el stream de entrada con un buffer de 1024 bytes. Los mensajes se dividen por `\n` (el ESP32 usa `SerialBT.println()` que termina con `\n`). Cada línea completa se emite al `SharedFlow<String>` del repositorio.
 
-## Máquina de Estados del ESP32 (V6)
+## Máquina de Estados del ESP32 (V7)
 
 El ESP32 corre una máquina de estados que determina qué comandos acepta vía Bluetooth.
 
@@ -118,6 +118,7 @@ ESPERA_CONEXION (0)  →  MODO_CONFIG_BT (1)
 | `MODO_CONFIG_ODOO` | 30 segundos |
 | `MODO_WIFI_SSID` | 60 segundos |
 | `MODO_WIFI_PASS` | 60 segundos |
+| `MODO_CONECTANDO_WIFI` | 30 segundos | [V7] |
 
 Al expirar, el ESP32 envía `"TIMEOUT"` y vuelve a `ESPERA_CONEXION`.
 
