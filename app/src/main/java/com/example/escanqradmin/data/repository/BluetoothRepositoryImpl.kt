@@ -49,6 +49,7 @@ class BluetoothRepositoryImpl @Inject constructor(
     private var socket: BluetoothSocket? = null
     private var connectionJob: Job? = null
     private val readBuffer = StringBuilder()
+    private var isReceiverRegistered = false
 
     private val receiver = object : BroadcastReceiver() {
         @SuppressLint("MissingPermission")
@@ -99,6 +100,12 @@ class BluetoothRepositoryImpl @Inject constructor(
             bluetoothAdapter.cancelDiscovery()
         }
         _scannedDevices.value = emptyList()
+
+        if (isReceiverRegistered) {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+            isReceiverRegistered = false
+        }
+
         val filter = IntentFilter(BluetoothDevice.ACTION_FOUND).apply {
             addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
@@ -108,16 +115,16 @@ class BluetoothRepositoryImpl @Inject constructor(
         } else {
             context.registerReceiver(receiver, filter)
         }
+        isReceiverRegistered = true
         bluetoothAdapter?.startDiscovery()
     }
 
     @SuppressLint("MissingPermission")
     override fun stopDiscovery() {
         bluetoothAdapter?.cancelDiscovery()
-        try {
-            context.unregisterReceiver(receiver)
-        } catch (e: Exception) {
-            // Receiver not registered
+        if (isReceiverRegistered) {
+            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+            isReceiverRegistered = false
         }
         _isScanning.value = false
     }
@@ -183,6 +190,19 @@ class BluetoothRepositoryImpl @Inject constructor(
                 true
             } catch (e: IOException) {
                 false
+            }
+        }
+    }
+
+    override suspend fun sendMessageAndWaitForReply(message: String, timeoutMs: Long): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                socket?.outputStream?.write("$message\n".toByteArray())
+                kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
+                    _messages.first { it.isNotBlank() }
+                }
+            } catch (e: Exception) {
+                null
             }
         }
     }
