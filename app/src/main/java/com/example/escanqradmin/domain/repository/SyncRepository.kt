@@ -9,4 +9,5 @@ interface SyncRepository {
     suspend fun deleteEntry(cedula: String): Result<Unit>
     suspend fun updateEntry(data: QrContent): Result<Unit>
     suspend fun registerGate(name: String, macAddress: String, description: String = ""): Result<GateRegisterResponse>
+    suspend fun getGateUsers(gateId: Int): Result<List<QrContent>>
 }

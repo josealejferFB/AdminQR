@@ -267,4 +267,56 @@ class SyncRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    override suspend fun getGateUsers(gateId: Int): Result<List<QrContent>> = withContext(Dispatchers.IO) {
+        try {
+            val jsonBody = buildJsonObject {
+                put("jsonrpc", "2.0")
+                put("method", "call")
+                put("params", buildJsonObject {
+                    put("gate_id", gateId)
+                })
+            }.toString()
+
+            val request = Request.Builder()
+                .url(ApiConstants.Endpoints.GATE_USERS(gateId))
+                .addHeader("Content-Type", "application/json")
+                .post(jsonBody.toRequestBody(mediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val bodyString = response.body?.string() ?: throw Exception("Empty body")
+                    val jsonElement = json.parseToJsonElement(bodyString)
+                    val jsonObject = jsonElement.jsonObject
+
+                    if (jsonObject.containsKey("error")) {
+                        val errObj = jsonObject["error"]
+                        Result.failure(Exception("Odoo Error: $errObj"))
+                    } else {
+                        val resultObj = jsonObject["result"] ?: throw Exception("Missing result in response")
+                        val conductoresResponse = json.decodeFromJsonElement<ConductoresResponse>(resultObj)
+
+                        if (conductoresResponse.success) {
+                            val qrContents = conductoresResponse.data.map { dto ->
+                                QrContent(
+                                    androidId = dto.id?.toString() ?: "",
+                                    userName = dto.nombre ?: "",
+                                    cedula = dto.cedula ?: "",
+                                    plate = dto.placas ?: ""
+                                )
+                            }
+                            Result.success(qrContents)
+                        } else {
+                            Result.failure(Exception(conductoresResponse.message))
+                        }
+                    }
+                } else {
+                    Result.failure(Exception("Error ${response.code}"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

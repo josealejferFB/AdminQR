@@ -12,6 +12,7 @@ object ApiConstants {
     private var endpointRegisterGate: String = "/api/v1/gates/register"
     private var endpointGatesList: String = "/api/v1/gates/list"
     private var endpointGateUpdate: String = "/api/v1/gates/update"
+    private var endpointGateUsers: String = "/api/v1/gates/{id}/users"
 
     private const val PREFS_NAME = "api_config_prefs"
     private const val KEY_PROTOCOL = "base_protocol"
@@ -22,6 +23,7 @@ object ApiConstants {
     private const val KEY_ENDPOINT_REGISTER_GATE = "endpoint_register_gate"
     private const val KEY_ENDPOINT_GATES_LIST = "endpoint_gates_list"
     private const val KEY_ENDPOINT_GATE_UPDATE = "endpoint_gate_update"
+    private const val KEY_ENDPOINT_GATE_USERS = "endpoint_gate_users"
 
     fun init(context: Context) {
         val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -33,6 +35,7 @@ object ApiConstants {
         endpointRegisterGate = prefs.getString(KEY_ENDPOINT_REGISTER_GATE, "/api/v1/gates/register") ?: "/api/v1/gates/register"
         endpointGatesList = prefs.getString(KEY_ENDPOINT_GATES_LIST, "/api/v1/gates/list") ?: "/api/v1/gates/list"
         endpointGateUpdate = prefs.getString(KEY_ENDPOINT_GATE_UPDATE, "/api/v1/gates/update") ?: "/api/v1/gates/update"
+        endpointGateUsers = prefs.getString(KEY_ENDPOINT_GATE_USERS, "/api/v1/gates/{id}/users") ?: "/api/v1/gates/{id}/users"
     }
 
     fun saveConfig(
@@ -44,7 +47,8 @@ object ApiConstants {
         conductoresPath: String = "/api/get_conductores",
         registerGatePath: String = "/api/v1/gates/register",
         gatesListPath: String = "/api/v1/gates/list",
-        gateUpdatePath: String = "/api/v1/gates/update"
+        gateUpdatePath: String = "/api/v1/gates/update",
+        gateUsersPath: String = "/api/v1/gates/{id}/users"
     ) {
         val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         
@@ -60,6 +64,7 @@ object ApiConstants {
         val cleanRegister = if (registerGatePath.startsWith("/")) registerGatePath else "/$registerGatePath"
         val cleanGatesList = if (gatesListPath.startsWith("/")) gatesListPath else "/$gatesListPath"
         val cleanGateUpdate = if (gateUpdatePath.startsWith("/")) gateUpdatePath else "/$gateUpdatePath"
+        val cleanGateUsers = if (gateUsersPath.startsWith("/")) gateUsersPath else "/$gateUsersPath"
 
         prefs.edit()
             .putString(KEY_PROTOCOL, protocol)
@@ -70,6 +75,7 @@ object ApiConstants {
             .putString(KEY_ENDPOINT_REGISTER_GATE, cleanRegister)
             .putString(KEY_ENDPOINT_GATES_LIST, cleanGatesList)
             .putString(KEY_ENDPOINT_GATE_UPDATE, cleanGateUpdate)
+            .putString(KEY_ENDPOINT_GATE_USERS, cleanGateUsers)
             .apply()
 
         baseProtocol = protocol
@@ -80,6 +86,7 @@ object ApiConstants {
         endpointRegisterGate = cleanRegister
         endpointGatesList = cleanGatesList
         endpointGateUpdate = cleanGateUpdate
+        endpointGateUsers = cleanGateUsers
     }
 
     fun getProtocol(): String = baseProtocol
@@ -90,6 +97,7 @@ object ApiConstants {
     fun getEndpointRegisterGate(): String = endpointRegisterGate
     fun getEndpointGatesList(): String = endpointGatesList
     fun getEndpointGateUpdate(): String = endpointGateUpdate
+    fun getEndpointGateUsers(): String = endpointGateUsers
 
     val BASE_URL: String
         get() {
@@ -108,5 +116,6 @@ object ApiConstants {
             get() = "$BASE_URL${endpointGatesList}"
         val GATE_UPDATE: String
             get() = "$BASE_URL${endpointGateUpdate}"
+        fun GATE_USERS(gateId: Int): String = "$BASE_URL${endpointGateUsers.replace("{id}", gateId.toString())}"
     }
 }
