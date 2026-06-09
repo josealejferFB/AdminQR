@@ -16,8 +16,6 @@ import com.example.escanqradmin.presentation.navigation.AppNavigation
 import com.example.escanqradmin.presentation.theme.theme.EscanQRAdminTheme
 import dagger.hilt.android.AndroidEntryPoint
 
-import com.example.escanqradmin.presentation.common.util.SetSystemBarsVisibility
-
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.escanqradmin.domain.repository.ThemeRepository
@@ -35,8 +33,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val isDarkMode by themeRepository.isDarkMode().collectAsState(initial = false)
             EscanQRAdminTheme(darkTheme = isDarkMode) {
-                // Global Immersive Mode: Hide system HUD across all screens
-                SetSystemBarsVisibility(visible = false)
                 
                 Surface(
                     modifier = Modifier.fillMaxSize(),

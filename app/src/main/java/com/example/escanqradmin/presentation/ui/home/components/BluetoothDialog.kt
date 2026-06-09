@@ -171,7 +171,7 @@ fun BluetoothDialog(
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape    = RoundedCornerShape(16.dp),
                     colors   = ButtonDefaults.buttonColors(
-                        containerColor = if (isScanning) Color.Gray else MaterialTheme.colorScheme.primary
+                        containerColor = if (isScanning) Color.Gray else MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     if (isScanning) {
@@ -226,11 +226,10 @@ private fun DeviceItem(
     AppCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = if (!isConnecting && !isDeviceConnected) onClick else null,
-        shape = RoundedCornerShape(16.dp),
         colors = AppCardDefaults.colors(
             containerColor = if (isDeviceConnected) (if (isSystemInDarkTheme()) Color(0xFF1B5E20).copy(alpha = 0.2f) else Color(0xFFE8F5E9)) else MaterialTheme.colorScheme.surfaceVariant
         ),
-        border = if (isDeviceConnected) AppCardDefaults.border(color = Color(0xFF4CAF50)) else null
+        border = if (isDeviceConnected) AppCardDefaults.border(color = Color(0xFF4CAF50).copy(alpha = 0.1f)) else AppCardDefaults.border()
     ) {
         Row(
             modifier          = Modifier.padding(14.dp).fillMaxWidth(),

@@ -41,34 +41,29 @@ class ScannerViewModel @Inject constructor() : ViewModel() {
     }
     
     private fun decryptAndroidId(combinedEncrypted: String): String {
-        try {
-            val keyBytes = com.example.escanqradmin.domain.model.SecurityConstants.SHARED_AES_KEY.toByteArray(Charsets.UTF_8)
-            val secretKeySpec = javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
-            
-            val ivBytes: ByteArray
-            val encryptedBytes: ByteArray
+        val keyBytes = com.example.escanqradmin.domain.model.SecurityConstants.SHARED_AES_KEY.toByteArray(Charsets.UTF_8)
+        val secretKeySpec = javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
 
-            if (combinedEncrypted.contains(":")) {
-                val parts = combinedEncrypted.split(":")
-                ivBytes = android.util.Base64.decode(parts[0], android.util.Base64.DEFAULT)
-                encryptedBytes = android.util.Base64.decode(parts[1], android.util.Base64.DEFAULT)
-            } else {
-                val combinedBytes = android.util.Base64.decode(combinedEncrypted, android.util.Base64.DEFAULT)
-                ivBytes = combinedBytes.copyOfRange(0, 12)
-                encryptedBytes = combinedBytes.copyOfRange(12, combinedBytes.size)
-            }
-            
-            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-            val spec = javax.crypto.spec.GCMParameterSpec(128, ivBytes)
-            
-            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, secretKeySpec, spec)
-            
-            val decryptedBytes = cipher.doFinal(encryptedBytes)
-            return String(decryptedBytes, Charsets.UTF_8)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return "Error: Descifrado GCM fallido"
+        val ivBytes: ByteArray
+        val encryptedBytes: ByteArray
+
+        if (combinedEncrypted.contains(":")) {
+            val parts = combinedEncrypted.split(":")
+            ivBytes = android.util.Base64.decode(parts[0], android.util.Base64.DEFAULT)
+            encryptedBytes = android.util.Base64.decode(parts[1], android.util.Base64.DEFAULT)
+        } else {
+            val combinedBytes = android.util.Base64.decode(combinedEncrypted, android.util.Base64.DEFAULT)
+            ivBytes = combinedBytes.copyOfRange(0, 12)
+            encryptedBytes = combinedBytes.copyOfRange(12, combinedBytes.size)
         }
+
+        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+        val spec = javax.crypto.spec.GCMParameterSpec(128, ivBytes)
+
+        cipher.init(javax.crypto.Cipher.DECRYPT_MODE, secretKeySpec, spec)
+
+        val decryptedBytes = cipher.doFinal(encryptedBytes)
+        return String(decryptedBytes, Charsets.UTF_8)
     }
     
     fun clearData() {

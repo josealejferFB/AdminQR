@@ -38,10 +38,11 @@ fun GateRegistrationDialog(
     connectionState: BluetoothConnectionState,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
-    onConnectToDevice: (String) -> Unit,
+    onConnectToDevice: (String, String?) -> Unit,
     onCancelConnection: () -> Unit,
     onSsidChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
+    onBtNameChange: (String) -> Unit,
     onSendWiFiConfig: () -> Unit,
     onGateNameChange: (String) -> Unit,
     onGateDescriptionChange: (String) -> Unit,
@@ -77,6 +78,7 @@ fun GateRegistrationDialog(
                             text = when (uiState.step) {
                                 is GateStep.SelectBluetooth -> "Conectar al ESP32"
                                 is GateStep.WiFiConfig -> "Configurar WiFi del ESP32"
+                                is GateStep.VerifyingWifi -> "Verificando conexión WiFi"
                                 is GateStep.NameGate -> "Asignar nombre al portón"
                                 is GateStep.Registering -> "Registrando en Odoo"
                                 is GateStep.Done -> "Portón registrado"
@@ -115,8 +117,10 @@ fun GateRegistrationDialog(
                             uiState = uiState,
                             onSsidChange = onSsidChange,
                             onPasswordChange = onPasswordChange,
+                            onBtNameChange = onBtNameChange,
                             onSendWiFiConfig = onSendWiFiConfig
                         )
+                        is GateStep.VerifyingWifi -> VerifyingWifiContent()
                         is GateStep.NameGate -> NameGateContent(
                             uiState = uiState,
                             onGateNameChange = onGateNameChange,
@@ -150,7 +154,7 @@ private fun ColumnScope.SelectBluetoothContent(
     connectionState: BluetoothConnectionState,
     onStartScan: () -> Unit,
     onStopScan: () -> Unit,
-    onConnectToDevice: (String) -> Unit,
+    onConnectToDevice: (String, String?) -> Unit,
     onCancelConnection: () -> Unit
 ) {
     if (connectionState is BluetoothConnectionState.Error) {
@@ -179,7 +183,7 @@ private fun ColumnScope.SelectBluetoothContent(
                 DeviceItem(
                     device = device,
                     isDeviceConnected = isThisDeviceConnected,
-                    onClick = { onConnectToDevice(device.address) },
+                    onClick = { onConnectToDevice(device.address, device.name) },
                     onDisconnect = onCancelConnection,
                     connectionState = connectionState
                 )
@@ -212,7 +216,7 @@ private fun ColumnScope.SelectBluetoothContent(
                 DeviceItem(
                     device = device,
                     isDeviceConnected = isThisDeviceConnected,
-                    onClick = { onConnectToDevice(device.address) },
+                    onClick = { onConnectToDevice(device.address, device.name) },
                     onDisconnect = onCancelConnection,
                     connectionState = connectionState
                 )
@@ -245,6 +249,7 @@ private fun WiFiConfigContent(
     uiState: GateRegistrationUiState,
     onSsidChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
+    onBtNameChange: (String) -> Unit,
     onSendWiFiConfig: () -> Unit
 ) {
     Column {
@@ -280,6 +285,17 @@ private fun WiFiConfigContent(
             visualTransformation = PasswordVisualTransformation(),
             enabled = !uiState.isSubmitting
         )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = uiState.btName,
+            onValueChange = onBtNameChange,
+            label = { Text("Nombre Bluetooth del ESP32") },
+            placeholder = { Text("ESP32_Seguro") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            enabled = !uiState.isSubmitting
+        )
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = onSendWiFiConfig,
@@ -296,6 +312,28 @@ private fun WiFiConfigContent(
             } else {
                 Text("ENVIAR AL ESP32", fontWeight = FontWeight.Bold)
             }
+        }
+    }
+}
+
+@Composable
+private fun VerifyingWifiContent() {
+    Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Verificando conexión WiFi...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "El ESP32 se está conectando a la red WiFi. Esto puede tomar hasta 30 segundos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
         }
     }
 }

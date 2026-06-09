@@ -1,6 +1,13 @@
 package com.example.escanqradmin.domain.model
 
 object SecurityConstants {
-    const val SHARED_AES_KEY = "GabyQrSecureKey12345678901234567"
-    const val PROVISIONING_TOKEN = "ALCARAVAN_2025"
+    var SHARED_AES_KEY: String = "GabyQrSecureKey12345678901234567"
+        private set
+    var PROVISIONING_TOKEN: String = "ALCARAVAN_2025"
+        private set
+
+    fun init(aesKey: String, provisioningToken: String) {
+        SHARED_AES_KEY = aesKey
+        PROVISIONING_TOKEN = provisioningToken
+    }
 }

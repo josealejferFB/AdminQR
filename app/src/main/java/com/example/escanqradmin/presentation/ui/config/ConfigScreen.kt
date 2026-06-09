@@ -35,8 +35,10 @@ import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefa
 import com.example.escanqradmin.presentation.theme.color.PrimaryBlue
 import com.example.escanqradmin.presentation.theme.color.SecondaryOrange
 import com.example.escanqradmin.presentation.theme.color.SurfaceGrey
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,9 +61,7 @@ fun ConfigScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                modifier = Modifier
-                    .statusBarsPadding()
-                    .displayCutoutPadding(),
+                windowInsets = WindowInsets(0.dp),
                 title = {
                     Text(
                         "Configuración de Red",
@@ -88,11 +88,10 @@ fun ConfigScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp),
+                .padding(horizontal = 20.dp)
+                .padding(top = 16.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-
             // URL Preview & Protocol Selection
             item {
                 ConfigurationCard(
@@ -116,6 +115,7 @@ fun ConfigScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable { showHistory = !showHistory }
                         .padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -135,34 +135,40 @@ fun ConfigScreen(
                             color = MaterialTheme.colorScheme.onBackground
                         )
                     }
-                    TextButton(onClick = { showHistory = !showHistory }) {
-                        Text(
-                            if (showHistory) "Ocultar" else "Ver todo",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
+                    Icon(
+                        imageVector = if (showHistory) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (showHistory) "Contraer sección" else "Expandir sección",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
 
             // History List
-            if (showHistory) {
-                if (uiState.serverHistory.isEmpty()) {
-                    item {
-                        EmptyHistoryPlaceholder()
-                    }
-                } else {
-                    items(uiState.serverHistory, key = { it.timestamp }) { history ->
-                        HistoryCatalogItem(
-                            history = history,
-                            onSelect = { viewModel.selectFromHistory(it) },
-                            onDelete = { viewModel.removeFromHistory(it) }
-                        )
+            item {
+                AnimatedVisibility(
+                    visible = showHistory,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Column {
+                        if (uiState.serverHistory.isEmpty()) {
+                            EmptyHistoryPlaceholder()
+                        } else {
+                            uiState.serverHistory.forEach { history ->
+                                HistoryCatalogItem(
+                                    history = history,
+                                    onSelect = { viewModel.selectFromHistory(it) },
+                                    onDelete = { viewModel.removeFromHistory(it) }
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                        }
                     }
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
 }
@@ -184,8 +190,7 @@ fun ConfigurationCard(
     onSave: () -> Unit
 ) {
     AppCard(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
@@ -277,7 +282,10 @@ fun ConfigurationCard(
                         contentDescription = null,
                         tint = if (host.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
                     )
-                }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary
+                )
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -293,11 +301,14 @@ fun ConfigurationCard(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     leadingIcon = {
                         Icon(Icons.Default.Cable, null, tint = if (port.isNotEmpty()) SecondaryOrange else Color.Gray)
-                    }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.secondary
+                    )
                 )
             }
 
-            Divider(color = Color.LightGray.copy(alpha = 0.2f), thickness = 1.dp)
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.2f), thickness = 1.dp)
 
             Text(
                 "Rutas de API (Endpoints)",
@@ -316,7 +327,10 @@ fun ConfigurationCard(
                 singleLine = true,
                 leadingIcon = {
                     Icon(Icons.Default.Upload, null, tint = Color.Gray)
-                }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary
+                )
             )
 
             // Endpoint Conductores
@@ -329,7 +343,10 @@ fun ConfigurationCard(
                 singleLine = true,
                 leadingIcon = {
                     Icon(Icons.Default.Download, null, tint = Color.Gray)
-                }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary
+                )
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -340,7 +357,7 @@ fun ConfigurationCard(
                     .fillMaxWidth()
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 enabled = !isLoading
             ) {
                 if (isLoading) {
@@ -388,9 +405,7 @@ fun HistoryCatalogItem(
 ) {
     AppCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = { onSelect(history) },
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        onClick = { onSelect(history) }
     ) {
         Row(
             modifier = Modifier
@@ -462,37 +477,42 @@ fun HistoryCatalogItem(
 
 @Composable
 fun EmptyHistoryPlaceholder() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+    AppCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Icon(
-            Icons.Default.History,
-            contentDescription = null,
-            tint = Color.LightGray.copy(alpha = 0.5f),
-            modifier = Modifier.size(48.dp)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            "Sin historial reciente",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.LightGray,
-            textAlign = TextAlign.Center
-        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Default.History,
+                contentDescription = null,
+                tint = Color.LightGray.copy(alpha = 0.5f),
+                modifier = Modifier.size(48.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                "Sin historial reciente",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.LightGray,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
 private fun formatTimestamp(timestamp: Long): String {
     if (timestamp == 0L) return ""
-    val now = System.currentTimeMillis()
-    val diff = now - timestamp
+    val now = Instant.now()
+    val ts = Instant.ofEpochMilli(timestamp)
+    val diff = Duration.between(ts, now)
     
     return when {
-        diff < 60_000 -> "Hace un momento"
-        diff < 3600_000 -> "Hace ${diff / 60_000} min"
-        diff < 86400_000 -> "Hoy, ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))}"
-        else -> SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(timestamp))
+        diff.toMinutes() < 1 -> "Hace un momento"
+        diff.toHours() < 1 -> "Hace ${diff.toMinutes()} min"
+        diff.toDays() < 1 -> "Hoy, ${ts.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("HH:mm"))}"
+        else -> ts.atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd MMM"))
     }
 }

@@ -34,17 +34,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import com.example.escanqradmin.domain.model.QrContent
-import com.example.escanqradmin.presentation.common.sharedcomponents.CustomBottomBar
-import com.example.escanqradmin.presentation.common.sharedcomponents.CustomTopBar
-import com.example.escanqradmin.presentation.common.util.SetSystemBarsVisibility
 import java.util.concurrent.Executors
-import com.example.escanqradmin.presentation.theme.color.*
+
+private val ScannerAccent = Color(0xFF2DD4BF)
 
 @Composable
 fun ScannerScreen(
@@ -114,39 +111,18 @@ fun ScannerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black), 
+                    .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
                 Text(text = "Se requiere acceso a la cámara", color = Color.White)
             }
         }
 
-        // Floating App TopBar (Semi-transparent Surface)
-        CustomTopBar(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-            isFloating = true,
-            applyPrivacyPadding = true,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .zIndex(1f)
-        )
-
-        // Floating App BottomBar (Semi-transparent Surface)
-        CustomBottomBar(
-            navController = navController,
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-            isFloating = true,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .zIndex(1f)
-        )
-
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 100.dp)
-                .zIndex(10f)
         )
     }
 
@@ -252,37 +228,35 @@ fun ScannerOverlay(
         Canvas(modifier = Modifier.fillMaxSize()) {
             val canvasWidth = size.width
             val canvasHeight = size.height
-            
+
             val boxSize = canvasWidth * 0.7f
             val boxTop = (canvasHeight - boxSize) / 2f
             val boxLeft = (canvasWidth - boxSize) / 2f
-            
+
             val scanRect = Rect(
                 offset = Offset(boxLeft, boxTop),
                 size = GeometrySize(boxSize, boxSize)
             )
-            
+
             val backgroundPath = Path().apply {
                 addRect(Rect(0f, 0f, canvasWidth, canvasHeight))
             }
             val cutoutPath = Path().apply {
                 addRoundRect(RoundRect(scanRect, CornerRadius(24.dp.toPx())))
             }
-            
+
             val overlayPath = Path.combine(PathOperation.Difference, backgroundPath, cutoutPath)
-            
+
             drawPath(
                 path = overlayPath,
                 color = Color.Black.copy(alpha = 0.6f)
             )
 
-            // Draw corners
             val cornerLength = 40.dp.toPx()
             val cornerStroke = 4.dp.toPx()
             val cornerColor = Color.White
             val radius = 24.dp.toPx()
-            
-            // Top Left
+
             drawPath(
                 path = Path().apply {
                     moveTo(boxLeft, boxTop + cornerLength)
@@ -293,8 +267,7 @@ fun ScannerOverlay(
                 color = cornerColor,
                 style = Stroke(width = cornerStroke)
             )
-            
-            // Top Right
+
             drawPath(
                 path = Path().apply {
                     moveTo(boxLeft + boxSize - cornerLength, boxTop)
@@ -305,8 +278,7 @@ fun ScannerOverlay(
                 color = cornerColor,
                 style = Stroke(width = cornerStroke)
             )
-            
-            // Bottom Left
+
             drawPath(
                 path = Path().apply {
                     moveTo(boxLeft, boxTop + boxSize - cornerLength)
@@ -317,8 +289,7 @@ fun ScannerOverlay(
                 color = cornerColor,
                 style = Stroke(width = cornerStroke)
             )
-            
-            // Bottom Right
+
             drawPath(
                 path = Path().apply {
                     moveTo(boxLeft + boxSize - cornerLength, boxTop + boxSize)
@@ -329,29 +300,27 @@ fun ScannerOverlay(
                 color = cornerColor,
                 style = Stroke(width = cornerStroke)
             )
-            
-            // Animated Scan Line
+
             val lineY = boxTop + (boxSize * lineOffset)
             drawLine(
-                color = PrimaryBlue.copy(alpha = 0.8f),
+                color = ScannerAccent.copy(alpha = 0.8f),
                 start = Offset(boxLeft + 10.dp.toPx(), lineY),
                 end = Offset(boxLeft + boxSize - 10.dp.toPx(), lineY),
                 strokeWidth = 3.dp.toPx()
             )
         }
 
-        // Floating UI Elements below the scanning box
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
-                .offset(y = (200).dp), 
+                .offset(y = (200).dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
                         .size(10.dp)
-                        .background(PrimaryBlue, CircleShape)
+                        .background(ScannerAccent, CircleShape)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
@@ -367,20 +336,19 @@ fun ScannerOverlay(
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 12.sp
             )
-            
+
             Spacer(modifier = Modifier.height(24.dp))
-            
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Flashlight Button
                 Box(
                     modifier = Modifier
                         .size(56.dp)
                         .background(
-                            if (torchEnabled) PrimaryBlue.copy(alpha = 0.5f) 
-                            else Color.White.copy(alpha = 0.2f), 
+                            if (torchEnabled) ScannerAccent.copy(alpha = 0.5f)
+                            else Color.White.copy(alpha = 0.2f),
                             CircleShape
                         )
                         .clickable { onToggleTorch() },
@@ -389,12 +357,11 @@ fun ScannerOverlay(
                     Icon(
                         imageVector = if (torchEnabled) Icons.Default.FlashlightOff else Icons.Default.FlashlightOn,
                         contentDescription = if (torchEnabled) "Apagar linterna" else "Encender linterna",
-                        tint = if (torchEnabled) PrimaryBlue else Color.White,
+                        tint = if (torchEnabled) ScannerAccent else Color.White,
                         modifier = Modifier.size(24.dp)
                     )
                 }
-                
-                // Manual Entry Button
+
                 Row(
                     modifier = Modifier
                         .height(56.dp)
@@ -445,7 +412,10 @@ private fun ManualEntryDialog(
                     label = { Text("Android ID") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.secondary
+                    )
                 )
                 OutlinedTextField(
                     value = userName,
@@ -453,7 +423,10 @@ private fun ManualEntryDialog(
                     label = { Text("Nombre") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.secondary
+                    )
                 )
                 OutlinedTextField(
                     value = cedula,
@@ -461,7 +434,10 @@ private fun ManualEntryDialog(
                     label = { Text("Cédula") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.secondary
+                    )
                 )
                 OutlinedTextField(
                     value = plate,
@@ -469,14 +445,17 @@ private fun ManualEntryDialog(
                     label = { Text("Placa") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.secondary
+                    )
                 )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(androidId, userName, cedula, plate) },
-                enabled = userName.isNotBlank() && cedula.isNotBlank()
+                enabled = userName.isNotBlank() && cedula.isNotBlank() && androidId.isNotBlank()
             ) {
                 Text("CONTINUAR", fontWeight = FontWeight.Bold)
             }

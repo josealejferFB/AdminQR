@@ -19,7 +19,7 @@
 |---|---|
 | UI | Jetpack Compose + Material3 (BOM gestionado) |
 | DI | Hilt + Hilt Navigation Compose |
-| Navegación | Navigation Compose con rutas `@Serializable` |
+| Navegación | Navigation Compose con rutas `@Serializable` + `NavigationBar` M3 |
 | Serialización | `kotlinx.serialization` (sin Gson ni Moshi) |
 | HTTP | OkHttp 4.x directo (sin Retrofit) |
 | Cámara | CameraX (core, camera2, lifecycle, view) |
@@ -43,11 +43,11 @@ data/
   ├── network/                  ← DTOs de red + ApiConstants
   └── repository/               ← Implementaciones de repositorios
 presentation/
-  ├── navigation/               ← Rutas tipadas + NavHost
-  ├── theme/                    ← Colores, temas, tipografía
+  ├── navigation/               ← Rutas tipadas + NavHost + NavigationBar
+  ├── theme/                    ← Colores, temas, tipografía, EspColorScheme
   ├── common/
-  │   ├── sharedcomponents/     ← AppCard, Bars, QrCodeImage
-  │   └── util/                 ← QrUtils, SystemUi
+  │   ├── sharedcomponents/     ← AppCard, AppBottomBar, QrCodeImage
+  │   └── util/                 ← QrUtils (SystemUi.kt eliminado)
   └── ui/                       ← Pantallas (una carpeta por feature)
 ```
 
@@ -58,8 +58,6 @@ Cada feature tiene un `ViewModel` inyectado con Hilt que expone:
 - **`StateFlow<UiState>`** — estado reactivo de la UI
 - **`SharedFlow<Event>`** — eventos únicos (snackbar, navegación)
 - **Métodos públicos** — acciones del usuario
-
-Los composables observan estos `Flow` con `collectAsState()` y `LaunchedEffect`.
 
 ### Ciclo de vida típico
 
@@ -86,12 +84,16 @@ Rutas definidas en `NavDestinations.kt` con `kotlinx.serialization`:
 @Serializable object Config
 ```
 
-`AppNavigation.kt` contiene el `NavHost` con transiciones entre pantallas.
+`AppNavigation.kt` contiene un `Scaffold` envolvente con `NavigationBar` M3 de 3 destinos (Inicio, Escáner, Ajustes). La barra se oculta en pantallas de detalle (`Result`, `ESPConfig`). El botón de escáner usa estilo destacado (fondo primary).
+
+No hay `SetSystemBarsVisibility` — edge-to-edge nativo con insets manejados por M3. `SystemUi.kt` eliminado.
+
+Transiciones: `slideInHorizontally` + `fadeIn`, 400ms `FastOutSlowInEasing`.
 
 ## Flujo de Datos General
 
 1. **Splash** → animación de bienvenida, navega a Home
-2. **Home** → panel con métricas, lista de usuarios activos, botón escanear
+2. **Home** → panel con métricas (AppCard), lista de usuarios activos, conexión ESP32, aprovisionamiento QR
 3. **Scanner** → CameraX + ML Kit detecta QR → deserializa JSON → descifra `aid` (AES/GCM) → navega a Result
 4. **Result** → muestra datos del usuario → sync con Odoo → muestra QR de acceso
 5. **Config** → configuración de host/puerto/endpoints para Odoo
@@ -123,8 +125,11 @@ Rutas definidas en `NavDestinations.kt` con `kotlinx.serialization`:
 
 Ver `docs/directrices_de_diseno.md` para especificación completa:
 
-- Sistema de colores con tokens semánticos (no colores fijos)
+- Sistema de colores Slate + Teal + Violet con tokens semánticos
 - `AppCard` estandarizada (border radius 24dp, elevación 2dp, borde primary al 10%)
+- `NavigationBar` M3 global con 3 destinos + botón central destacado
+- `EspColorScheme` para consola ESP32 (se adapta al tema claro/oscuro)
 - Animaciones Spring (splash, indicador pulsante de conexión)
-- Modo oscuro nativo
-- Barras flotantes translúcidas en pantalla de cámara
+- Transiciones slide + fade entre pantallas
+- Modo oscuro nativo sin colores hardcodeados
+- Sin `SetSystemBarsVisibility` — edge-to-edge nativo

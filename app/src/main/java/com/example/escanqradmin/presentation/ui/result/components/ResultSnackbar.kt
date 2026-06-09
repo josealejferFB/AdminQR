@@ -30,23 +30,30 @@ fun ResultSnackbar(
         exit     = slideOutVertically { -it } + fadeOut(),
         modifier = modifier
     ) {
-        val (bgColor, icon, message) = when (status) {
+        val (containerColor, icon, message) = when (status) {
             is SyncStatus.Loading -> Triple(
-                Color(0xFF0D47A1),
+                MaterialTheme.colorScheme.primaryContainer,
                 Icons.Default.Sync,
                 "Sincronizando con el servidor..."
             )
             is SyncStatus.Success -> Triple(
-                Color(0xFF1B5E20),
+                MaterialTheme.colorScheme.secondaryContainer,
                 Icons.Default.CheckCircle,
                 "✓ Registro completado correctamente"
             )
             is SyncStatus.Error -> Triple(
-                Color(0xFFB71C1C),
+                MaterialTheme.colorScheme.errorContainer,
                 Icons.Default.Error,
                 "✗ ${status.message}"
             )
             SyncStatus.Idle -> return@AnimatedVisibility
+        }
+
+        val contentColor = when (status) {
+            is SyncStatus.Loading -> MaterialTheme.colorScheme.onPrimaryContainer
+            is SyncStatus.Success -> MaterialTheme.colorScheme.onSecondaryContainer
+            is SyncStatus.Error -> MaterialTheme.colorScheme.onErrorContainer
+            SyncStatus.Idle -> Color.Transparent
         }
 
         Card(
@@ -54,7 +61,7 @@ fun ResultSnackbar(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 6.dp),
             shape     = RoundedCornerShape(14.dp),
-            colors    = CardDefaults.cardColors(containerColor = bgColor),
+            colors    = CardDefaults.cardColors(containerColor = containerColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
         ) {
             Row(
@@ -63,17 +70,17 @@ fun ResultSnackbar(
             ) {
                 if (status is SyncStatus.Loading) {
                     CircularProgressIndicator(
-                        color       = Color.White,
+                        color       = contentColor,
                         modifier    = Modifier.size(20.dp),
                         strokeWidth = 2.dp
                     )
                 } else {
-                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(22.dp))
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
                     text       = message,
-                    color      = Color.White,
+                    color      = contentColor,
                     fontWeight = FontWeight.SemiBold,
                     fontSize   = 13.sp,
                     lineHeight = 18.sp

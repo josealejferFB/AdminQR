@@ -14,8 +14,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.text.SimpleDateFormat
-import java.util.*
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 // ── Models ───────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ class ESPConfigViewModel @Inject constructor(
             initialValue = BluetoothConnectionState.Idle
         )
 
-    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private val timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss")
 
     init { observeMessages() }
 
@@ -177,7 +177,7 @@ class ESPConfigViewModel @Inject constructor(
     private fun addRx(text: String) = addMsg(text, isSent = false)
     private fun addMsg(text: String, isSent: Boolean) {
         _uiState.update {
-            it.copy(messages = it.messages + ConsoleMessage(text, isSent, timeFormat.format(Date())))
+            it.copy(messages = it.messages + ConsoleMessage(text, isSent, LocalTime.now().format(timeFormat)))
         }
     }
 }

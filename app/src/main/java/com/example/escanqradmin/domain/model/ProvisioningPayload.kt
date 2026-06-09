@@ -1,5 +1,8 @@
 package com.example.escanqradmin.domain.model
 
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
 data class ProvisioningPayload(
     val endpoint: String,
     val target_mac: String,
@@ -7,4 +10,8 @@ data class ProvisioningPayload(
 )
 
 fun ProvisioningPayload.toJson(): String =
-    """{"endpoint":"$endpoint","target_mac":"$target_mac","token":"$token"}"""
+    buildJsonObject {
+        put("endpoint", endpoint)
+        put("target_mac", target_mac)
+        put("token", token)
+    }.toString()

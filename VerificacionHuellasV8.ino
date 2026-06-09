@@ -728,6 +728,9 @@ void manejarConexionWiFiAsync() {
     digitalWrite(PIN_LED_WAIT, LOW);
     digitalWrite(PIN_LED_ERROR, HIGH);
 
+    SerialBT.begin(config.btName.c_str());
+    Serial.println("[V8] BT reiniciado tras fallo WiFi: " + config.btName);
+
     pantalla("ERROR WIFI", "Timeout 30s");
     Serial.println("[V7] WiFi timeout");
     sistema.msjDesde = millis();

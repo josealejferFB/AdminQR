@@ -1,17 +1,19 @@
 package com.example.escanqradmin.presentation.ui.home.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,11 +23,18 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.runtime.*
 import com.example.escanqradmin.presentation.ui.home.ActiveUser
-import com.example.escanqradmin.presentation.theme.color.*
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Done
+
+private data class BadgeInfo(val icon: ImageVector, val color: Color)
+
+@Composable
+private fun statusBadgeInfo(status: String): BadgeInfo {
+    return when (status) {
+        "VALIDADO" -> BadgeInfo(Icons.Default.Done, MaterialTheme.colorScheme.secondary)
+        "RECHAZADO" -> BadgeInfo(Icons.Default.Close, MaterialTheme.colorScheme.error)
+        else -> BadgeInfo(Icons.Default.Schedule, MaterialTheme.colorScheme.outline)
+    }
+}
 
 @Composable
 fun ActiveUserCard(
@@ -50,7 +59,7 @@ fun ActiveUserCard(
             ),
         onClick = { isExpanded = !isExpanded }
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -59,18 +68,20 @@ fun ActiveUserCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(44.dp)
                             .background(
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                shape = RoundedCornerShape(12.dp)
+                                color = if (user.status == "VALIDADO") MaterialTheme.colorScheme.secondary
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(14.dp)
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = if (user.status == "VALIDADO") MaterialTheme.colorScheme.primary else Color.Gray,
-                            modifier = Modifier.size(24.dp)
+                        Text(
+                            text = user.name.take(2).uppercase(),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = if (user.status == "VALIDADO") MaterialTheme.colorScheme.onSecondary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
@@ -95,7 +106,7 @@ fun ActiveUserCard(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = user.document,
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp
                             )
                         }
@@ -103,12 +114,31 @@ fun ActiveUserCard(
                 }
                 
                 if (!isExpanded) {
-                    Text(
-                        text = user.status,
-                        color = if (user.status == "VALIDADO") MaterialTheme.colorScheme.primary else SecondaryOrange,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 10.sp
-                    )
+                    val badge = statusBadgeInfo(user.status)
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = badge.color.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = badge.icon,
+                                contentDescription = null,
+                                tint = badge.color,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = user.status,
+                                color = badge.color,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
                 } else {
                     IconButton(
                         onClick = { isExpanded = false },
@@ -121,17 +151,19 @@ fun ActiveUserCard(
             
             AnimatedVisibility(visible = !isExpanded) {
                 Column {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(12.dp))
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Bottom
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
                             Text(
                                 text = "PLACA",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -147,7 +179,7 @@ fun ActiveUserCard(
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Borrar registro",
-                                tint = Color.Red.copy(alpha = 0.7f),
+                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -163,7 +195,10 @@ fun ActiveUserCard(
                         label = { Text("Nombre") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.secondary
+                        )
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     
@@ -177,6 +212,7 @@ fun ActiveUserCard(
                         singleLine = true,
                         enabled = false,
                         colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.secondary,
                             disabledBorderColor = Color.LightGray,
                             disabledTextColor = Color.Gray,
                             disabledLabelColor = Color.Gray
@@ -190,7 +226,10 @@ fun ActiveUserCard(
                         label = { Text("Placa") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.secondary
+                        )
                     )
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -217,7 +256,7 @@ fun ActiveUserCard(
                             onClick = onDelete,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))

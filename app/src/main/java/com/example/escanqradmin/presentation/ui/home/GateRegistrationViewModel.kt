@@ -2,10 +2,12 @@ package com.example.escanqradmin.presentation.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
+import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -25,6 +28,7 @@ import javax.inject.Inject
 sealed class GateStep {
     data object SelectBluetooth : GateStep()
     data class WiFiConfig(val macAddress: String? = null) : GateStep()
+    data object VerifyingWifi : GateStep()
     data class NameGate(val macAddress: String) : GateStep()
     data object Registering : GateStep()
     data object Done : GateStep()
@@ -35,6 +39,7 @@ data class GateRegistrationUiState(
     val step: GateStep = GateStep.SelectBluetooth,
     val ssid: String = "",
     val password: String = "",
+    val btName: String = "",
     val gateName: String = "",
     val gateDescription: String = "",
     val macAddress: String = "",
@@ -63,12 +68,19 @@ class GateRegistrationViewModel @Inject constructor(
         coerceInputValues = true
     }
 
+    private var lastDeviceAddress: String? = null
+    private var verificationJob: Job? = null
+
     fun setSsid(value: String) {
         _uiState.update { it.copy(ssid = value) }
     }
 
     fun setPassword(value: String) {
         _uiState.update { it.copy(password = value) }
+    }
+
+    fun setBtName(value: String) {
+        _uiState.update { it.copy(btName = value) }
     }
 
     fun setGateName(value: String) {
@@ -79,9 +91,15 @@ class GateRegistrationViewModel @Inject constructor(
         _uiState.update { it.copy(gateDescription = value) }
     }
 
-    fun connectToBluetoothDevice(address: String) {
+    fun connectToBluetoothDevice(address: String, deviceName: String? = null) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isSubmitting = true) }
+            lastDeviceAddress = address
+            _uiState.update {
+                it.copy(
+                    isSubmitting = true,
+                    btName = deviceName ?: "ESP32_Seguro"
+                )
+            }
             bluetoothRepository.connectToDevice(address)
             bluetoothRepository.connectionState.first { state ->
                 when (state) {
@@ -118,6 +136,9 @@ class GateRegistrationViewModel @Inject constructor(
                 put("action", "config_network")
                 put("ssid", state.ssid)
                 put("password", state.password)
+                if (state.btName.isNotBlank()) {
+                    put("bt_name", state.btName)
+                }
             }.toString()
 
             val response = bluetoothRepository.sendMessageAndWaitForReply(payload)
@@ -141,11 +162,12 @@ class GateRegistrationViewModel @Inject constructor(
                     if (mac != null) {
                         _uiState.update {
                             it.copy(
-                                step = GateStep.NameGate(macAddress = mac),
+                                step = GateStep.VerifyingWifi,
                                 macAddress = mac,
-                                isSubmitting = false
+                                isSubmitting = true
                             )
                         }
+                        verifyWiFiConnection()
                     } else {
                         _uiState.update {
                             it.copy(
@@ -170,6 +192,66 @@ class GateRegistrationViewModel @Inject constructor(
                         isSubmitting = false
                     )
                 }
+            }
+        }
+    }
+
+    private fun verifyWiFiConnection() {
+        verificationJob?.cancel()
+        verificationJob = viewModelScope.launch {
+            val address = lastDeviceAddress
+            if (address == null) {
+                _uiState.update {
+                    it.copy(
+                        step = GateStep.Error("Error interno"),
+                        isSubmitting = false
+                    )
+                }
+                return@launch
+            }
+
+            delay(3000)
+
+            val startTime = System.currentTimeMillis()
+            val maxDuration = 35_000L
+
+            while (System.currentTimeMillis() - startTime < maxDuration) {
+                bluetoothRepository.disconnect()
+                delay(300)
+
+                bluetoothRepository.connectToDevice(address)
+
+                val connected = try {
+                    withTimeout(5000) {
+                        bluetoothRepository.connectionState.first { state ->
+                            state is BluetoothConnectionState.Connected ||
+                            state is BluetoothConnectionState.Error
+                        }
+                    }
+                    bluetoothRepository.connectionState.value is BluetoothConnectionState.Connected
+                } catch (_: Exception) {
+                    false
+                }
+
+                if (connected) {
+                    _uiState.update {
+                        it.copy(
+                            step = GateStep.NameGate(macAddress = _uiState.value.macAddress),
+                            isSubmitting = false
+                        )
+                    }
+                    return@launch
+                }
+            }
+
+            _uiState.update {
+                it.copy(
+                    step = GateStep.Error(
+                        "No se pudo reconectar con el ESP32. " +
+                        "Verifica que tenga señal WiFi y que esté encendido."
+                    ),
+                    isSubmitting = false
+                )
             }
         }
     }
@@ -208,6 +290,8 @@ class GateRegistrationViewModel @Inject constructor(
     }
 
     fun resetToSelectBluetooth() {
+        verificationJob?.cancel()
+        lastDeviceAddress = null
         _uiState.update { GateRegistrationUiState() }
     }
 
@@ -217,7 +301,8 @@ class GateRegistrationViewModel @Inject constructor(
 
     fun goBackOneStep() {
         val currentStep = _uiState.value.step
-        if (currentStep is GateStep.Error || currentStep is GateStep.NameGate || currentStep is GateStep.WiFiConfig) {
+        if (currentStep is GateStep.Error || currentStep is GateStep.NameGate ||
+            currentStep is GateStep.WiFiConfig || currentStep is GateStep.VerifyingWifi) {
             val targetStep = when {
                 _uiState.value.macAddress.isNotEmpty() -> GateStep.NameGate(macAddress = _uiState.value.macAddress)
                 _uiState.value.ssid.isNotEmpty() -> GateStep.WiFiConfig()
@@ -239,8 +324,10 @@ class GateRegistrationViewModel @Inject constructor(
     }
 
     fun closeDialog() {
+        verificationJob?.cancel()
         viewModelScope.launch {
             bluetoothRepository.disconnect()
+            _uiState.update { GateRegistrationUiState() }
             _events.emit(GateRegistrationEvent.CloseDialog)
         }
     }

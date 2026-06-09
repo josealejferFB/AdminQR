@@ -1,157 +1,156 @@
 # Directrices de Diseño y UI/UX - EscanQR (Material Design 3 - 2026)
 
-Este documento detalla la especificación técnica de diseño implementada en la aplicación administradora de **EscanQR** para que el equipo de desarrollo de la aplicación de usuario pueda replicar el mismo lavado de cara, garantizando consistencia visual y de experiencia de usuario (UI/UX).
+Este documento detalla la especificación técnica de diseño implementada en la aplicación administradora de **EscanQR**.
 
 ---
 
 ## 1. Sistema de Colores y Adaptación de Temas
 
-Para lograr una interfaz premium y compatible con el **Tema Oscuro (Dark Mode)**, está prohibido el uso de colores estáticos (como `Color.White`, `Color.Black` o valores hexadecimales fijos) para fondos, textos o bordes. Todos los elementos deben consumir tokens semánticos del esquema de temas.
+Todos los elementos deben consumir tokens semánticos del `MaterialTheme.colorScheme`. Prohibido el uso de colores fijos (`Color.White`, `Color.Black` o hexadecimales) para fondos, textos o bordes — excepto en ESPConfigScreen (uso de `EspColorScheme`).
 
 ### 1.1. Tabla de Tokens de Color
 
-| Token Semántico | Valor Tema Claro (Light) | Valor Tema Oscuro (Dark) | Propósito en la UI |
-| :--- | :--- | :--- | :--- |
-| `primary` | `#000666` (PrimaryBlue) | `#8FA9FF` | Color de énfasis principal, botones de acción clave, textos destacados. |
-| `secondary` | `#E28364` (Orange) | `#E28364` (Orange) | Alertas, llamadas a la acción secundarias, estados intermedios. |
-| `tertiary` | `#E2E2E2` (SurfaceGrey) | `#2E2E2E` | Fondos de avatares, divisores y elementos deshabilitados. |
-| `background` | `#FAFAFA` (Gris claro) | `#121212` (Negro OLED/Gris muy oscuro) | Fondo de las pantallas principales del sistema. |
-| `surface` | `#FFFFFF` (Blanco puro) | `#1E1E1E` (Gris elevado) | Fondo de las tarjetas, diálogos y barras flotantes. |
-| `onPrimary` | `#FFFFFF` | `#000000` | Color del texto/icono sobre fondo primario. |
-| `onBackground` | `#000000` | `#FFFFFF` | Color del texto principal sobre el fondo de pantalla. |
-| `onSurface` | `#000000` | `#FFFFFF` | Color del texto principal sobre tarjetas o superficies. |
+| Token Semántico | Tema Claro | Tema Oscuro | Propósito |
+|:---|---:|---:|---|
+| `primary` | `#1E293B` (Slate-800) | `#94A3B8` (Slate-400) | Énfasis principal, botones, textos destacados |
+| `onPrimary` | `#FFFFFF` | `#0F172A` | Texto/icono sobre primary |
+| `primaryContainer` | `#E2E8F0` | `#1E293B` | Fondos de indicadores, badges |
+| `secondary` | `#0D9488` (Teal-600) | `#2DD4BF` (Teal-400) | Acentos secundarios, estados correctos |
+| `onSecondary` | `#FFFFFF` | `#042F2E` | Texto/icono sobre secondary |
+| `secondaryContainer` | `#CCFBF1` | `#134E4A` | Fondos de chips de éxito |
+| `tertiary` | `#7C3AED` (Violet-600) | `#A78BFA` (Violet-400) | Paso 2 de activación, QR |
+| `onTertiary` | `#FFFFFF` | `#1E0A3C` | Texto/icono sobre tertiary |
+| `background` | `#FAFAFA` | `#0A0A0A` | Fondo de pantallas |
+| `onBackground` | `#0F172A` | `#FAFAFA` | Texto principal sobre fondo |
+| `surface` | `#FFFFFF` | `#18181B` | Tarjetas, diálogos, top bar |
+| `onSurface` | `#1E293B` | `#E4E4E7` | Texto sobre tarjetas |
+| `surfaceVariant` | `#F1F5F9` | `#27272A` | Fondos secundarios (SearchBar) |
+| `outline` | `#CBD5E1` | `#3F3F46` | Bordes de inputs, divisores |
+| `error` | `#DC2626` | `#FCA5A5` | Estados de error |
+| `errorContainer` | `#FEE2E2` | `#7F1D1D` | Fondos de error |
 
----
+### 1.2. EspColorScheme (Consola ESP32)
 
-## 2. Estandarización de Tarjetas (`AppCard`)
+ESPCONFIGScreen usa su propio par de esquemas que mantienen aesthetic terminal pero se adaptan al tema claro/oscuro:
 
-Todas las tarjetas de la aplicación deben utilizar un diseño unificado basado en los siguientes parámetros de Material Design 3:
-
-* **Corner Radius (Bordes Redondeados):** `24.dp` (esquinas anchas, modernas).
-* **Elevación (Sombra):** `2.dp` en estado normal.
-* **Borde Contorno (Border Stroke):** `1.dp` de grosor con el color `primary` y una opacidad (alpha) de `0.1f` (`10%`). Esto aporta un contorno sutil que resalta la tarjeta sin sobrecargar la UI.
-* **Margen / Padding Interno:** Mínimo `16.dp` a `20.dp` de espaciado interior para respiración de contenidos.
-
-### Código de Referencia en Jetpack Compose
+| Token | Claro | Oscuro | Constante anterior |
+|:---|---:|---:|---|
+| `surface` | `#F8FAFC` | `#0D1117` | `ConsoleBg` |
+| `surfaceVariant` | `#E2E8F0` | `#161B22` | `ConsolePanel` / `FormBg` |
+| `outline` | `#CBD5E1` | `#30363D` | `ConsoleBorder` |
+| `onSurface` | `#0F172A` | `#E6EDF3` | texto en consola |
+| `onSurfaceVariant` | `#64748B` | `#8B949E` | `MutedText` |
+| `primary` | `#1F6FEB` | `#1F6FEB` | `TxColor` / `PromptColor` |
+| `secondary` | `#238636` | `#238636` | `RxColor` |
+| `tertiary` | `#8957E5` | `#8957E5` | Color de QuickCmd Config |
 
 ```kotlin
 @Composable
-fun AppCard(
-    modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(24.dp),
-    colors: CardColors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surface
-    ),
-    elevation: CardElevation = CardDefaults.cardElevation(
-        defaultElevation = 2.dp
-    ),
-    border: BorderStroke? = BorderStroke(
-        width = 1.dp,
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-    ),
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Card(
-        modifier = modifier,
-        shape = shape,
-        colors = colors,
-        elevation = elevation,
-        border = border,
-        content = content
+fun EspColorScheme(): EspColorSchemeColors {
+    val dark = isSystemInDarkTheme()
+    return EspColorSchemeColors(
+        surface = if (dark) Color(0xFF0D1117) else Color(0xFFF8FAFC),
+        surfaceVariant = if (dark) Color(0xFF161B22) else Color(0xFFE2E8F0),
+        onSurface = if (dark) Color(0xFFE6EDF3) else Color(0xFF0F172A),
+        // ...
     )
 }
 ```
 
 ---
 
-## 3. Animaciones Premium y Micro-interacciones (Estado del Arte 2026)
+## 2. Estandarización de Tarjetas (`AppCard`)
 
-Para hacer que la aplicación se sienta viva e interactiva, implementamos animaciones no lineales apoyadas en especificaciones de resorte (**Springs**).
+Parámetros unificados de Material Design 3:
 
-### 3.1. Animación del Splash Screen
+- **Corner Radius:** `24.dp`
+- **Elevación:** `2.dp`
+- **Borde:** `1.dp`, `primary` al `10%` de opacidad
+- **Padding interno mínimo:** `16.dp` – `20.dp`
 
-La pantalla de bienvenida ejecuta tres animaciones paralelas en un intervalo de **2.0 segundos**:
-
-1. **Efecto de Halo Radial (Fondo):** Un degradado radial de la marca se expande suavemente de `0.5f` a `1.2f` en escala y se desvanece de `0%` a `15%` de opacidad con una curva `EaseOutQuart` de 1200ms.
-2. **Entrada con Rebote del Logo (`ic_app_logo`):** El logo principal escala desde `0f` hasta `1f` y rota desde `-90°` hasta `0°` usando un interpolador bouncy spring:
-   * **Damping Ratio:** `Spring.DampingRatioMediumBouncy` (rebote medio suave).
-   * **Stiffness:** `Spring.StiffnessLow` (movimiento fluido y no cortado).
-3. **Texto Deslizante y Desvanecido:** El nombre de la aplicación y la descripción aparecen con una opacidad de `0f` a `1f` deslizándose verticalmente desde `40.dp` hacia su posición final con un retardo (delay) de `400ms`.
-
-#### Código de Referencia en Jetpack Compose
+`AppCardDefaults` expresa estos valores como objetos reutilizables:
 
 ```kotlin
-val scale = remember { Animatable(0f) }
-val rotation = remember { Animatable(-90f) }
-val alpha = remember { Animatable(0f) }
-val yOffset = remember { Animatable(40f) }
-
-LaunchedEffect(key1 = true) {
-    // Bote y giro del logotipo
-    launch {
-        scale.animateTo(
-            targetValue = 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        )
-    }
-    launch {
-        rotation.animateTo(
-            targetValue = 0f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow
-            )
-        )
-    }
-    // Desvanecimiento y subida del texto
-    launch {
-        delay(400)
-        alpha.animateTo(1f, animationSpec = tween(800, easing = EaseOutCubic))
-    }
-    launch {
-        delay(400)
-        yOffset.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
-    }
+object AppCardDefaults {
+    val Shape: Shape get() = RoundedCornerShape(24.dp)
+    val Elevation: CardElevation get() = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    fun border(color: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)): BorderStroke
+    fun colors(containerColor: Color = MaterialTheme.colorScheme.surface): CardColors
 }
 ```
 
-### 3.2. Anillo de Estado Pulsante (Conectividad / Online)
+**NO** sobrescribir `shape` ni `elevation` al usar `AppCard` — usar `AppCardDefaults.*` siempre.
 
-Para indicar que el usuario o el servidor se encuentra activo ("Estás en línea"), se utiliza un indicador de punto con un anillo expansivo translúcido infinito:
-
-* **Punto Central:** Círculo estático de color verde o primario de `10.dp`.
-* **Anillo Pulsante:** Un círculo externo que escala continuamente de `1f` a `2.3f` y desvanece su opacidad de `0.6f` a `0f` en bucle continuo de `1500ms`.
-
-```kotlin
-val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-val scale by infiniteTransition.animateFloat(
-    initialValue = 1f,
-    targetValue = 2.3f,
-    animationSpec = infiniteRepeatable(
-        animation = tween(1500, easing = EaseOutQuart),
-        repeatMode = RepeatMode.Restart
-    ),
-    label = "scale"
-)
-val alpha by infiniteTransition.animateFloat(
-    initialValue = 0.6f,
-    targetValue = 0f,
-    animationSpec = infiniteRepeatable(
-        animation = tween(1500, easing = EaseOutQuart),
-        repeatMode = RepeatMode.Restart
-    ),
-    label = "alpha"
-)
-```
+### Excepciones conocidas (intencionales)
+- `ResultSnackbar`: shape 14.dp (snackbar flotante, no una card)
+- Botones: 12.dp (filled, outlined, tonal)
+- Inputs (`OutlinedTextField`): 12.dp – 16.dp
+- Diálogos (`AlertDialog`): 24.dp
 
 ---
 
-## 4. Lineamientos de UX y Layout
+## 3. Navegación Principal
 
-* **Translucidez en Contenedores Flotantes:** Para pantallas de cámara o scanner, las barras de navegación (`TopBar` / `BottomBar`) deben ser flotantes con esquinas redondeadas y usar un fondo translúcido:
-  `MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)` combinado con `Blur` de ventana si la plataforma lo soporta.
-* **Top App Bars Minimalistas:** En lugar de barras superiores de color primario sólido, utilizar el color de superficie (`surface`) con textos oscuros o claros dinámicos (`onSurface`), manteniendo un estilo limpio.
-* **Feedback Háptico:** Usar llamadas hápticas (`HapticFeedbackType.LongPress` / `TextHandleMove`) al interactuar con botones de navegación inferiores o tarjetas para reforzar la sensación de calidad.
+Arquitectura basada en `NavigationBar` de Material3 envuelta en un `Scaffold` único en `AppNavigation.kt`:
+
+```
+Scaffold + NavigationBar (3 destinos)
+├── Inicio (HomeScreen)
+├── Escáner (ScannerScreen) — botón central destacado con primary
+├── Ajustes (ConfigScreen)
+└── [Detalle] ResultScreen — sin NavigationBar, solo back
+└── [Detalle] ESPConfigScreen — sin NavigationBar, solo back
+```
+
+- La `NavigationBar` se oculta automáticamente en pantallas de detalle.
+- El botón central de escáner usa un `Box` con `RoundedCornerShape(16.dp)` y color `primary` para destacar visualmente.
+- No hay `SetSystemBarsVisibility` — la app usa edge-to-edge nativo con insets manejados por M3.
+- `SystemUi.kt` eliminado.
+
+### Historial de evolución
+- **Antes:** `CustomBottomBar` solo en 2/5 pantallas, `CustomTopBar` flotante, 3 implementaciones distintas de top bar.
+- **Ahora:** `NavigationBar` M3 nativa en 3/5 destinos, `TopAppBar` M3 consistente.
+
+---
+
+## 4. Animaciones Premium y Micro-interacciones
+
+### 4.1. Splash Screen
+Tres animaciones paralelas (~2.0s):
+1. **Halo radial:** degradado primary → transparente, escala 0.5→1.2, alpha 0→15%, 1200ms `EaseOutQuart`.
+2. **Logo bounce + rotate:** spring `DampingRatioMediumBouncy` + `StiffnessLow`, escala 0→1, rotación -90°→0°.
+3. **Texto slide-up + fade:** delay 400ms, alpha 0→1, offset Y 40dp→0.
+
+### 4.2. Indicador de conectividad
+Punto verde + anillo pulsante infinito con `infiniteRepeatable` + `tween(1500ms)`.
+
+### 4.3. Transiciones entre pantallas
+`slideInHorizontally` + `fadeIn`, 400ms, `FastOutSlowInEasing`.
+Pop: dirección inversa.
+
+---
+
+## 5. Lineamientos de UX y Composición
+
+- **TopAppBar M3**: usar siempre `TopAppBar` de Material3 (no `Row` custom). Logo + título en `title`, acciones en `actions`.
+- **Bottom nav**: única `NavigationBar` global. No incluir barras custom por pantalla.
+- **Snackbar**: usar `snackbarHost` del `Scaffold`, no posicionamiento manual.
+- **Tarjetas de métricas**: usar `AppCard` con iconos de 24dp, texto en 28sp (valor) y 10sp (label).
+- **Formularios**: `OutlinedTextField` con `RoundedCornerShape(12.dp)` y borde visible (`focusedBorderColor = primary`, `unfocusedBorderColor = outline`).
+- **Cámara (ScannerScreen)**: fullscreen sin top bar propia. La `NavigationBar` global da acceso a otras secciones.
+- **Diálogos**: `AlertDialog` con `containerColor = surface`, `shape = RoundedCornerShape(24.dp)`.
+- **Colores de estado**: mapear siempre a tokens del `ColorScheme` - `secondary` para éxito/validado, `error` para fallo, `tertiary` para paso secundario, `outline` para pendiente/bloqueado.
+
+---
+
+## 6. Shape Consistency
+
+| Elemento | Radius |
+|---|---|
+| AppCard / cards | 24.dp |
+| Botones (filled, outlined, tonal) | 12.dp |
+| OutlinedTextField | 12.dp |
+| NavigationBar | 16.dp (top-only, M3 nativo) |
+| Diálogos | 24.dp |
+| Chips / badges | 8.dp |
+| ResultSnackbar | 14.dp |

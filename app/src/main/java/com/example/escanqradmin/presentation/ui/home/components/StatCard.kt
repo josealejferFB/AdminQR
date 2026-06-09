@@ -1,8 +1,7 @@
 package com.example.escanqradmin.presentation.ui.home.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -10,9 +9,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.escanqradmin.presentation.theme.color.SurfaceGrey
-
-import androidx.compose.material3.MaterialTheme
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
+import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 
 @Composable
 fun StatCard(
@@ -21,19 +19,20 @@ fun StatCard(
     label: String,
     valueColor: Color
 ) {
-    Box(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
-            .padding(16.dp)
+    AppCard(
+        modifier = modifier,
+        elevation = AppCardDefaults.Elevation
     ) {
-        Column {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             Text(
                 text = value,
                 color = valueColor,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold
             )
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = label,
                 color = Color.Gray,
