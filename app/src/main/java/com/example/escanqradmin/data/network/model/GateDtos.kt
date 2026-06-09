@@ -23,3 +23,26 @@ data class GateRegisterResponse(
     @SerialName("gate_id") val gateId: Int? = null,
     val message: String? = null
 )
+
+@Serializable
+data class GateListResponse(
+    val success: Boolean,
+    val gates: List<GateDto>? = null,
+    val message: String? = null
+)
+
+@Serializable
+data class GateDto(
+    val id: Int,
+    val name: String,
+    @SerialName("mac_address") val macAddress: String,
+    @SerialName("ip_address") val ipAddress: String? = null,
+    @SerialName("is_online") val isOnline: Boolean = false,
+    @SerialName("bt_name") val btName: String = "ESP32_Seguro"
+)
+
+@Serializable
+data class GateNameUpdateRequest(
+    @SerialName("gate_id") val gateId: Int,
+    val name: String
+)
