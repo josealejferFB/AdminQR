@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -43,6 +44,8 @@ fun GateRegistrationDialog(
     onSsidChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onBtNameChange: (String) -> Unit,
+    onRefreshNetworks: () -> Unit,
+    onSelectNetwork: (String) -> Unit,
     onSendWiFiConfig: () -> Unit,
     onGateNameChange: (String) -> Unit,
     onGateDescriptionChange: (String) -> Unit,
@@ -118,6 +121,8 @@ fun GateRegistrationDialog(
                             onSsidChange = onSsidChange,
                             onPasswordChange = onPasswordChange,
                             onBtNameChange = onBtNameChange,
+                            onRefreshNetworks = onRefreshNetworks,
+                            onSelectNetwork = onSelectNetwork,
                             onSendWiFiConfig = onSendWiFiConfig
                         )
                         is GateStep.VerifyingWifi -> VerifyingWifiContent()
@@ -244,14 +249,23 @@ private fun ColumnScope.SelectBluetoothContent(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WiFiConfigContent(
     uiState: GateRegistrationUiState,
     onSsidChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onBtNameChange: (String) -> Unit,
+    onRefreshNetworks: () -> Unit,
+    onSelectNetwork: (String) -> Unit,
     onSendWiFiConfig: () -> Unit
 ) {
+    var ssidExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        onRefreshNetworks()
+    }
+
     Column {
         Text(
             "Configurar Red WiFi",
@@ -265,15 +279,62 @@ private fun WiFiConfigContent(
             color = Color.Gray
         )
         Spacer(Modifier.height(16.dp))
-        OutlinedTextField(
-            value = uiState.ssid,
-            onValueChange = onSsidChange,
-            label = { Text("SSID") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            enabled = !uiState.isSubmitting
-        )
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ExposedDropdownMenuBox(
+                expanded = ssidExpanded,
+                onExpandedChange = { ssidExpanded = it },
+                modifier = Modifier.weight(1f)
+            ) {
+                OutlinedTextField(
+                    value = uiState.ssid,
+                    onValueChange = onSsidChange,
+                    label = { Text("SSID") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !uiState.isSubmitting,
+                    trailingIcon = {
+                        if (uiState.availableNetworks.isNotEmpty()) {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = ssidExpanded)
+                        }
+                    }
+                )
+                if (uiState.availableNetworks.isNotEmpty()) {
+                    ExposedDropdownMenu(
+                        expanded = ssidExpanded,
+                        onDismissRequest = { ssidExpanded = false }
+                    ) {
+                        uiState.availableNetworks.forEach { network ->
+                            DropdownMenuItem(
+                                text = { Text(network) },
+                                onClick = {
+                                    onSelectNetwork(network)
+                                    ssidExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(
+                onClick = onRefreshNetworks,
+                enabled = !uiState.isSubmitting
+            ) {
+                if (uiState.isLoadingNetworks) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(Icons.Default.Wifi, contentDescription = "Redes disponibles", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
             value = uiState.password,

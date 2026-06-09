@@ -1,11 +1,14 @@
 package com.example.escanqradmin.presentation.ui.home
 
+import android.content.Context
+import android.net.wifi.WifiManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -44,7 +47,9 @@ data class GateRegistrationUiState(
     val gateDescription: String = "",
     val macAddress: String = "",
     val registeredGateId: Int? = null,
-    val isSubmitting: Boolean = false
+    val isSubmitting: Boolean = false,
+    val availableNetworks: List<String> = emptyList(),
+    val isLoadingNetworks: Boolean = false
 )
 
 sealed class GateRegistrationEvent {
@@ -53,6 +58,7 @@ sealed class GateRegistrationEvent {
 
 @HiltViewModel
 class GateRegistrationViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val bluetoothRepository: BluetoothRepository,
     private val syncRepository: SyncRepository
 ) : ViewModel() {
@@ -81,6 +87,48 @@ class GateRegistrationViewModel @Inject constructor(
 
     fun setBtName(value: String) {
         _uiState.update { it.copy(btName = value) }
+    }
+
+    fun refreshAvailableNetworks() {
+        _uiState.update { it.copy(isLoadingNetworks = true) }
+        try {
+            val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            if (wifiManager != null) {
+                val networkList = mutableSetOf<String>()
+
+                val connInfo = wifiManager.connectionInfo
+                val connectedSsid = connInfo.ssid?.trim('"', ' ') ?: ""
+                if (connectedSsid.isNotBlank() && connectedSsid != "<unknown ssid>") {
+                    networkList.add(connectedSsid)
+                }
+
+                @Suppress("DEPRECATION")
+                val configured = wifiManager.configuredNetworks
+                if (configured != null) {
+                    for (cfg in configured) {
+                        val ssid = cfg.SSID.trim('"', ' ')
+                        if (ssid.isNotBlank() && ssid.length > 1) {
+                            networkList.add(ssid)
+                        }
+                    }
+                }
+
+                _uiState.update {
+                    it.copy(
+                        availableNetworks = networkList.toList().sorted(),
+                        isLoadingNetworks = false
+                    )
+                }
+            } else {
+                _uiState.update { it.copy(isLoadingNetworks = false) }
+            }
+        } catch (_: Exception) {
+            _uiState.update { it.copy(isLoadingNetworks = false) }
+        }
+    }
+
+    fun selectNetwork(ssid: String) {
+        _uiState.update { it.copy(ssid = ssid) }
     }
 
     fun setGateName(value: String) {

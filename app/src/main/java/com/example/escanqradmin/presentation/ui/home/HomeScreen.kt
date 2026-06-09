@@ -554,6 +554,8 @@ fun HomeScreen(
                     onSsidChange = { gateRegistrationViewModel.setSsid(it) },
                     onPasswordChange = { gateRegistrationViewModel.setPassword(it) },
                     onBtNameChange = { gateRegistrationViewModel.setBtName(it) },
+                    onRefreshNetworks = { gateRegistrationViewModel.refreshAvailableNetworks() },
+                    onSelectNetwork = { gateRegistrationViewModel.selectNetwork(it) },
                     onSendWiFiConfig = { gateRegistrationViewModel.sendWiFiConfig() },
                     onGateNameChange = { gateRegistrationViewModel.setGateName(it) },
                     onGateDescriptionChange = { gateRegistrationViewModel.setGateDescription(it) },
