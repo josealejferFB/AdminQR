@@ -179,6 +179,30 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun connectToGate(gate: GateInfo) {
+        viewModelScope.launch {
+            val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
+            if (isConnected) {
+                val currentAddress = (bluetoothConnectionState.value as BluetoothConnectionState.Connected).deviceAddress
+                if (currentAddress == gate.macAddress) {
+                    _snackbarMessages.emit("Ya conectado a ${gate.name}")
+                    return@launch
+                }
+                disconnect()
+                delay(500)
+            }
+            connectToDevice(gate.macAddress)
+        }
+    }
+
+    fun getConnectedGate(gates: List<GateInfo>): GateInfo? {
+        val state = bluetoothConnectionState.value
+        if (state is BluetoothConnectionState.Connected) {
+            return gates.firstOrNull { it.macAddress == state.deviceAddress }
+        }
+        return null
+    }
+
     // ── Multi-Gate support (V8) ────────────────────────────────────
     fun loadGates() {
         viewModelScope.launch {
