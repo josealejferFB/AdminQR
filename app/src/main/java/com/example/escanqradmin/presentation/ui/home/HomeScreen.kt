@@ -47,6 +47,7 @@ import com.example.escanqradmin.presentation.navigation.Config
 import com.example.escanqradmin.presentation.navigation.ESPConfig
 import com.example.escanqradmin.presentation.theme.color.*
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
+import com.example.escanqradmin.presentation.ui.home.components.BluetoothConnectionPanel
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateIpConfigDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
@@ -305,151 +306,22 @@ fun HomeScreen(
                     }
 
                     item {
-                        AppCard(
-                            modifier = Modifier.fillMaxWidth(),
-                            border = AppCardDefaults.border(
-                                if (bluetoothConnectionState is BluetoothConnectionState.Connected)
-                                    Color.Green.copy(alpha = 0.1f)
-                                else
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-                            )
-                        ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(44.dp)
-                                                .background(
-                                                    if (bluetoothConnectionState is BluetoothConnectionState.Connected)
-                                                        Color.Green.copy(alpha = 0.15f)
-                                                    else
-                                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                                    CircleShape
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = if (bluetoothConnectionState is BluetoothConnectionState.Connected)
-                                                    Icons.Default.BluetoothConnected
-                                                else
-                                                    Icons.Default.Bluetooth,
-                                                contentDescription = null,
-                                                tint = if (bluetoothConnectionState is BluetoothConnectionState.Connected)
-                                                    Color.Green
-                                                else
-                                                    MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(22.dp)
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(16.dp))
-                                        Column {
-                                            Text(
-                                                "Lector Físico (ESP32)",
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 15.sp,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            Text(
-                                                text = when (val s = bluetoothConnectionState) {
-                                                    is BluetoothConnectionState.Connected -> "CONECTADO: ${s.deviceAddress}"
-                                                    is BluetoothConnectionState.Connecting -> "CONECTANDO..."
-                                                    is BluetoothConnectionState.Error -> "ERROR EN CONEXIÓN"
-                                                    else -> "DESCONECTADO"
-                                                },
-                                                fontSize = 12.sp,
-                                                color = if (bluetoothConnectionState is BluetoothConnectionState.Connected)
-                                                    Color.Green.copy(alpha = 0.8f)
-                                                else
-                                                    Color.Gray,
-                                                fontWeight = FontWeight.Medium
-                                            )
-                                        }
-                                    }
-                                    Box(
-                                        modifier = Modifier.size(10.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (bluetoothConnectionState is BluetoothConnectionState.Connected) {
-                                            val pulseTransition = rememberInfiniteTransition(label = "btPulse")
-                                            val pulseAlpha by pulseTransition.animateFloat(
-                                                initialValue = 0.5f,
-                                                targetValue = 0f,
-                                                animationSpec = infiniteRepeatable(
-                                                    animation = tween(1000, easing = EaseOutCubic),
-                                                    repeatMode = RepeatMode.Restart
-                                                ),
-                                                label = "pulseAlpha"
-                                            )
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(24.dp)
-                                                    .background(Color.Green.copy(alpha = pulseAlpha), CircleShape)
-                                            )
-                                        }
-                                        Box(
-                                            modifier = Modifier
-                                                .size(10.dp)
-                                                .background(
-                                                    color = when (bluetoothConnectionState) {
-                                                        is BluetoothConnectionState.Connected -> Color.Green
-                                                        is BluetoothConnectionState.Connecting -> MaterialTheme.colorScheme.secondary
-                                                        else -> Color.Gray
-                                                    },
-                                                    shape = CircleShape
-                                                )
-                                        )
-                                    }
-                                }
+                        val connectedGate = viewModel.getConnectedGate(uiState.gates)
+                        val pairedAddresses = pairedDevices.map { it.address }
 
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    if (bluetoothConnectionState is BluetoothConnectionState.Connected) {
-                                        OutlinedButton(
-                                            onClick = { viewModel.disconnect() },
-                                            modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(14.dp),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
-                                            border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f))
-                                        ) {
-                                            Icon(Icons.Default.BluetoothDisabled, contentDescription = null, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Desconectar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    } else {
-                                        Button(
-                                            onClick = requestBluetoothAction,
-                                            modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(14.dp),
-                                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                                        ) {
-                                            Icon(Icons.Default.Bluetooth, contentDescription = null, modifier = Modifier.size(18.dp))
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Vincular", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
-                                        }
-                                    }
-
-                                    FilledTonalButton(
-                                        onClick = { navController.navigate(ESPConfig) },
-                                        enabled = bluetoothConnectionState is BluetoothConnectionState.Connected,
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(14.dp)
-                                    ) {
-                                        Icon(Icons.Default.SettingsInputComponent, contentDescription = null, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Ajustar Red", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
+                        BluetoothConnectionPanel(
+                            gates = uiState.gates,
+                            connectionState = bluetoothConnectionState,
+                            pairedDeviceAddresses = pairedAddresses,
+                            connectedGateName = connectedGate?.name,
+                            onConnectToGate = { viewModel.connectToGate(it) },
+                            onDisconnect = { viewModel.disconnect() },
+                            onPairGate = {
+                                selectedGateForDialog = it
+                                requestBluetoothAction()
+                            },
+                            onRegisterNew = { showGateRegistrationDialog = true }
+                        )
                     }
 
                     item {
