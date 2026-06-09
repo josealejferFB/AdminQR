@@ -751,7 +751,9 @@ void agregarEndpointStatus() {
     if (WiFi.status() == WL_CONNECTED) {
       json += ",\"ip\":\"" + WiFi.localIP().toString() + "\"";
     }
-    json += ",\"uptime\":" + String(millis() / 1000) + "}";
+    json += ",\"uptime\":" + String(millis() / 1000);
+    json += ",\"static_ip\":\"" + config.staticIp + "\"";
+    json += ",\"bt_name\":\"" + config.btName + "\"}";
 
     server.send(200, "application/json", json);
   });
