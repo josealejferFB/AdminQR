@@ -1,10 +1,12 @@
 package com.example.escanqradmin.di.modules
 
 import com.example.escanqradmin.data.repository.BluetoothRepositoryImpl
+import com.example.escanqradmin.data.repository.GateRepositoryImpl
 import com.example.escanqradmin.data.repository.HistoryRepositoryImpl
 import com.example.escanqradmin.data.repository.SyncRepositoryImpl
 import com.example.escanqradmin.data.repository.ThemeRepositoryImpl
 import com.example.escanqradmin.domain.repository.BluetoothRepository
+import com.example.escanqradmin.domain.repository.GateRepository
 import com.example.escanqradmin.domain.repository.HistoryRepository
 import com.example.escanqradmin.domain.repository.SyncRepository
 import com.example.escanqradmin.domain.repository.ThemeRepository
@@ -20,8 +22,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -51,6 +58,12 @@ abstract class RepositoryModule {
         themeRepositoryImpl: ThemeRepositoryImpl
     ): ThemeRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindGateRepository(
+        gateRepositoryImpl: GateRepositoryImpl
+    ): GateRepository
+
     companion object {
         @Provides
         @Singleton
@@ -59,14 +72,28 @@ abstract class RepositoryModule {
         ): OkHttpClient {
             val isDebuggable = (context.applicationInfo.flags and
                     android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-            return OkHttpClient.Builder()
+
+            val builder = OkHttpClient.Builder()
                 .connectTimeout(15, TimeUnit.SECONDS)
                 .readTimeout(15, TimeUnit.SECONDS)
                 .addInterceptor(HttpLoggingInterceptor().apply {
                     level = if (isDebuggable) HttpLoggingInterceptor.Level.BODY
                             else HttpLoggingInterceptor.Level.NONE
                 })
-                .build()
+
+            if (isDebuggable) {
+                val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                    override fun checkClientTrusted(_chain: Array<X509Certificate>, _authType: String) {}
+                    override fun checkServerTrusted(_chain: Array<X509Certificate>, _authType: String) {}
+                    override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+                })
+                val sslContext = SSLContext.getInstance("TLS")
+                sslContext.init(null, trustAllCerts, SecureRandom())
+                builder.sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+                builder.hostnameVerifier { _, _ -> true }
+            }
+
+            return builder.build()
         }
 
         @Provides
