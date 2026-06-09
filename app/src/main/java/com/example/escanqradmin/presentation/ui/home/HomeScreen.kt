@@ -16,6 +16,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.example.escanqradmin.domain.model.GateInfo
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnackbar
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
@@ -80,6 +82,9 @@ fun HomeScreen(
     var showProvisioningDialog by remember { mutableStateOf(false) }
     var showGateRegistrationDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
+    var showGateIpDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var selectedGateForDialog by remember { mutableStateOf<GateInfo?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.refreshData()
@@ -271,6 +276,30 @@ fun HomeScreen(
                                     fontWeight = FontWeight.Bold,
                                 )
                             }
+                    }
+
+                    // ── Gate Chip Selector ─────────────────────────────
+                    item {
+                        if (uiState.gates.isNotEmpty()) {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                GateChipRow(
+                                    gates = uiState.gates,
+                                    selectedGateId = uiState.selectedGateId,
+                                    onSelect = { viewModel.selectGate(it) },
+                                    onAddGate = { showGateRegistrationDialog = true },
+                                    onConfigureIp = { gate ->
+                                        // Will be wired in B6
+                                    },
+                                    onRename = { gate ->
+                                        // Will be wired in B7
+                                    },
+                                    onDetails = { gate ->
+                                        // TODO: details dialog
+                                    }
+                                )
+                            }
+                        }
                     }
 
                     item {
@@ -530,7 +559,8 @@ fun HomeScreen(
                         }
                     }
 
-                    val filteredUsers = uiState.activeUsers.filter {
+                    val displayUsers = if (uiState.selectedGateId != null) uiState.gateUsers else uiState.activeUsers
+                    val filteredUsers = displayUsers.filter {
                         it.name.contains(searchQuery, ignoreCase = true) || it.document.contains(searchQuery, ignoreCase = true)
                     }
 
@@ -750,4 +780,61 @@ fun ProvisioningQrDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(24.dp)
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GateChipRow(
+    gates: List<GateInfo>,
+    selectedGateId: Int?,
+    onSelect: (Int?) -> Unit,
+    onAddGate: () -> Unit,
+    onConfigureIp: (GateInfo) -> Unit,
+    onRename: (GateInfo) -> Unit,
+    onDetails: (GateInfo) -> Unit
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            FilterChip(
+                selected = selectedGateId == null,
+                onClick = { onSelect(null) },
+                label = { Text("Todas") }
+            )
+        }
+        items(gates) { gate ->
+            var showMenu by remember { mutableStateOf(false) }
+            Box {
+                FilterChip(
+                    selected = selectedGateId == gate.id,
+                    onClick = { onSelect(gate.id) },
+                    label = { Text(gate.name) },
+                    trailingIcon = {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, "Opciones")
+                        }
+                    }
+                )
+                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Configurar IP") },
+                        onClick = { showMenu = false; onConfigureIp(gate) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Renombrar") },
+                        onClick = { showMenu = false; onRename(gate) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Ver detalles") },
+                        onClick = { showMenu = false; onDetails(gate) }
+                    )
+                }
+            }
+        }
+        item {
+            IconButton(onClick = onAddGate) {
+                Icon(Icons.Default.Add, "Registrar tarjeta")
+            }
+        }
+    }
+}
 }
