@@ -239,6 +239,14 @@ void loop() {
                 config.pass = String(password);
                 config.wifiConfigurado = true;
 
+                const char* btName = doc["bt_name"] | "";
+                if (strlen(btName) > 0) {
+                  prefs.begin("cfg", false);
+                  prefs.putString("bt_name", btName);
+                  prefs.end();
+                  config.btName = String(btName);
+                }
+
                 String mac = obtenerMacAddress();
 
                 String jsonResp = "{\"status\":\"success\",\"mac_address\":\""
@@ -274,6 +282,28 @@ void loop() {
                 pantalla("IP GUARDADA", "Reiniciando...");
                 delay(1000);
                 ESP.restart();
+              }
+              sistema.msjDesde = millis();
+              sistema.mostrandoMsj = true;
+              sistema.estado = ESPERA_CONEXION;
+            } else if (strcmp(action, "set_bt_name") == 0) {
+              const char* name = doc["name"] | "";
+
+              if (strlen(name) == 0) {
+                SerialBT.println("{\"status\":\"error\",\"message\":\"Nombre requerido\"}");
+                pantalla("ERROR", "Nombre BT vacío");
+              } else {
+                prefs.begin("cfg", false);
+                prefs.putString("bt_name", name);
+                prefs.end();
+                config.btName = String(name);
+
+                SerialBT.println("{\"status\":\"success\",\"message\":\"Nombre BT actualizado\"}");
+                pantalla("BT NAME OK", name);
+
+                SerialBT.end();
+                SerialBT.begin(config.btName.c_str());
+                Serial.println("[V8] BT name cambiado a: " + config.btName);
               }
               sistema.msjDesde = millis();
               sistema.mostrandoMsj = true;
