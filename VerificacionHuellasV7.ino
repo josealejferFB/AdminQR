@@ -686,6 +686,11 @@ void manejarConexionWiFiAsync() {
     sistema.wifiConnecting = false;
     digitalWrite(PIN_LED_WAIT, LOW);
 
+    SerialBT.end();
+    delay(500);
+    SerialBT.begin(config.btName.c_str());
+    Serial.println("[V8] BT reiniciado como: " + config.btName);
+
     pantalla("WIFI CONECTADO", WiFi.localIP().toString().c_str());
     Serial.println("[V7] WiFi conectado: " + WiFi.localIP().toString());
 
