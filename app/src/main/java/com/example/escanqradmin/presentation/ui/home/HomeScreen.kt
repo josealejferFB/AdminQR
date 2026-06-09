@@ -529,7 +529,8 @@ fun HomeScreen(
                                     Icon(Icons.Default.People, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(24.dp))
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(text = uiState.totalUsers.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.secondary)
-                                    Text(text = "USUARIOS REGISTRADOS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
+                                    Text(text = "USUARIOS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
+                                    Text(text = "REGISTRADOS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
                                 }
                             }
                         }
