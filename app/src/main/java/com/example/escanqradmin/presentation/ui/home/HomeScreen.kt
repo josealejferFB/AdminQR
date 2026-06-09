@@ -50,6 +50,7 @@ import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateIpConfigDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
+import com.example.escanqradmin.presentation.ui.home.components.RenameGateDialog
 import com.example.escanqradmin.presentation.ui.home.components.SearchBar
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.QrCodeBox
@@ -294,7 +295,8 @@ fun HomeScreen(
                                         showGateIpDialog = true
                                     },
                                     onRename = { gate ->
-                                        // Will be wired in B7
+                                        selectedGateForDialog = gate
+                                        showRenameDialog = true
                                     },
                                     onDetails = { gate ->
                                         // TODO: details dialog
@@ -701,6 +703,18 @@ fun HomeScreen(
                     onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
                     onDismiss = { showGateIpDialog = false; selectedGateForDialog = null },
                     onSuccess = { showGateIpDialog = false; selectedGateForDialog = null }
+                )
+            }
+
+            if (showRenameDialog && selectedGateForDialog != null) {
+                RenameGateDialog(
+                    gate = selectedGateForDialog!!,
+                    onConfirm = { newName ->
+                        viewModel.renameGate(selectedGateForDialog!!.id, newName)
+                        showRenameDialog = false
+                        selectedGateForDialog = null
+                    },
+                    onDismiss = { showRenameDialog = false; selectedGateForDialog = null }
                 )
             }
         }
