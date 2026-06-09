@@ -511,8 +511,8 @@ fun HomeScreen(
             if (showBluetoothDialog) {
                 BluetoothDialog(
                     onDismiss = { showBluetoothDialog = false; viewModel.stopDiscovery() },
-                    pairedDevices = pairedDevices.filter { it.name?.startsWith("ESP32", ignoreCase = true) == true },
-                    scannedDevices = scannedDevices.filter { it.name?.startsWith("ESP32", ignoreCase = true) == true },
+                    pairedDevices = pairedDevices,
+                    scannedDevices = scannedDevices,
                     isScanning = isScanning,
                     connectionState = bluetoothConnectionState,
                     onStartScan = { viewModel.startDiscovery() },
@@ -543,8 +543,8 @@ fun HomeScreen(
 
                 GateRegistrationDialog(
                     uiState = gateUiState,
-                    scannedDevices = scannedDevices.filter { it.name?.startsWith("ESP32", ignoreCase = true) == true },
-                    pairedDevices = pairedDevices.filter { it.name?.startsWith("ESP32", ignoreCase = true) == true },
+                    scannedDevices = scannedDevices,
+                    pairedDevices = pairedDevices,
                     isScanning = isScanning,
                     connectionState = bluetoothConnectionState,
                     onStartScan = { viewModel.startDiscovery() },
