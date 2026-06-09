@@ -50,6 +50,12 @@ struct {
   String ssid, pass;
   String odooUrl;
   bool   wifiConfigurado;
+  // [V8] IP estática
+  String staticIp;
+  String staticGateway;
+  String staticNetmask;
+  // [V8] Nombre Bluetooth configurable
+  String btName;
 } config;
 
 // ========== ESTADO DEL SISTEMA ==========
@@ -462,6 +468,10 @@ void cargarConfig() {
   config.pass            = prefs.getString("pass", "");
   config.odooUrl         = prefs.getString("odoo_url", "");
   config.wifiConfigurado = (config.ssid.length() > 0);
+  config.staticIp      = prefs.getString("static_ip", "");
+  config.staticGateway = prefs.getString("static_gw", "");
+  config.staticNetmask = prefs.getString("static_mask", "");
+  config.btName        = prefs.getString("bt_name", "ESP32_Seguro");
   prefs.end();
 
   // URL por defecto si no hay configuración guardada
