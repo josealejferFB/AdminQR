@@ -282,27 +282,25 @@ fun HomeScreen(
 
                     // ── Gate Chip Selector ─────────────────────────────
                     item {
-                        if (uiState.gates.isNotEmpty()) {
-                            Column {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                GateChipRow(
-                                    gates = uiState.gates,
-                                    selectedGateId = uiState.selectedGateId,
-                                    onSelect = { viewModel.selectGate(it) },
-                                    onAddGate = { showGateRegistrationDialog = true },
-                                    onConfigureIp = { gate ->
-                                        selectedGateForDialog = gate
-                                        showGateIpDialog = true
-                                    },
-                                    onRename = { gate ->
-                                        selectedGateForDialog = gate
-                                        showRenameDialog = true
-                                    },
-                                    onDetails = { gate ->
-                                        // TODO: details dialog
-                                    }
-                                )
-                            }
+                        Column {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            GateChipRow(
+                                gates = uiState.gates,
+                                selectedGateId = uiState.selectedGateId,
+                                onSelect = { viewModel.selectGate(it) },
+                                onAddGate = { showGateRegistrationDialog = true },
+                                onConfigureIp = { gate ->
+                                    selectedGateForDialog = gate
+                                    showGateIpDialog = true
+                                },
+                                onRename = { gate ->
+                                    selectedGateForDialog = gate
+                                    showRenameDialog = true
+                                },
+                                onDetails = { gate ->
+                                    // TODO: details dialog
+                                }
+                            )
                         }
                     }
 
