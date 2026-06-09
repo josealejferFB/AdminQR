@@ -47,6 +47,7 @@ fun GateRegistrationDialog(
     onGateDescriptionChange: (String) -> Unit,
     onRegisterGate: () -> Unit,
     onDismissError: () -> Unit,
+    onGoBackFromError: () -> Unit,
     onDismiss: () -> Unit,
     onReset: () -> Unit
 ) {
@@ -120,7 +121,8 @@ fun GateRegistrationDialog(
                             uiState = uiState,
                             onGateNameChange = onGateNameChange,
                             onGateDescriptionChange = onGateDescriptionChange,
-                            onRegisterGate = onRegisterGate
+                            onRegisterGate = onRegisterGate,
+                            onGoBack = { onDismissError() }
                         )
                         is GateStep.Registering -> RegisteringContent()
                         is GateStep.Done -> DoneContent(
@@ -130,7 +132,8 @@ fun GateRegistrationDialog(
                         is GateStep.Error -> ErrorContent(
                             uiState = uiState,
                             onDismiss = onDismiss,
-                            onRetry = onDismissError
+                            onRetry = onDismissError,
+                            onGoBack = onGoBackFromError
                         )
                     }
                 }
@@ -302,7 +305,8 @@ private fun NameGateContent(
     uiState: GateRegistrationUiState,
     onGateNameChange: (String) -> Unit,
     onGateDescriptionChange: (String) -> Unit,
-    onRegisterGate: () -> Unit
+    onRegisterGate: () -> Unit,
+    onGoBack: () -> Unit
 ) {
     Column {
         Text(
@@ -353,6 +357,17 @@ private fun NameGateContent(
             enabled = uiState.gateName.isNotBlank() && !uiState.isSubmitting
         ) {
             Text("REGISTRAR EN ODOO", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = onGoBack,
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(14.dp),
+            enabled = !uiState.isSubmitting
+        ) {
+            Icon(Icons.Default.NavigateBefore, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("CAMBIAR CONFIGURACIÓN WIFI", fontWeight = FontWeight.Medium, fontSize = 12.sp)
         }
     }
 }
@@ -408,7 +423,8 @@ private fun DoneContent(
 private fun ErrorContent(
     uiState: GateRegistrationUiState,
     onDismiss: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onGoBack: () -> Unit
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -431,21 +447,31 @@ private fun ErrorContent(
         val errorMessage = (uiState.step as? GateStep.Error)?.message ?: "Error desconocido"
         Text(errorMessage, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
         Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
-                onClick = onDismiss,
+                onClick = onGoBack,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("CERRAR", fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.NavigateBefore, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("VOLVER", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
             Button(
                 onClick = onRetry,
                 modifier = Modifier.weight(1f).height(52.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Text("REINTENTAR", fontWeight = FontWeight.Bold)
+                Text("REINTENTAR", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(
+            onClick = onDismiss,
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(14.dp)
+        ) {
+            Text("CERRAR", fontWeight = FontWeight.Medium)
         }
     }
 }

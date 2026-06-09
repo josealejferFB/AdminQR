@@ -558,6 +558,7 @@ fun HomeScreen(
                     onGateDescriptionChange = { gateRegistrationViewModel.setGateDescription(it) },
                     onRegisterGate = { gateRegistrationViewModel.registerGate() },
                     onDismissError = { gateRegistrationViewModel.dismissError() },
+                    onGoBackFromError = { gateRegistrationViewModel.goBackTwoSteps() },
                     onDismiss = {
                         gateRegistrationViewModel.closeDialog()
                         showGateRegistrationDialog = false

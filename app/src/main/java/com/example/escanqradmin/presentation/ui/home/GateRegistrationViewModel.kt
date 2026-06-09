@@ -212,14 +212,29 @@ class GateRegistrationViewModel @Inject constructor(
     }
 
     fun dismissError() {
+        goBackOneStep()
+    }
+
+    fun goBackOneStep() {
         val currentStep = _uiState.value.step
-        if (currentStep is GateStep.Error) {
-            val previousStep = when {
+        if (currentStep is GateStep.Error || currentStep is GateStep.NameGate || currentStep is GateStep.WiFiConfig) {
+            val targetStep = when {
                 _uiState.value.macAddress.isNotEmpty() -> GateStep.NameGate(macAddress = _uiState.value.macAddress)
                 _uiState.value.ssid.isNotEmpty() -> GateStep.WiFiConfig()
                 else -> GateStep.SelectBluetooth
             }
-            _uiState.update { it.copy(step = previousStep) }
+            _uiState.update { it.copy(step = targetStep) }
+        }
+    }
+
+    fun goBackTwoSteps() {
+        val currentStep = _uiState.value.step
+        if (currentStep is GateStep.Error) {
+            val targetStep = when {
+                _uiState.value.macAddress.isNotEmpty() && _uiState.value.ssid.isNotEmpty() -> GateStep.WiFiConfig()
+                else -> GateStep.SelectBluetooth
+            }
+            _uiState.update { it.copy(step = targetStep) }
         }
     }
 
