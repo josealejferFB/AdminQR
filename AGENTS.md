@@ -40,7 +40,7 @@ Full docs in `docs/`:
 - Tests are stub/example files only (`ExampleUnitTest`, `ExampleInstrumentedTest`)
 - Network: cleartext HTTP is allowed via `network_security_config.xml`
 - AES key `SHARED_AES_KEY` and provisioning `PROVISIONING_TOKEN` are hardcoded in `SecurityConstants.kt`
-- The repo includes an Arduino companion sketch (`VerificacionHuellasV7.ino`) for the ESP32 gate controller; V8 adds `config_ip`, `set_bt_name`, and IP estática/BT name features
+- The repo includes an Arduino companion sketch (`VerificacionHuellasV8.ino`) for the ESP32 gate controller; V8 adds `config_ip`, `set_bt_name`, static IP, configurable BT name, and BT auto-reconnect after WiFi
 - ESP32 V7/V8 firmware uses a state machine: `ESPERA_CONEXION → MODO_CONFIG_BT → {ODOO | WIFI | config_ip | set_bt_name | config_network}` with 30-60s timeouts
 - QR between apps uses AES-256-GCM with shared key (`SecurityConstants.SHARED_AES_KEY`)
 - Spanish language throughout the codebase (UI strings, comments, variable names)
