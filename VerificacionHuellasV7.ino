@@ -512,6 +512,17 @@ void conectarWiFi() {
   }
 
   pantalla("Conectando WiFi...", config.ssid.c_str());
+
+  if (config.staticIp.length() > 0) {
+    IPAddress ip, gw, mask;
+    if (ip.fromString(config.staticIp.c_str()) &&
+        gw.fromString(config.staticGateway.c_str()) &&
+        mask.fromString(config.staticNetmask.c_str())) {
+      WiFi.config(ip, gw, mask);
+      Serial.println("[V8] IP estática: " + config.staticIp);
+    }
+  }
+
   WiFi.begin(config.ssid.c_str(), config.pass.c_str());
 
   unsigned long start = millis();
