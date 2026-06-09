@@ -48,6 +48,7 @@ import com.example.escanqradmin.presentation.navigation.ESPConfig
 import com.example.escanqradmin.presentation.theme.color.*
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
+import com.example.escanqradmin.presentation.ui.home.components.GateIpConfigDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
 import com.example.escanqradmin.presentation.ui.home.components.SearchBar
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
@@ -289,7 +290,8 @@ fun HomeScreen(
                                     onSelect = { viewModel.selectGate(it) },
                                     onAddGate = { showGateRegistrationDialog = true },
                                     onConfigureIp = { gate ->
-                                        // Will be wired in B6
+                                        selectedGateForDialog = gate
+                                        showGateIpDialog = true
                                     },
                                     onRename = { gate ->
                                         // Will be wired in B7
@@ -690,6 +692,17 @@ fun HomeScreen(
                     onReset = { gateRegistrationViewModel.resetToSelectBluetooth() }
                 )
             }
+
+            if (showGateIpDialog && selectedGateForDialog != null) {
+                GateIpConfigDialog(
+                    gate = selectedGateForDialog!!,
+                    connectionStateProvider = { bluetoothConnectionState },
+                    onConnect = { address -> viewModel.connectToDevice(address) },
+                    onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
+                    onDismiss = { showGateIpDialog = false; selectedGateForDialog = null },
+                    onSuccess = { showGateIpDialog = false; selectedGateForDialog = null }
+                )
+            }
         }
     }
 }
@@ -836,5 +849,4 @@ private fun GateChipRow(
             }
         }
     }
-}
 }
