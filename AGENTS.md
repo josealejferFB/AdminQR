@@ -18,7 +18,7 @@ Full docs in `docs/`:
 - `Arquitectura.md` — stack, MVVM, folder structure, design guidelines
 - `Contrato-Odoo.md` — endpoints, JSON-RPC payloads, URL construction
 - `Contrato-App-Usuario.md` — QR format, AES/GCM encryption, provisioning tokens
-- `Contrato-ESP32.md` — Bluetooth SPP, V6 state machine, commands, timeouts
+- `Contrato-ESP32.md` — Bluetooth SPP, V7/V8 state machine, commands, timeouts, IP estática, BT name
 - `directrices_de_diseno.md` — color tokens (Slate/Teal/Violet), AppCard, NavigationBar M3, EspColorScheme, animations
 
 ## Key conventions
@@ -40,8 +40,8 @@ Full docs in `docs/`:
 - Tests are stub/example files only (`ExampleUnitTest`, `ExampleInstrumentedTest`)
 - Network: cleartext HTTP is allowed via `network_security_config.xml`
 - AES key `SHARED_AES_KEY` and provisioning `PROVISIONING_TOKEN` are hardcoded in `SecurityConstants.kt`
-- The repo includes an Arduino companion sketch (`VerificacionHuellasV7.ino`) for the ESP32 gate controller
-- ESP32 V6 firmware uses a state machine: `ESPERA_CONEXION → MODO_CONFIG_BT → {ODOO | WIFI}` with 30-60s timeouts
+- The repo includes an Arduino companion sketch (`VerificacionHuellasV7.ino`) for the ESP32 gate controller; V8 adds `config_ip`, `set_bt_name`, and IP estática/BT name features
+- ESP32 V7/V8 firmware uses a state machine: `ESPERA_CONEXION → MODO_CONFIG_BT → {ODOO | WIFI | config_ip | set_bt_name | config_network}` with 30-60s timeouts
 - QR between apps uses AES-256-GCM with shared key (`SecurityConstants.SHARED_AES_KEY`)
 - Spanish language throughout the codebase (UI strings, comments, variable names)
 - `material-icons-extended` is a direct dependency (not via BOM)

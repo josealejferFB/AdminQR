@@ -252,3 +252,99 @@ when (msg) {
 - `CMD_DESCONOCIDO`
 - `REINICIANDO`
 - `SISTEMA LISTO` (por prefijo)
+
+## V8 — Nuevas Funcionalidades
+
+A partir de V8 se añadieron comandos JSON y configuración de IP estática y nombre Bluetooth.
+
+### Comandos JSON (V8)
+
+| Comando | Estado Requerido | Descripción |
+|---|---|---|
+| `config_ip` | `MODO_CONFIG_BT` | Recibe JSON con `ip`, `gateway`, `netmask`. Guarda en Preferences y reinicia. |
+| `set_bt_name` | `MODO_CONFIG_BT` | Recibe JSON con `name`. Cambia nombre BT en caliente y persiste en Preferences. |
+| `config_network` | `MODO_CONFIG_BT` | Ahora acepta `bt_name` opcional además de `ssid`/`pass`. |
+
+#### `config_ip`
+
+```json
+{
+    "ip": "192.168.1.200",
+    "gateway": "192.168.1.1",
+    "netmask": "255.255.255.0"
+}
+```
+
+- Guarda IP, gateway y netmask en Preferences (claves `static_ip`, `static_gateway`, `static_netmask`)
+- En el boot, si existen estas claves, aplica `WiFi.config()` antes de `WiFi.begin()`
+- Responde `"CONFIG_OK"` o `"JSON_ERROR"`
+- La IP estática se expone en `GET /status` como campo `static_ip`
+
+#### `set_bt_name`
+
+```json
+{
+    "name": "ESP32_Puerta1"
+}
+```
+
+- Cambia el nombre Bluetooth en caliente usando `SerialBT.flush()` y reiniciando SPP
+- Persiste el nombre en Preferences (clave `bt_name`)
+- En boot, si existe la clave `bt_name`, lo usa en `SerialBT.begin(bt_name)`
+- Responde `"CONFIG_OK"` o `"JSON_ERROR"`
+- El nombre BT se expone en `GET /status` como campo `bt_name`
+
+#### `config_network` (mejorado)
+
+```json
+{
+    "ssid": "MiRed",
+    "pass": "password123",
+    "bt_name": "ESP32_Puerta1"
+}
+```
+
+- `bt_name` es opcional. Si se incluye, actualiza el nombre BT además del WiFi.
+- Mantiene compatibilidad hacia atrás con el flujo `wifi` (V7).
+
+### Estados V8
+
+Sin cambios respecto a V7. La máquina de estados sigue siendo:
+
+```
+ESPERA_CONEXION (0) → MODO_CONFIG_BT (1)
+                         ├─ "config" → MODO_CONFIG_ODOO (2)
+                         ├─ "wifi"   → MODO_WIFI_SSID (3)
+                         │              └─ MODO_WIFI_PASS (4)
+                         │                   └─ REINICIANDO
+                         ├─ "config_ip"     → guarda IP y reinicia
+                         ├─ "set_bt_name"   → cambia BT name
+                         └─ "config_network" → guarda WiFi + BT name
+```
+
+### Timeouts V8
+
+Sin cambios respecto a V7.
+
+### IP Estática
+
+- **Persistencia:** claves `static_ip`, `static_gateway`, `static_netmask` en NVS (Preferences)
+- **Aplicación en boot:** si existen, se llama `WiFi.config(local_ip, gateway, netmask)` antes de `WiFi.begin()`
+- **Exposición:** campo `static_ip` en `GET /status`
+- **Comando de configuración:** `config_ip` vía Bluetooth
+
+### Bluetooth Name
+
+- **Persistencia:** clave `bt_name` en NVS (Preferences)
+- **Aplicación en boot:** si existe, se pasa a `SerialBT.begin(bt_name)`
+- **Cambio en caliente:** vía `set_bt_name` o `bt_name` en `config_network`
+- **Exposición:** campo `bt_name` en `GET /status`
+
+### Persistencia V8 (adicional a V7)
+
+| Clave | Valor |
+|---|---|
+| `static_ip` | IP estática (String) |
+| `static_gateway` | Gateway (String) |
+| `static_netmask` | Máscara de red (String) |
+| `bt_name` | Nombre Bluetooth personalizado (String) |
