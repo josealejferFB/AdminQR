@@ -255,6 +255,29 @@ void loop() {
 
                 Serial.println("[V7] JSON config_network OK. MAC: " + mac);
               }
+            } else if (strcmp(action, "config_ip") == 0) {
+              const char* ip      = doc["ip"]      | "";
+              const char* gateway = doc["gateway"] | "";
+              const char* netmask = doc["netmask"] | "";
+
+              if (strlen(ip) == 0 || strlen(gateway) == 0 || strlen(netmask) == 0) {
+                SerialBT.println("{\"status\":\"error\",\"message\":\"IP, gateway y netmask requeridos\"}");
+                pantalla("ERROR IP", "Campos incompletos");
+              } else {
+                prefs.begin("cfg", false);
+                prefs.putString("static_ip",  ip);
+                prefs.putString("static_gw",  gateway);
+                prefs.putString("static_mask", netmask);
+                prefs.end();
+
+                SerialBT.println("{\"status\":\"success\",\"message\":\"IP estática configurada\"}");
+                pantalla("IP GUARDADA", "Reiniciando...");
+                delay(1000);
+                ESP.restart();
+              }
+              sistema.msjDesde = millis();
+              sistema.mostrandoMsj = true;
+              sistema.estado = ESPERA_CONEXION;
             } else {
               SerialBT.println("{\"status\":\"error\",\"message\":\"Acción desconocida\"}");
               pantalla("ERROR JSON", (String("Acción: ") + action).c_str());
