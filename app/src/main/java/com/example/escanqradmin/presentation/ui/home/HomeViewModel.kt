@@ -17,6 +17,8 @@ import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.HistoryRepository
 import com.example.escanqradmin.domain.repository.SyncRepository
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
+import com.example.escanqradmin.domain.model.GateInfo
+import com.example.escanqradmin.domain.repository.GateRepository
 import javax.inject.Inject
 
 data class ActiveUser(
@@ -32,7 +34,10 @@ data class HomeUiState(
     val totalUsers: Int = 0,
     val activeUsers: List<ActiveUser> = emptyList(),
     val isRefreshing: Boolean = false,
-    val isServerOnline: Boolean = true
+    val isServerOnline: Boolean = true,
+    val gates: List<GateInfo> = emptyList(),
+    val selectedGateId: Int? = null,
+    val gateUsers: List<ActiveUser> = emptyList()
 )
 
 @HiltViewModel
@@ -40,7 +45,8 @@ class HomeViewModel @Inject constructor(
     private val repository: HistoryRepository,
     private val bluetoothRepository: BluetoothRepository,
     private val syncRepository: SyncRepository,
-    private val themeRepository: ThemeRepository
+    private val themeRepository: ThemeRepository,
+    private val gateRepository: GateRepository
 ) : ViewModel() {
 
     val isDarkMode = themeRepository.isDarkMode().stateIn(
@@ -173,6 +179,52 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    // ── Multi-Gate support (V8) ────────────────────────────────────
+    fun loadGates() {
+        viewModelScope.launch {
+            gateRepository.getGates().onSuccess { gates ->
+                _uiState.update { it.copy(gates = gates) }
+            }
+        }
+    }
+
+    fun selectGate(gateId: Int?) {
+        _uiState.update { it.copy(selectedGateId = gateId) }
+        if (gateId != null) {
+            loadGateUsers(gateId)
+        } else {
+            _uiState.update { it.copy(gateUsers = emptyList()) }
+        }
+    }
+
+    private fun loadGateUsers(gateId: Int) {
+        viewModelScope.launch {
+            syncRepository.getGateUsers(gateId).onSuccess { users ->
+                val activeUsers = users.map { qr ->
+                    ActiveUser(
+                        id = qr.androidId,
+                        name = qr.userName,
+                        document = qr.cedula,
+                        status = "VALIDADO",
+                        plate = qr.plate
+                    )
+                }
+                _uiState.update { it.copy(gateUsers = activeUsers) }
+            }
+        }
+    }
+
+    fun renameGate(gateId: Int, newName: String) {
+        viewModelScope.launch {
+            gateRepository.updateGateName(gateId, newName).onSuccess {
+                _snackbarMessages.emit("Nombre actualizado correctamente")
+                loadGates()
+            }.onFailure { e ->
+                _snackbarMessages.emit("Error al renombrar: ${e.message}")
+            }
+        }
+    }
+
     // ── Gestión de usuarios (solo vía servidor) ───────────────────
 
     fun deleteUser(id: String, document: String) {
@@ -218,6 +270,7 @@ class HomeViewModel @Inject constructor(
                 .onFailure {
                     _uiState.update { it.copy(isServerOnline = false) }
                 }
+            loadGates()
             delay(500)
             _uiState.update { it.copy(isRefreshing = false) }
         }
