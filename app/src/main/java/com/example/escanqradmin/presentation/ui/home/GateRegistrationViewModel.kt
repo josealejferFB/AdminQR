@@ -43,6 +43,7 @@ data class GateRegistrationUiState(
     val ssid: String = "",
     val password: String = "",
     val btName: String = "",
+    val hostname: String = "",
     val gateName: String = "",
     val gateDescription: String = "",
     val macAddress: String = "",
@@ -87,6 +88,10 @@ class GateRegistrationViewModel @Inject constructor(
 
     fun setBtName(value: String) {
         _uiState.update { it.copy(btName = value) }
+    }
+
+    fun setHostname(value: String) {
+        _uiState.update { it.copy(hostname = value) }
     }
 
     fun refreshAvailableNetworks() {
@@ -145,7 +150,8 @@ class GateRegistrationViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isSubmitting = true,
-                    btName = deviceName ?: "ESP32_Seguro"
+                    btName = deviceName ?: "ESP32_Seguro",
+                    hostname = deviceName ?: "ESP32-Gate"
                 )
             }
             bluetoothRepository.connectToDevice(address)
@@ -186,6 +192,9 @@ class GateRegistrationViewModel @Inject constructor(
                 put("password", state.password)
                 if (state.btName.isNotBlank()) {
                     put("bt_name", state.btName)
+                }
+                if (state.hostname.isNotBlank()) {
+                    put("hostname", state.hostname)
                 }
             }.toString()
 

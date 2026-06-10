@@ -49,6 +49,7 @@ import com.example.escanqradmin.presentation.theme.color.*
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothConnectionPanel
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
+import com.example.escanqradmin.presentation.ui.home.components.ChangeHostnameDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateIpConfigDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
 import com.example.escanqradmin.presentation.ui.home.components.RenameGateDialog
@@ -86,6 +87,7 @@ fun HomeScreen(
     var showGateRegistrationDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
     var showGateIpDialog by remember { mutableStateOf(false) }
+    var showHostnameDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var selectedGateForDialog by remember { mutableStateOf<GateInfo?>(null) }
 
@@ -293,6 +295,10 @@ fun HomeScreen(
                                 onConfigureIp = { gate ->
                                     selectedGateForDialog = gate
                                     showGateIpDialog = true
+                                },
+                                onChangeHostname = { gate ->
+                                    selectedGateForDialog = gate
+                                    showHostnameDialog = true
                                 },
                                 onRename = { gate ->
                                     selectedGateForDialog = gate
@@ -554,6 +560,7 @@ fun HomeScreen(
                     onSsidChange = { gateRegistrationViewModel.setSsid(it) },
                     onPasswordChange = { gateRegistrationViewModel.setPassword(it) },
                     onBtNameChange = { gateRegistrationViewModel.setBtName(it) },
+                    onHostnameChange = { gateRegistrationViewModel.setHostname(it) },
                     onRefreshNetworks = { gateRegistrationViewModel.refreshAvailableNetworks() },
                     onSelectNetwork = { gateRegistrationViewModel.selectNetwork(it) },
                     onSendWiFiConfig = { gateRegistrationViewModel.sendWiFiConfig() },
@@ -590,6 +597,17 @@ fun HomeScreen(
                         selectedGateForDialog = null
                     },
                     onDismiss = { showRenameDialog = false; selectedGateForDialog = null }
+                )
+            }
+
+            if (showHostnameDialog && selectedGateForDialog != null) {
+                ChangeHostnameDialog(
+                    gate = selectedGateForDialog!!,
+                    connectionStateProvider = { bluetoothConnectionState },
+                    onConnect = { address -> viewModel.connectToDevice(address) },
+                    onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
+                    onDismiss = { showHostnameDialog = false; selectedGateForDialog = null },
+                    onSuccess = { showHostnameDialog = false; selectedGateForDialog = null }
                 )
             }
         }
@@ -692,6 +710,7 @@ private fun GateChipRow(
     onSelect: (Int?) -> Unit,
     onAddGate: () -> Unit,
     onConfigureIp: (GateInfo) -> Unit,
+    onChangeHostname: (GateInfo) -> Unit,
     onRename: (GateInfo) -> Unit,
     onDetails: (GateInfo) -> Unit
 ) {
@@ -720,6 +739,10 @@ private fun GateChipRow(
                     DropdownMenuItem(
                         text = { Text("Configurar IP") },
                         onClick = { showMenu = false; onConfigureIp(gate) }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Cambiar Hostname") },
+                        onClick = { showMenu = false; onChangeHostname(gate) }
                     )
                     DropdownMenuItem(
                         text = { Text("Renombrar") },

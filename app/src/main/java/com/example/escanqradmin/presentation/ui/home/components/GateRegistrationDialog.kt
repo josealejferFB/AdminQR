@@ -44,6 +44,7 @@ fun GateRegistrationDialog(
     onSsidChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onBtNameChange: (String) -> Unit,
+    onHostnameChange: (String) -> Unit,
     onRefreshNetworks: () -> Unit,
     onSelectNetwork: (String) -> Unit,
     onSendWiFiConfig: () -> Unit,
@@ -121,6 +122,7 @@ fun GateRegistrationDialog(
                             onSsidChange = onSsidChange,
                             onPasswordChange = onPasswordChange,
                             onBtNameChange = onBtNameChange,
+                            onHostnameChange = onHostnameChange,
                             onRefreshNetworks = onRefreshNetworks,
                             onSelectNetwork = onSelectNetwork,
                             onSendWiFiConfig = onSendWiFiConfig
@@ -256,9 +258,10 @@ private fun WiFiConfigContent(
     onSsidChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onBtNameChange: (String) -> Unit,
+    onHostnameChange: (String) -> Unit,
     onRefreshNetworks: () -> Unit,
     onSelectNetwork: (String) -> Unit,
-    onSendWiFiConfig: () -> Unit
+    onSendWiFiConfig: () -> Unit,
 ) {
     var ssidExpanded by remember { mutableStateOf(false) }
 
@@ -352,6 +355,17 @@ private fun WiFiConfigContent(
             onValueChange = onBtNameChange,
             label = { Text("Nombre Bluetooth del ESP32") },
             placeholder = { Text("ESP32_Seguro") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            enabled = !uiState.isSubmitting
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = uiState.hostname,
+            onValueChange = onHostnameChange,
+            label = { Text("Nombre en el Router (Hostname)") },
+            placeholder = { Text("ESP32-Gate") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),

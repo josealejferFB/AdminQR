@@ -3,11 +3,12 @@
 //  Apertura de portón: señal HTTP desde Odoo → relé
 //  Bluetooth: Protocolo dual (JSON + texto V6 legacy)
 //  Novedades V8:
-//    - Comandos JSON: config_network, config_ip, set_bt_name
+//    - Comandos JSON: config_network, config_ip, set_bt_name, set_hostname
 //    - IP estática configurable vía BT (config_ip)
 //    - Nombre Bluetooth configurable vía set_bt_name
+//    - Hostname DHCP configurable vía set_hostname
 //    - BT se reinicia automáticamente tras conexión WiFi
-//    - GET /status expone static_ip y bt_name
+//    - GET /status expone static_ip, bt_name y hostname
 // ============================================================
 
 #include <BluetoothSerial.h>
@@ -56,6 +57,8 @@ struct {
   String staticNetmask;
   // [V8] Nombre Bluetooth configurable
   String btName;
+  // [V8] Nombre de host para DHCP
+  String hostname;
 } config;
 
 // ========== ESTADO DEL SISTEMA ==========
@@ -247,6 +250,14 @@ void loop() {
                   config.btName = String(btName);
                 }
 
+                const char* hostname = doc["hostname"] | "";
+                if (strlen(hostname) > 0) {
+                  prefs.begin("cfg", false);
+                  prefs.putString("hostname", hostname);
+                  prefs.end();
+                  config.hostname = String(hostname);
+                }
+
                 String mac = obtenerMacAddress();
 
                 String jsonResp = "{\"status\":\"success\",\"mac_address\":\""
@@ -310,6 +321,24 @@ void loop() {
               sistema.msjDesde = millis();
               sistema.mostrandoMsj = true;
               sistema.estado = ESPERA_CONEXION;
+            } else if (strcmp(action, "set_hostname") == 0) {
+              const char* hostname = doc["hostname"] | "";
+
+              if (strlen(hostname) == 0) {
+                SerialBT.println("{\"status\":\"error\",\"message\":\"Hostname requerido\"}");
+                pantalla("ERROR", "Hostname vacío");
+              } else {
+                prefs.begin("cfg", false);
+                prefs.putString("hostname", hostname);
+                prefs.end();
+                config.hostname = String(hostname);
+
+                SerialBT.println("{\"status\":\"success\",\"message\":\"Hostname configurado\"}");
+                SerialBT.flush();
+                pantalla("HOSTNAME OK", hostname);
+                delay(1000);
+                ESP.restart();
+              }
             } else {
               SerialBT.println("{\"status\":\"error\",\"message\":\"Acción desconocida\"}");
               pantalla("ERROR JSON", (String("Acción: ") + action).c_str());
@@ -527,6 +556,7 @@ void cargarConfig() {
   config.staticGateway = prefs.getString("static_gw", "");
   config.staticNetmask = prefs.getString("static_mask", "");
   config.btName        = prefs.getString("bt_name", "ESP32_Seguro");
+  config.hostname      = prefs.getString("hostname", "ESP32-Gate");
   prefs.end();
 
   // URL por defecto si no hay configuración guardada
@@ -578,6 +608,7 @@ void conectarWiFi() {
     }
   }
 
+  WiFi.setHostname(config.hostname.c_str());
   WiFi.begin(config.ssid.c_str(), config.pass.c_str());
 
   unsigned long start = millis();
@@ -671,6 +702,7 @@ String obtenerMacAddress() {
 void manejarConexionWiFiAsync() {
   static bool wifiStarted = false;
   if (!wifiStarted) {
+    WiFi.setHostname(config.hostname.c_str());
     WiFi.begin(config.ssid.c_str(), config.pass.c_str());
     wifiStarted = true;
     pantalla("CONECTANDO WIFI", config.ssid.c_str());
@@ -758,7 +790,8 @@ void agregarEndpointStatus() {
     }
     json += ",\"uptime\":" + String(millis() / 1000);
     json += ",\"static_ip\":\"" + config.staticIp + "\"";
-    json += ",\"bt_name\":\"" + config.btName + "\"}";
+    json += ",\"bt_name\":\"" + config.btName + "\"";
+    json += ",\"hostname\":\"" + config.hostname + "\"}";
 
     server.send(200, "application/json", json);
   });
