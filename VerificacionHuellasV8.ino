@@ -300,6 +300,7 @@ void loop() {
                 config.btName = String(name);
 
                 SerialBT.println("{\"status\":\"success\",\"message\":\"Nombre BT actualizado\"}");
+                SerialBT.flush();
                 pantalla("BT NAME OK", name);
 
                 SerialBT.end();
