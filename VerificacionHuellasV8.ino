@@ -208,7 +208,7 @@ void loop() {
 
         // ── [V7] Auto-detección: JSON vs texto ─────────────────
         if (cmd.length() > 0 && cmd.charAt(0) == '{') {
-          StaticJsonDocument<256> doc;
+          StaticJsonDocument<512> doc;
           DeserializationError error = deserializeJson(doc, cmd);
 
           if (error) {
@@ -252,6 +252,7 @@ void loop() {
                 String jsonResp = "{\"status\":\"success\",\"mac_address\":\""
                                   + mac + "\",\"message\":\"Red configurada\"}";
                 SerialBT.println(jsonResp);
+                SerialBT.flush();
 
                 pantalla("CONFIG JSON OK", ("MAC: " + mac).c_str());
 

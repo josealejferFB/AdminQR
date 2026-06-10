@@ -261,7 +261,7 @@ class GateRegistrationViewModel @Inject constructor(
             delay(3000)
 
             val startTime = System.currentTimeMillis()
-            val maxDuration = 35_000L
+            val maxDuration = 45_000L
 
             while (System.currentTimeMillis() - startTime < maxDuration) {
                 bluetoothRepository.disconnect()
@@ -295,8 +295,8 @@ class GateRegistrationViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     step = GateStep.Error(
-                        "No se pudo reconectar con el ESP32. " +
-                        "Verifica que tenga señal WiFi y que esté encendido."
+                        "No se pudo reconectar con el ESP32 tras enviar la configuración WiFi. " +
+                        "Verifica que el nombre de red y contraseña sean correctos."
                     ),
                     isSubmitting = false
                 )
