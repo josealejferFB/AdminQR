@@ -65,7 +65,8 @@ class GateRepositoryImpl @Inject constructor(
                                     macAddress = dto.macAddress,
                                     ipAddress = dto.ipAddress,
                                     isOnline = dto.isOnline,
-                                    btName = dto.btName
+                                    btName = dto.btName,
+                                    isOdooRegistered = dto.id != null
                                 )
                             }
                             Result.success(gateInfos)

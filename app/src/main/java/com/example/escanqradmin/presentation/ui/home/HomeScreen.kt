@@ -13,7 +13,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -767,60 +769,170 @@ private fun GateChipRow(
 
         items(gates, key = { it.macAddress }) { gate ->
             var showMenu by remember { mutableStateOf(false) }
-            FilterChip(
-                selected = selectedMacAddress == gate.macAddress,
-                onClick = { onSelect(gate.macAddress) },
-                label = {
-                    Column {
-                        Text(gate.name)
-                        if (!gate.isOdooRegistered) {
-                            Text(
-                                "No configurada",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                trailingIcon = {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
-                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                            if (gate.isOdooRegistered) {
-                                DropdownMenuItem(
-                                    text = { Text("Ver detalles") },
-                                    onClick = { showMenu = false; onDetails(gate) }
-                                )
-                            } else {
-                                DropdownMenuItem(
-                                    text = { Text("Configurar con Odoo") },
-                                    onClick = { showMenu = false; onConfigureOdoo(gate) }
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text("Cambiar Hostname") },
-                                onClick = { showMenu = false; onChangeHostname(gate) }
-                            )
-                            if (gate.isOdooRegistered) {
-                                DropdownMenuItem(
-                                    text = { Text("Renombrar") },
-                                    onClick = { showMenu = false; onRename(gate) }
-                                )
-                            } else {
-                                DropdownMenuItem(
-                                    text = { Text("Eliminar") },
-                                    onClick = { showMenu = false; onDeleteLocalGate(gate) }
-                                )
-                            }
-                        }
-                    }
-                }
+            ChipWithMenu(
+                gate = gate,
+                isSelected = selectedMacAddress == gate.macAddress,
+                onSelect = { onSelect(gate.macAddress) },
+                showMenu = showMenu,
+                onToggleMenu = { showMenu = it },
+                onRename = { showMenu = false; onRename(gate) },
+                onChangeHostname = { showMenu = false; onChangeHostname(gate) },
+                onConfigureOdoo = { showMenu = false; onConfigureOdoo(gate) },
+                onDeleteLocalGate = { showMenu = false; onDeleteLocalGate(gate) }
             )
         }
 
         item {
             IconButton(onClick = onAddGate) {
                 Icon(Icons.Default.Add, contentDescription = "Agregar portón")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChipWithMenu(
+    gate: GateInfo,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    showMenu: Boolean,
+    onToggleMenu: (Boolean) -> Unit,
+    onRename: () -> Unit,
+    onChangeHostname: () -> Unit,
+    onConfigureOdoo: () -> Unit,
+    onDeleteLocalGate: () -> Unit
+) {
+    val containerColor = if (isSelected)
+        MaterialTheme.colorScheme.secondaryContainer
+    else
+        MaterialTheme.colorScheme.surfaceVariant
+
+    val contentColor = if (isSelected)
+        MaterialTheme.colorScheme.onSecondaryContainer
+    else
+        MaterialTheme.colorScheme.onSurfaceVariant
+
+    val borderColor = if (isSelected)
+        MaterialTheme.colorScheme.secondary
+    else
+        MaterialTheme.colorScheme.outline
+
+    Box {
+        Surface(
+            modifier = Modifier.combinedClickable(
+                onClick = onSelect,
+                onLongClick = { onToggleMenu(true) }
+            ),
+            shape = RoundedCornerShape(8.dp),
+            color = containerColor,
+            border = BorderStroke(1.dp, borderColor.copy(alpha = 0.3f)),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(
+                            if (gate.isOdooRegistered) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.outline,
+                            CircleShape
+                        )
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Column {
+                    Text(
+                        text = gate.name,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = contentColor
+                    )
+                    if (!gate.isOdooRegistered) {
+                        Text(
+                            "No configurado",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        }
+
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { onToggleMenu(false) },
+            modifier = Modifier.width(220.dp)
+        ) {
+            // Status header
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (gate.isOdooRegistered) MaterialTheme.colorScheme.secondary
+                                    else MaterialTheme.colorScheme.outline,
+                                    CircleShape
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (gate.isOdooRegistered)
+                                "Registrado en Odoo${if (gate.id != null) " (ID ${gate.id})" else ""}"
+                            else "Local — No registrado",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                onClick = {},
+                enabled = false
+            )
+
+            if (!gate.isOdooRegistered) {
+                DropdownMenuItem(
+                    text = { Text("Registrar en Odoo") },
+                    onClick = onConfigureOdoo,
+                    leadingIcon = {
+                        Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                )
+            } else {
+                DropdownMenuItem(
+                    text = { Text("Enviar URL Odoo al ESP32") },
+                    onClick = onConfigureOdoo,
+                    leadingIcon = {
+                        Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Renombrar") },
+                    onClick = onRename,
+                    leadingIcon = {
+                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                )
+            }
+
+            DropdownMenuItem(
+                text = { Text("Cambiar Hostname") },
+                onClick = onChangeHostname,
+                leadingIcon = {
+                    Icon(Icons.Default.Computer, contentDescription = null, modifier = Modifier.size(18.dp))
+                }
+            )
+
+            if (!gate.isOdooRegistered) {
+                DropdownMenuItem(
+                    text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
+                    onClick = onDeleteLocalGate,
+                    leadingIcon = {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                    }
+                )
             }
         }
     }
