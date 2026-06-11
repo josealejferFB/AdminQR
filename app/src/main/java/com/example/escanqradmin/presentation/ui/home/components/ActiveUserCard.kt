@@ -5,6 +5,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -52,18 +54,22 @@ fun ActiveUserCard(
     var selectedGates by remember(user) { mutableStateOf(user.authorizedGates.toSet()) }
 
     val status = statusInfo(user.status)
+    val noRipple = remember { MutableInteractionSource() }
 
     AppCard(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(
+                interactionSource = noRipple,
+                indication = null
+            ) { isExpanded = !isExpanded }
             .animateContentSize(
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioLowBouncy,
                     stiffness = Spring.StiffnessLow
                 )
             ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        onClick = { isExpanded = !isExpanded }
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp)) {
             Row(

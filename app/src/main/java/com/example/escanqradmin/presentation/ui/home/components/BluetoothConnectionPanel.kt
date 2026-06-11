@@ -5,6 +5,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,10 +58,15 @@ fun BluetoothConnectionPanel(
     ) {
         Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp)) {
             // ── Compact header (always visible) ─────────────
+            val noRipple = remember { MutableInteractionSource() }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = gates.isNotEmpty()) { isExpanded = !isExpanded },
+                    .clickable(
+                        interactionSource = noRipple,
+                        indication = null,
+                        enabled = gates.isNotEmpty()
+                    ) { isExpanded = !isExpanded },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Status icon
