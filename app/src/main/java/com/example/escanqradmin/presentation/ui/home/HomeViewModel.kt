@@ -109,6 +109,7 @@ class HomeViewModel @Inject constructor(
     }
 
     fun addLocalGate(name: String, macAddress: String, btName: String, hostname: String) {
+        if (_localGates.value.any { it.macAddress == macAddress }) return
         val gate = GateInfo(
             id = null,
             name = name,
@@ -238,7 +239,8 @@ class HomeViewModel @Inject constructor(
     fun loadGates() {
         viewModelScope.launch {
             gateRepository.getGates().onSuccess { odooGates ->
-                val local = _localGates.value.filter { !it.isOdooRegistered }
+                val odooMacs = odooGates.map { it.macAddress }.toSet()
+                val local = _localGates.value.filter { !it.isOdooRegistered && it.macAddress !in odooMacs }
                 _uiState.update { it.copy(gates = odooGates + local, isServerOnline = true) }
             }.onFailure {
                 val local = _localGates.value.filter { !it.isOdooRegistered }
