@@ -482,8 +482,10 @@ fun HomeScreen(
                         if (filteredUsers.isEmpty()) {
                             AnimatedVisibility(
                                 visible = showActiveUsers,
-                                enter = fadeIn() + expandVertically(),
-                                exit = fadeOut() + shrinkVertically()
+                                enter = fadeIn(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
+                                        expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)),
+                                exit = fadeOut(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
+                                       shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
                             ) {
                                 AppCard(modifier = Modifier.fillMaxWidth()) {
                                     Column(
@@ -512,8 +514,10 @@ fun HomeScreen(
                     items(filteredUsers, key = { it.id }) { user ->
                         AnimatedVisibility(
                             visible = showActiveUsers,
-                            enter = fadeIn() + expandVertically(),
-                            exit = fadeOut() + shrinkVertically()
+                            enter = fadeIn(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
+                                    expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)),
+                            exit = fadeOut(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
+                                   shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
                         ) {
                             Column {
                                 ActiveUserCard(
@@ -522,7 +526,7 @@ fun HomeScreen(
                                     onDelete = { userToDelete = user; showDeleteDialog = true },
                                     onUpdate = { viewModel.updateUser(it) }
                                 )
-                                Spacer(modifier = Modifier.height(12.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                             }
                         }
                     }
