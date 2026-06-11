@@ -61,6 +61,7 @@ fun ActiveUserCard(
                 )
             ),
         border = AppCardDefaults.border(color = borderColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         onClick = { isExpanded = !isExpanded }
     ) {
         Column(modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp)) {
