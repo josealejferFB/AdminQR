@@ -83,6 +83,9 @@ struct {
   // Control asíncrono de mensajes en pantalla
   unsigned long msjDesde;
   bool          mostrandoMsj;
+
+  // [V8] Evita acumular handlers HTTP duplicados en RAM
+  bool          handlersRegistered;
 } sistema;
 
 // ========== ESTADOS ==========
@@ -143,10 +146,11 @@ void setup() {
 
   // Estado inicial
   sistema.estado       = ESPERA_CONEXION;
-  sistema.releActivo   = false;
-  sistema.mostrandoMsj = false;
-  sistema.lastBlink    = 0;
-  sistema.ledState     = false;
+  sistema.releActivo         = false;
+  sistema.mostrandoMsj       = false;
+  sistema.lastBlink          = 0;
+  sistema.ledState           = false;
+  sistema.handlersRegistered = false;
 
   // [V7] Inicializar campos nuevos
   sistema.wifiConnecting = false;
@@ -268,10 +272,17 @@ void loop() {
 
                 String mac = obtenerMacAddress();
 
-                String jsonResp = "{\"status\":\"success\",\"mac_address\":\""
-                                  + mac + "\",\"message\":\"Red configurada\"}";
-                SerialBT.println(jsonResp);
+                {
+                  StaticJsonDocument<128> resp;
+                  resp["status"] = "success";
+                  resp["mac_address"] = mac;
+                  resp["message"] = "Red configurada";
+                  String jsonResp;
+                  serializeJson(resp, jsonResp);
+                  SerialBT.println(jsonResp);
+                }
                 SerialBT.flush();
+                delay(200);
 
                 pantalla("CONFIG JSON OK", ("MAC: " + mac).c_str());
 
@@ -299,6 +310,8 @@ void loop() {
                 prefs.end();
 
                 SerialBT.println("{\"status\":\"success\",\"message\":\"IP estática configurada\"}");
+                SerialBT.flush();
+                delay(200);
                 pantalla("IP GUARDADA", "Reiniciando...");
                 delay(1000);
                 ESP.restart();
@@ -320,6 +333,7 @@ void loop() {
 
                 SerialBT.println("{\"status\":\"success\",\"message\":\"Nombre BT actualizado\"}");
                 SerialBT.flush();
+                delay(200);
                 pantalla("BT NAME OK", name);
 
                 SerialBT.end();
@@ -628,26 +642,30 @@ void conectarWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n[WiFi] Conectado: " + WiFi.localIP().toString());
 
-    // ── Endpoint /abrir ──
-    server.on("/abrir", HTTP_GET, []() {
-      if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
-        server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
-        Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
-        return;
-      }
-      server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
-      pantalla("SENAL ODOO", "Abriendo porton...");
-      digitalWrite(PIN_LED_OK, HIGH);
-      digitalWrite(PIN_RELAY_OK, HIGH);
-      sistema.releActivo = true;
-      sistema.releActivoDesde = millis();
-      sistema.msjDesde = millis();
-      sistema.mostrandoMsj = true;
-      Serial.println("[RELE] Activado por Odoo");
-    });
+    if (!sistema.handlersRegistered) {
+      // ── Endpoint /abrir ──
+      server.on("/abrir", HTTP_GET, []() {
+        if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
+          server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
+          Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
+          return;
+        }
+        server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
+        pantalla("SENAL ODOO", "Abriendo porton...");
+        digitalWrite(PIN_LED_OK, HIGH);
+        digitalWrite(PIN_RELAY_OK, HIGH);
+        sistema.releActivo = true;
+        sistema.releActivoDesde = millis();
+        sistema.msjDesde = millis();
+        sistema.mostrandoMsj = true;
+        Serial.println("[RELE] Activado por Odoo");
+      });
 
-    // ── [V7] Endpoint /status ──
-    agregarEndpointStatus();
+      // ── [V7] Endpoint /status ──
+      agregarEndpointStatus();
+
+      sistema.handlersRegistered = true;
+    }
 
     server.begin();
     Serial.println("[HTTP] Servidor iniciado en puerto 80");
@@ -736,24 +754,28 @@ void manejarConexionWiFiAsync() {
     pantalla("WIFI CONECTADO", WiFi.localIP().toString().c_str());
     Serial.println("[V7] WiFi conectado: " + WiFi.localIP().toString());
 
-    server.on("/abrir", HTTP_GET, []() {
-      if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
-        server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
-        Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
-        return;
-      }
-      server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
-      pantalla("SENAL ODOO", "Abriendo porton...");
-      digitalWrite(PIN_LED_OK, HIGH);
-      digitalWrite(PIN_RELAY_OK, HIGH);
-      sistema.releActivo = true;
-      sistema.releActivoDesde = millis();
-      sistema.msjDesde = millis();
-      sistema.mostrandoMsj = true;
-      Serial.println("[RELE] Activado por Odoo");
-    });
+    if (!sistema.handlersRegistered) {
+      server.on("/abrir", HTTP_GET, []() {
+        if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
+          server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
+          Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
+          return;
+        }
+        server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
+        pantalla("SENAL ODOO", "Abriendo porton...");
+        digitalWrite(PIN_LED_OK, HIGH);
+        digitalWrite(PIN_RELAY_OK, HIGH);
+        sistema.releActivo = true;
+        sistema.releActivoDesde = millis();
+        sistema.msjDesde = millis();
+        sistema.mostrandoMsj = true;
+        Serial.println("[RELE] Activado por Odoo");
+      });
 
-    agregarEndpointStatus();
+      agregarEndpointStatus();
+
+      sistema.handlersRegistered = true;
+    }
 
     server.begin();
     Serial.println("[HTTP] Servidor iniciado en puerto 80");
@@ -786,21 +808,25 @@ void manejarConexionWiFiAsync() {
 // ============================================================
 void agregarEndpointStatus() {
   server.on("/status", HTTP_GET, []() {
-    String wifiStatus;
-    if (WiFi.status() == WL_CONNECTED) wifiStatus = "connected";
-    else if (sistema.wifiConnecting) wifiStatus = "connecting";
-    else wifiStatus = "disconnected";
+    StaticJsonDocument<256> doc;
+    doc["mac"] = obtenerMacAddress();
 
-    String json = "{\"mac\":\"" + obtenerMacAddress()
-                  + "\",\"wifi\":\"" + wifiStatus + "\"";
     if (WiFi.status() == WL_CONNECTED) {
-      json += ",\"ip\":\"" + WiFi.localIP().toString() + "\"";
+      doc["wifi"] = "connected";
+      doc["ip"] = WiFi.localIP().toString();
+    } else if (sistema.wifiConnecting) {
+      doc["wifi"] = "connecting";
+    } else {
+      doc["wifi"] = "disconnected";
     }
-    json += ",\"uptime\":" + String(millis() / 1000);
-    json += ",\"static_ip\":\"" + config.staticIp + "\"";
-    json += ",\"bt_name\":\"" + config.btName + "\"";
-    json += ",\"hostname\":\"" + config.hostname + "\"}";
 
+    doc["uptime"] = millis() / 1000;
+    doc["static_ip"] = config.staticIp;
+    doc["bt_name"] = config.btName;
+    doc["hostname"] = config.hostname;
+
+    String json;
+    serializeJson(doc, json);
     server.send(200, "application/json", json);
   });
 }

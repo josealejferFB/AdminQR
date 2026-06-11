@@ -19,7 +19,7 @@ fun ChangeHostnameDialog(
     onDismiss: () -> Unit,
     onSuccess: () -> Unit
 ) {
-    var hostname by remember { mutableStateOf(gate.btName.ifBlank { "ESP32-Gate" }) }
+    var hostname by remember { mutableStateOf("") }
     var isSending by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
@@ -91,7 +91,8 @@ fun ChangeHostnameDialog(
                             val reply = onSendMessageAndWaitForReply(payload, 10000)
 
                             if (reply != null) {
-                                statusMessage = "Hostname enviado: $reply"
+                                statusMessage = "Reiniciando ESP32..."
+                                delay(1500)
                                 result = "Hostname configurado. El ESP32 se reiniciará."
                                 onSuccess()
                             } else {

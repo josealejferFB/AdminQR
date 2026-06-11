@@ -22,6 +22,9 @@ fun GateIpConfigDialog(
     var ip by remember { mutableStateOf("") }
     var gateway by remember { mutableStateOf("") }
     var netmask by remember { mutableStateOf("") }
+    var ipError by remember { mutableStateOf<String?>(null) }
+    var gatewayError by remember { mutableStateOf<String?>(null) }
+    var netmaskError by remember { mutableStateOf<String?>(null) }
     var isSending by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
@@ -44,24 +47,30 @@ fun GateIpConfigDialog(
                 } else {
                     OutlinedTextField(
                         value = ip,
-                        onValueChange = { ip = it },
+                        onValueChange = { ip = it; ipError = null },
                         label = { Text("IP") },
+                        isError = ipError != null,
+                        supportingText = ipError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = gateway,
-                        onValueChange = { gateway = it },
+                        onValueChange = { gateway = it; gatewayError = null },
                         label = { Text("Gateway") },
+                        isError = gatewayError != null,
+                        supportingText = gatewayError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = netmask,
-                        onValueChange = { netmask = it },
+                        onValueChange = { netmask = it; netmaskError = null },
                         label = { Text("Máscara") },
+                        isError = netmaskError != null,
+                        supportingText = netmaskError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -78,6 +87,19 @@ fun GateIpConfigDialog(
             if (result == null) {
                 Button(
                     onClick = {
+                        ipError = null; gatewayError = null; netmaskError = null
+
+                        val valid = isValidIp(ip) && isValidIp(gateway) && isValidIp(netmask)
+                        if (!isValidIp(ip)) {
+                            ipError = "Formato inválido (ej: 192.168.1.100)"
+                        }
+                        if (!isValidIp(gateway)) {
+                            gatewayError = "Formato inválido (ej: 192.168.1.1)"
+                        }
+                        if (!isValidIp(netmask)) {
+                            netmaskError = "Formato inválido (ej: 255.255.255.0)"
+                        }
+                        if (valid) {
                         isSending = true
                         statusMessage = "Conectando al ESP32..."
                         currentPhase = "Conectando..."
@@ -108,11 +130,13 @@ fun GateIpConfigDialog(
                             statusMessage = "Enviando configuración IP..."
                             currentPhase = "Enviando..."
 
-                            val payload = "{\"jsonrpc\":\"2.0\",\"action\":\"config_ip\",\"ip\":\"$ip\",\"gateway\":\"$gateway\",\"netmask\":\"$netmask\"}"
+                            val payload = "{\"action\":\"config_ip\",\"ip\":\"$ip\",\"gateway\":\"$gateway\",\"netmask\":\"$netmask\"}"
                             val reply = onSendMessageAndWaitForReply(payload, 10000)
 
                             if (reply != null) {
-                                statusMessage = "Configuración enviada: $reply"
+                                statusMessage = "Reiniciando ESP32..."
+                                currentPhase = "Reiniciando..."
+                                delay(1500)
                                 result = "IP configurada correctamente"
                                 onSuccess()
                             } else {
@@ -120,6 +144,7 @@ fun GateIpConfigDialog(
                                 result = "Error: Sin respuesta"
                             }
                             isSending = false
+                        }
                         }
                     },
                     enabled = !isSending
@@ -134,4 +159,13 @@ fun GateIpConfigDialog(
             }
         }
     )
+}
+
+private fun isValidIp(value: String): Boolean {
+    val octets = value.split(".")
+    if (octets.size != 4) return false
+    return octets.all { octet ->
+        val num = octet.toIntOrNull()
+        num != null && num in 0..255
+    }
 }
