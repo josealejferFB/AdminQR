@@ -43,14 +43,10 @@ fun GateRegistrationDialog(
     onCancelConnection: () -> Unit,
     onSsidChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
-    onBtNameChange: (String) -> Unit,
-    onHostnameChange: (String) -> Unit,
     onRefreshNetworks: () -> Unit,
     onSelectNetwork: (String) -> Unit,
     onSendWiFiConfig: () -> Unit,
     onGateNameChange: (String) -> Unit,
-    onGateDescriptionChange: (String) -> Unit,
-    onRegisterGate: () -> Unit,
     onDismissError: () -> Unit,
     onGoBackFromError: () -> Unit,
     onDismiss: () -> Unit,
@@ -83,9 +79,7 @@ fun GateRegistrationDialog(
                                 is GateStep.SelectBluetooth -> "Conectar al ESP32"
                                 is GateStep.WiFiConfig -> "Configurar WiFi del ESP32"
                                 is GateStep.VerifyingWifi -> "Verificando conexión WiFi"
-                                is GateStep.NameGate -> "Asignar nombre al portón"
-                                is GateStep.Registering -> "Registrando en Odoo"
-                                is GateStep.Done -> "Portón registrado"
+                                is GateStep.LocalDone -> "Portón configurado"
                                 is GateStep.Error -> "Error"
                             },
                             style = MaterialTheme.typography.bodySmall,
@@ -121,22 +115,13 @@ fun GateRegistrationDialog(
                             uiState = uiState,
                             onSsidChange = onSsidChange,
                             onPasswordChange = onPasswordChange,
-                            onBtNameChange = onBtNameChange,
-                            onHostnameChange = onHostnameChange,
                             onRefreshNetworks = onRefreshNetworks,
                             onSelectNetwork = onSelectNetwork,
-                            onSendWiFiConfig = onSendWiFiConfig
+                            onSendWiFiConfig = onSendWiFiConfig,
+                            onGateNameChange = onGateNameChange
                         )
                         is GateStep.VerifyingWifi -> VerifyingWifiContent()
-                        is GateStep.NameGate -> NameGateContent(
-                            uiState = uiState,
-                            onGateNameChange = onGateNameChange,
-                            onGateDescriptionChange = onGateDescriptionChange,
-                            onRegisterGate = onRegisterGate,
-                            onGoBack = { onDismissError() }
-                        )
-                        is GateStep.Registering -> RegisteringContent()
-                        is GateStep.Done -> DoneContent(
+                        is GateStep.LocalDone -> LocalDoneContent(
                             uiState = uiState,
                             onDismiss = onDismiss
                         )
@@ -257,11 +242,10 @@ private fun WiFiConfigContent(
     uiState: GateRegistrationUiState,
     onSsidChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
-    onBtNameChange: (String) -> Unit,
-    onHostnameChange: (String) -> Unit,
     onRefreshNetworks: () -> Unit,
     onSelectNetwork: (String) -> Unit,
     onSendWiFiConfig: () -> Unit,
+    onGateNameChange: (String) -> Unit,
 ) {
     var ssidExpanded by remember { mutableStateOf(false) }
 
@@ -277,7 +261,7 @@ private fun WiFiConfigContent(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Ingresa las credenciales WiFi para el ESP32",
+            "Ingresa las credenciales WiFi y el nombre del portón para el ESP32",
             style = MaterialTheme.typography.bodySmall,
             color = Color.Gray
         )
@@ -351,21 +335,10 @@ private fun WiFiConfigContent(
         )
         Spacer(Modifier.height(12.dp))
         OutlinedTextField(
-            value = uiState.btName,
-            onValueChange = onBtNameChange,
-            label = { Text("Nombre Bluetooth del ESP32") },
-            placeholder = { Text("ESP32_Seguro") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            enabled = !uiState.isSubmitting
-        )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = uiState.hostname,
-            onValueChange = onHostnameChange,
-            label = { Text("Nombre en el Router (Hostname)") },
-            placeholder = { Text("ESP32-Gate") },
+            value = uiState.gateName,
+            onValueChange = onGateNameChange,
+            label = { Text("Nombre del Portón") },
+            placeholder = { Text("Ej: Portón Principal") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
@@ -376,7 +349,7 @@ private fun WiFiConfigContent(
             onClick = onSendWiFiConfig,
             modifier = Modifier.fillMaxWidth().height(52.dp),
             shape = RoundedCornerShape(16.dp),
-            enabled = uiState.ssid.isNotBlank() && !uiState.isSubmitting
+            enabled = uiState.ssid.isNotBlank() && uiState.gateName.isNotBlank() && !uiState.isSubmitting
         ) {
             if (uiState.isSubmitting) {
                 CircularProgressIndicator(
@@ -414,90 +387,7 @@ private fun VerifyingWifiContent() {
 }
 
 @Composable
-private fun NameGateContent(
-    uiState: GateRegistrationUiState,
-    onGateNameChange: (String) -> Unit,
-    onGateDescriptionChange: (String) -> Unit,
-    onRegisterGate: () -> Unit,
-    onGoBack: () -> Unit
-) {
-    Column {
-        Text(
-            "Portón Detectado",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(Modifier.height(8.dp))
-        AppCard(
-            modifier = Modifier.fillMaxWidth(),
-            colors = AppCardDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-        ) {
-            Row(Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Wifi, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("MAC Address", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                    Text(uiState.macAddress, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        OutlinedTextField(
-            value = uiState.gateName,
-            onValueChange = onGateNameChange,
-            label = { Text("Nombre del Portón") },
-            placeholder = { Text("Ej: Portón Principal") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            enabled = !uiState.isSubmitting
-        )
-        Spacer(Modifier.height(12.dp))
-        OutlinedTextField(
-            value = uiState.gateDescription,
-            onValueChange = onGateDescriptionChange,
-            label = { Text("Descripción (opcional)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            enabled = !uiState.isSubmitting
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onRegisterGate,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(16.dp),
-            enabled = uiState.gateName.isNotBlank() && !uiState.isSubmitting
-        ) {
-            Text("REGISTRAR EN ODOO", fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(
-            onClick = onGoBack,
-            modifier = Modifier.fillMaxWidth().height(44.dp),
-            shape = RoundedCornerShape(14.dp),
-            enabled = !uiState.isSubmitting
-        ) {
-            Icon(Icons.Default.NavigateBefore, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("CAMBIAR CONFIGURACIÓN WIFI", fontWeight = FontWeight.Medium, fontSize = 12.sp)
-        }
-    }
-}
-
-@Composable
-private fun RegisteringContent() {
-    Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(Modifier.height(16.dp))
-            Text("Registrando portón...", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-        }
-    }
-}
-
-@Composable
-private fun DoneContent(
+private fun LocalDoneContent(
     uiState: GateRegistrationUiState,
     onDismiss: () -> Unit
 ) {
@@ -513,14 +403,17 @@ private fun DoneContent(
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "Portón '${uiState.gateName}' registrado exitosamente",
+            "Portón '${uiState.gateName}' configurado",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
-        if (uiState.registeredGateId != null) {
-            Spacer(Modifier.height(4.dp))
-            Text("ID: ${uiState.registeredGateId}", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "El portón está listo para usar. Puedes registrarlo en Odoo desde el menú del chip.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.Gray,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = onDismiss,

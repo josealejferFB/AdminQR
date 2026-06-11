@@ -540,7 +540,10 @@ fun HomeScreen(
                 LaunchedEffect(Unit) {
                     gateRegistrationViewModel.events.collectLatest { event ->
                         when (event) {
-                            GateRegistrationEvent.CloseDialog -> {
+                            is GateRegistrationEvent.CloseDialog -> {
+                                showGateRegistrationDialog = false
+                            }
+                            is GateRegistrationEvent.GateConfiguredLocally -> {
                                 showGateRegistrationDialog = false
                             }
                         }
@@ -559,14 +562,10 @@ fun HomeScreen(
                     onCancelConnection = { viewModel.disconnect() },
                     onSsidChange = { gateRegistrationViewModel.setSsid(it) },
                     onPasswordChange = { gateRegistrationViewModel.setPassword(it) },
-                    onBtNameChange = { gateRegistrationViewModel.setBtName(it) },
-                    onHostnameChange = { gateRegistrationViewModel.setHostname(it) },
                     onRefreshNetworks = { gateRegistrationViewModel.refreshAvailableNetworks() },
                     onSelectNetwork = { gateRegistrationViewModel.selectNetwork(it) },
                     onSendWiFiConfig = { gateRegistrationViewModel.sendWiFiConfig() },
                     onGateNameChange = { gateRegistrationViewModel.setGateName(it) },
-                    onGateDescriptionChange = { gateRegistrationViewModel.setGateDescription(it) },
-                    onRegisterGate = { gateRegistrationViewModel.registerGate() },
                     onDismissError = { gateRegistrationViewModel.dismissError() },
                     onGoBackFromError = { gateRegistrationViewModel.goBackTwoSteps() },
                     onDismiss = {
