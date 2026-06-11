@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.escanqradmin.domain.model.GateInfo
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.ui.home.ActiveUser
@@ -41,15 +42,16 @@ private fun statusInfo(status: String): BadgeInfo {
 @Composable
 fun ActiveUserCard(
     user: ActiveUser,
+    gates: List<GateInfo>,
     onDelete: () -> Unit,
     onUpdate: (ActiveUser) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     var name by remember(user) { mutableStateOf(user.name) }
     var plate by remember(user) { mutableStateOf(user.plate) }
+    var selectedGates by remember(user) { mutableStateOf(user.authorizedGates.toSet()) }
 
     val status = statusInfo(user.status)
-    val borderColor = status.color.copy(alpha = 0.15f)
 
     AppCard(
         modifier = Modifier
@@ -60,7 +62,6 @@ fun ActiveUserCard(
                     stiffness = Spring.StiffnessLow
                 )
             ),
-        border = AppCardDefaults.border(color = borderColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         onClick = { isExpanded = !isExpanded }
     ) {
@@ -69,7 +70,6 @@ fun ActiveUserCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Avatar
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -86,7 +86,6 @@ fun ActiveUserCard(
                 }
                 Spacer(Modifier.width(12.dp))
 
-                // Info
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -121,7 +120,6 @@ fun ActiveUserCard(
                     }
                 }
 
-                // Expand icon
                 IconButton(
                     onClick = { isExpanded = !isExpanded },
                     modifier = Modifier.size(32.dp)
@@ -136,7 +134,6 @@ fun ActiveUserCard(
                 }
             }
 
-            // Gate chips
             if (user.authorizedGateNames.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 FlowRow(
@@ -172,7 +169,6 @@ fun ActiveUserCard(
                 }
             }
 
-            // Expanded edit section
             AnimatedVisibility(visible = isExpanded) {
                 Column(modifier = Modifier.padding(top = 16.dp, end = 12.dp)) {
                     HorizontalDivider(
@@ -231,6 +227,50 @@ fun ActiveUserCard(
                         )
                     )
 
+                    // Gate selector
+                    if (gates.isNotEmpty()) {
+                        Spacer(Modifier.height(20.dp))
+                        Text(
+                            "Puertas autorizadas",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            gates.forEach { gate ->
+                                val isSelected = gate.macAddress in selectedGates
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        selectedGates = if (isSelected) selectedGates - gate.macAddress
+                                                         else selectedGates + gate.macAddress
+                                    },
+                                    label = {
+                                        Text(
+                                            gate.name,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                        )
+                                    },
+                                    leadingIcon = if (isSelected) {
+                                        {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    } else null,
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(Modifier.height(20.dp))
 
                     Row(
@@ -239,7 +279,15 @@ fun ActiveUserCard(
                     ) {
                         Button(
                             onClick = {
-                                onUpdate(user.copy(name = name, plate = plate))
+                                val resolvedNames = gates.filter { it.macAddress in selectedGates }.map { it.name }
+                                onUpdate(
+                                    user.copy(
+                                        name = name,
+                                        plate = plate,
+                                        authorizedGates = selectedGates.toList(),
+                                        authorizedGateNames = resolvedNames
+                                    )
+                                )
                                 isExpanded = false
                             },
                             modifier = Modifier.weight(1f).height(44.dp),

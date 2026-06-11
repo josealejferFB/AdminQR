@@ -10,6 +10,8 @@ import com.example.escanqradmin.domain.repository.SyncRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
@@ -187,6 +189,13 @@ class SyncRepositoryImpl @Inject constructor(
                     put("cedula", data.cedula)
                     put("nombre", data.userName)
                     put("placas", data.plate)
+                    if (data.authorizedGates.isNotEmpty()) {
+                        put("puertas_autorizadas", buildJsonArray {
+                            data.authorizedGates.forEach { mac ->
+                                add(buildJsonObject { put("mac_address", mac) })
+                            }
+                        })
+                    }
                 })
             }.toString()
 

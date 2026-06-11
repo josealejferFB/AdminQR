@@ -351,7 +351,8 @@ class HomeViewModel @Inject constructor(
                 androidId = user.id,
                 userName  = user.name,
                 cedula    = user.document,
-                plate     = user.plate
+                plate     = user.plate,
+                authorizedGates = user.authorizedGates
             )
             syncRepository.updateEntry(qrContent).onSuccess {
                 repository.updateRecord(qrContent)

@@ -513,6 +513,7 @@ fun HomeScreen(
                             Column {
                                 ActiveUserCard(
                                     user = user,
+                                    gates = uiState.gates,
                                     onDelete = { userToDelete = user; showDeleteDialog = true },
                                     onUpdate = { viewModel.updateUser(it) }
                                 )
