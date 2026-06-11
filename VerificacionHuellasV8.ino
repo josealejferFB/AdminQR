@@ -528,37 +528,34 @@ void pantalla(const char* l1, const char* l2, const char* l3, const char* l4) {
   display.display();
 }
 
-// Pantalla de estado idle: IP + MAC + BT
+// Pantalla de estado idle: hostname + IP + MAC + WiFi
 void mostrarIdle() {
   display.clearDisplay();
   display.setTextSize(1);
 
+  display.setCursor(0, 0);
+  display.println("SISTEMA LISTO");
+  display.setCursor(0, 8);
+  display.println(config.hostname);
+  display.drawLine(0, 17, 127, 17, SSD1306_WHITE);
+
   if (WiFi.status() == WL_CONNECTED) {
-    display.setCursor(0, 0);
-    display.println("SISTEMA LISTO");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
-    display.setCursor(0, 14);
-    display.println("IP:");
+    display.setCursor(0, 20);
+    display.print("IP ");
     display.println(WiFi.localIP().toString());
-
-    display.setCursor(0, 33);
-    display.println("MAC:");
+    display.setCursor(0, 28);
+    display.print("MAC ");
     display.println(obtenerMacAddress());
-
-    display.drawLine(0, 53, 127, 53, SSD1306_WHITE);
-    display.setCursor(0, 55);
-    display.print("WiFi: ");
+    display.setCursor(0, 36);
+    display.print("WiFi ");
     display.println(config.ssid);
 
   } else if (sistema.estado != MODO_CONECTANDO_WIFI) {
-    display.setCursor(0, 0);
-    display.println("SISTEMA LISTO");
-    display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-    display.setCursor(0, 14);
-    display.println("WiFi: No conectado");
-    display.println("");
+    display.setCursor(0, 20);
+    display.println("WiFi No conectado");
+    display.setCursor(0, 28);
     display.println("Configure via BT:");
+    display.setCursor(0, 36);
     display.println("  'wifi' o JSON");
   }
 
