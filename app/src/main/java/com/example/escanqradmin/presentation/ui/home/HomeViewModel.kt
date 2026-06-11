@@ -36,7 +36,7 @@ data class HomeUiState(
     val isRefreshing: Boolean = false,
     val isServerOnline: Boolean = true,
     val gates: List<GateInfo> = emptyList(),
-    val selectedGateId: Int? = null,
+    val selectedMacAddress: String? = null,
     val gateUsers: List<ActiveUser> = emptyList()
 )
 
@@ -82,6 +82,28 @@ class HomeViewModel @Inject constructor(
     // true = estamos en medio de un intento de conexión
     @Volatile private var isConnecting = false
     private var previousConnectionState: BluetoothConnectionState = BluetoothConnectionState.Idle
+
+    private val _localGates = MutableStateFlow<List<GateInfo>>(emptyList())
+
+    fun addLocalGate(name: String, macAddress: String, btName: String, hostname: String) {
+        val gate = GateInfo(
+            id = null,
+            name = name,
+            macAddress = macAddress,
+            btName = btName,
+            hostname = hostname,
+            isOdooRegistered = false
+        )
+        _localGates.update { it + gate }
+        loadGates()
+    }
+
+    fun markGateAsOdooRegistered(macAddress: String, odooId: Int) {
+        _localGates.update { gates ->
+            gates.map { if (it.macAddress == macAddress) it.copy(id = odooId, isOdooRegistered = true) else it }
+        }
+        loadGates()
+    }
 
     init {
         observeHistory()
@@ -153,32 +175,6 @@ class HomeViewModel @Inject constructor(
         bluetoothRepository.disconnect()
     }
 
-    /**
-     * Busca la dirección del ESP32 objetivo.
-     * Descubre dinámicamente el primer dispositivo cuyo nombre empiece con "ESP32".
-     */
-    private fun findEsp32Address(): String? {
-        val devices = pairedDevices.value
-        return devices.firstOrNull { it.name?.startsWith("ESP32", ignoreCase = true) == true }?.address
-    }
-
-    fun connectToEsp32() {
-        viewModelScope.launch {
-            val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
-            if (isConnected) {
-                _snackbarMessages.emit("Ya estás conectado al ESP32")
-            } else {
-                val esp32Address = findEsp32Address()
-                if (esp32Address != null) {
-                    _snackbarMessages.emit("Conectando al ESP32...")
-                    connectToDevice(esp32Address)
-                } else {
-                    _snackbarMessages.emit("No hay ESP32 vinculado. Conecta uno primero.")
-                }
-            }
-        }
-    }
-
     fun connectToGate(gate: GateInfo) {
         viewModelScope.launch {
             val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
@@ -206,18 +202,27 @@ class HomeViewModel @Inject constructor(
     // ── Multi-Gate support (V8) ────────────────────────────────────
     fun loadGates() {
         viewModelScope.launch {
-            gateRepository.getGates().onSuccess { gates ->
-                _uiState.update { it.copy(gates = gates) }
+            gateRepository.getGates().onSuccess { odooGates ->
+                val local = _localGates.value.filter { !it.isOdooRegistered }
+                _uiState.update { it.copy(gates = odooGates + local, isServerOnline = true) }
+            }.onFailure {
+                val local = _localGates.value.filter { !it.isOdooRegistered }
+                _uiState.update { it.copy(gates = local, isServerOnline = false) }
             }
         }
     }
 
-    fun selectGate(gateId: Int?) {
-        _uiState.update { it.copy(selectedGateId = gateId) }
-        if (gateId != null) {
-            loadGateUsers(gateId)
+    fun selectGate(macAddress: String?) {
+        if (macAddress != null) {
+            val gate = _uiState.value.gates.find { it.macAddress == macAddress }
+            _uiState.update { it.copy(selectedMacAddress = macAddress) }
+            if (gate?.id != null) {
+                loadGateUsers(gate.id!!)
+            } else {
+                _uiState.update { it.copy(gateUsers = emptyList()) }
+            }
         } else {
-            _uiState.update { it.copy(gateUsers = emptyList()) }
+            _uiState.update { it.copy(selectedMacAddress = null, gateUsers = emptyList()) }
         }
     }
 
@@ -234,6 +239,8 @@ class HomeViewModel @Inject constructor(
                     )
                 }
                 _uiState.update { it.copy(gateUsers = activeUsers) }
+            }.onFailure {
+                _uiState.update { it.copy(gateUsers = emptyList(), isServerOnline = false) }
             }
         }
     }

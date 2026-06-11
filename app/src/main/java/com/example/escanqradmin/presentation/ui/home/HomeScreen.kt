@@ -289,7 +289,7 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             GateChipRow(
                                 gates = uiState.gates,
-                                selectedGateId = uiState.selectedGateId,
+                                selectedMacAddress = uiState.selectedMacAddress,
                                 onSelect = { viewModel.selectGate(it) },
                                 onAddGate = { showGateRegistrationDialog = true },
                                 onConfigureIp = { gate ->
@@ -440,7 +440,7 @@ fun HomeScreen(
                         }
                     }
 
-                    val displayUsers = if (uiState.selectedGateId != null) uiState.gateUsers else uiState.activeUsers
+                    val displayUsers = if (uiState.selectedMacAddress != null) uiState.gateUsers else uiState.activeUsers
                     val filteredUsers = displayUsers.filter {
                         it.name.contains(searchQuery, ignoreCase = true) || it.document.contains(searchQuery, ignoreCase = true)
                     }
@@ -707,8 +707,8 @@ fun ProvisioningQrDialog(
 @Composable
 private fun GateChipRow(
     gates: List<GateInfo>,
-    selectedGateId: Int?,
-    onSelect: (Int?) -> Unit,
+    selectedMacAddress: String?,
+    onSelect: (String?) -> Unit,
     onAddGate: () -> Unit,
     onConfigureIp: (GateInfo) -> Unit,
     onChangeHostname: (GateInfo) -> Unit,
@@ -718,7 +718,7 @@ private fun GateChipRow(
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             FilterChip(
-                selected = selectedGateId == null,
+                selected = selectedMacAddress == null,
                 onClick = { onSelect(null) },
                 label = { Text("Todas") }
             )
@@ -727,8 +727,8 @@ private fun GateChipRow(
             var showMenu by remember { mutableStateOf(false) }
             Box {
                 FilterChip(
-                    selected = selectedGateId == gate.id,
-                    onClick = { onSelect(gate.id) },
+                    selected = selectedMacAddress == gate.macAddress,
+                    onClick = { onSelect(gate.macAddress) },
                     label = { Text(gate.name) },
                     trailingIcon = {
                         IconButton(onClick = { showMenu = true }) {
