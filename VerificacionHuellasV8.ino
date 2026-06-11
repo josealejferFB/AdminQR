@@ -270,14 +270,6 @@ void loop() {
                   config.hostname = String(hostname);
                 }
 
-                // Reiniciar BT con el nuevo nombre inmediatamente
-                if (strlen(btName) > 0) {
-                  SerialBT.flush();
-                  delay(100);
-                  SerialBT.end();
-                  SerialBT.begin(config.btName.c_str());
-                }
-
                 String mac = obtenerMacAddress();
 
                 {
@@ -291,6 +283,15 @@ void loop() {
                 }
                 SerialBT.flush();
                 delay(200);
+
+                // Reiniciar BT con el nuevo nombre
+                if (strlen(btName) > 0) {
+                  SerialBT.end();
+                  delay(100);
+                  SerialBT.begin(config.btName.c_str());
+                  SerialBT.flush();
+                  delay(100);
+                }
 
                 pantalla("CONFIG JSON OK", ("MAC: " + mac).c_str());
 
