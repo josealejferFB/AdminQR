@@ -592,7 +592,9 @@ fun HomeScreen(
                 RenameGateDialog(
                     gate = selectedGateForDialog!!,
                     onConfirm = { newName ->
-                        viewModel.renameGate(selectedGateForDialog!!.id, newName)
+                        selectedGateForDialog!!.id?.let { gateId ->
+                            viewModel.renameGate(gateId, newName)
+                        }
                         showRenameDialog = false
                         selectedGateForDialog = null
                     },
