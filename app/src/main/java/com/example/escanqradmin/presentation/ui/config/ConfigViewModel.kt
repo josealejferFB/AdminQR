@@ -24,6 +24,10 @@ data class ServerHistory(
     val port: String,
     val endpointSync: String = "/api/control_acceso",
     val endpointConductores: String = "/api/get_conductores",
+    val endpointRegisterGate: String = "/api/v1/gates/register",
+    val endpointGatesList: String = "/api/v1/gates/list",
+    val endpointGateUpdate: String = "/api/v1/gates/update",
+    val endpointGateUsers: String = "/api/v1/gates/{id}/users",
     val timestamp: Long
 )
 
@@ -33,6 +37,10 @@ data class ConfigUiState(
     val port: String = "",
     val endpointSync: String = "/api/control_acceso",
     val endpointConductores: String = "/api/get_conductores",
+    val endpointRegisterGate: String = "/api/v1/gates/register",
+    val endpointGatesList: String = "/api/v1/gates/list",
+    val endpointGateUpdate: String = "/api/v1/gates/update",
+    val endpointGateUsers: String = "/api/v1/gates/{id}/users",
     val serverHistory: List<ServerHistory> = emptyList(),
     val isLoading: Boolean = false
 )
@@ -63,7 +71,11 @@ class ConfigViewModel @Inject constructor(
                 host = ApiConstants.getHost(),
                 port = ApiConstants.getPort(),
                 endpointSync = ApiConstants.getEndpointSync(),
-                endpointConductores = ApiConstants.getEndpointConductores()
+                endpointConductores = ApiConstants.getEndpointConductores(),
+                endpointRegisterGate = ApiConstants.getEndpointRegisterGate(),
+                endpointGatesList = ApiConstants.getEndpointGatesList(),
+                endpointGateUpdate = ApiConstants.getEndpointGateUpdate(),
+                endpointGateUsers = ApiConstants.getEndpointGateUsers()
             )
         }
     }
@@ -99,6 +111,22 @@ class ConfigViewModel @Inject constructor(
         _uiState.update { it.copy(endpointConductores = value) }
     }
 
+    fun onEndpointRegisterGateChange(value: String) {
+        _uiState.update { it.copy(endpointRegisterGate = value) }
+    }
+
+    fun onEndpointGatesListChange(value: String) {
+        _uiState.update { it.copy(endpointGatesList = value) }
+    }
+
+    fun onEndpointGateUpdateChange(value: String) {
+        _uiState.update { it.copy(endpointGateUpdate = value) }
+    }
+
+    fun onEndpointGateUsersChange(value: String) {
+        _uiState.update { it.copy(endpointGateUsers = value) }
+    }
+
     fun saveConfig() {
         viewModelScope.launch {
             val protocol = _uiState.value.protocol
@@ -106,6 +134,10 @@ class ConfigViewModel @Inject constructor(
             val port = _uiState.value.port.trim()
             val endpointSync = _uiState.value.endpointSync.trim()
             val endpointConductores = _uiState.value.endpointConductores.trim()
+            val endpointRegisterGate = _uiState.value.endpointRegisterGate.trim()
+            val endpointGatesList = _uiState.value.endpointGatesList.trim()
+            val endpointGateUpdate = _uiState.value.endpointGateUpdate.trim()
+            val endpointGateUsers = _uiState.value.endpointGateUsers.trim()
 
             if (host.isEmpty()) {
                 _snackbarMessages.emit("Por favor ingrese la dirección del host")
@@ -120,8 +152,18 @@ class ConfigViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                ApiConstants.saveConfig(context, protocol, host, port, endpointSync, endpointConductores)
-                saveToHistory(protocol, host, port, endpointSync, endpointConductores)
+                ApiConstants.saveConfig(
+                    context, protocol, host, port,
+                    endpointSync, endpointConductores,
+                    endpointRegisterGate, endpointGatesList,
+                    endpointGateUpdate, endpointGateUsers
+                )
+                saveToHistory(
+                    protocol, host, port,
+                    endpointSync, endpointConductores,
+                    endpointRegisterGate, endpointGatesList,
+                    endpointGateUpdate, endpointGateUsers
+                )
                 _snackbarMessages.emit("Configuración guardada correctamente")
             } catch (e: Exception) {
                 _snackbarMessages.emit("Error al guardar: ${e.message}")
@@ -131,15 +173,28 @@ class ConfigViewModel @Inject constructor(
         }
     }
 
-    private fun saveToHistory(protocol: String, host: String, port: String, endpointSync: String, endpointConductores: String) {
+    private fun saveToHistory(
+        protocol: String, host: String, port: String,
+        endpointSync: String, endpointConductores: String,
+        endpointRegisterGate: String, endpointGatesList: String,
+        endpointGateUpdate: String, endpointGateUsers: String
+    ) {
         val currentHistory = _uiState.value.serverHistory.toMutableList()
         
         currentHistory.removeAll { 
             it.host == host && it.port == port && it.protocol == protocol && 
-            it.endpointSync == endpointSync && it.endpointConductores == endpointConductores 
+            it.endpointSync == endpointSync && it.endpointConductores == endpointConductores &&
+            it.endpointRegisterGate == endpointRegisterGate && it.endpointGatesList == endpointGatesList &&
+            it.endpointGateUpdate == endpointGateUpdate && it.endpointGateUsers == endpointGateUsers
         }
         
-        currentHistory.add(0, ServerHistory(protocol, host, port, endpointSync, endpointConductores, System.currentTimeMillis()))
+        currentHistory.add(0, ServerHistory(
+            protocol, host, port,
+            endpointSync, endpointConductores,
+            endpointRegisterGate, endpointGatesList,
+            endpointGateUpdate, endpointGateUsers,
+            System.currentTimeMillis()
+        ))
         
         val limitedHistory = currentHistory.take(15)
         
@@ -156,7 +211,11 @@ class ConfigViewModel @Inject constructor(
                 host = history.host,
                 port = history.port,
                 endpointSync = history.endpointSync,
-                endpointConductores = history.endpointConductores
+                endpointConductores = history.endpointConductores,
+                endpointRegisterGate = history.endpointRegisterGate,
+                endpointGatesList = history.endpointGatesList,
+                endpointGateUpdate = history.endpointGateUpdate,
+                endpointGateUsers = history.endpointGateUsers
             )
         }
     }

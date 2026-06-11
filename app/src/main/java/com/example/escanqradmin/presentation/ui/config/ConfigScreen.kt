@@ -100,12 +100,20 @@ fun ConfigScreen(
                     port = uiState.port,
                     endpointSync = uiState.endpointSync,
                     endpointConductores = uiState.endpointConductores,
+                    endpointRegisterGate = uiState.endpointRegisterGate,
+                    endpointGatesList = uiState.endpointGatesList,
+                    endpointGateUpdate = uiState.endpointGateUpdate,
+                    endpointGateUsers = uiState.endpointGateUsers,
                     isLoading = uiState.isLoading,
                     onProtocolChange = viewModel::onProtocolChange,
                     onHostChange = viewModel::onHostChange,
                     onPortChange = viewModel::onPortChange,
                     onEndpointSyncChange = viewModel::onEndpointSyncChange,
                     onEndpointConductoresChange = viewModel::onEndpointConductoresChange,
+                    onEndpointRegisterGateChange = viewModel::onEndpointRegisterGateChange,
+                    onEndpointGatesListChange = viewModel::onEndpointGatesListChange,
+                    onEndpointGateUpdateChange = viewModel::onEndpointGateUpdateChange,
+                    onEndpointGateUsersChange = viewModel::onEndpointGateUsersChange,
                     onSave = viewModel::saveConfig
                 )
             }
@@ -187,6 +195,14 @@ fun ConfigurationCard(
     onEndpointSyncChange: (String) -> Unit,
     endpointConductores: String,
     onEndpointConductoresChange: (String) -> Unit,
+    endpointRegisterGate: String,
+    onEndpointRegisterGateChange: (String) -> Unit,
+    endpointGatesList: String,
+    onEndpointGatesListChange: (String) -> Unit,
+    endpointGateUpdate: String,
+    onEndpointGateUpdateChange: (String) -> Unit,
+    endpointGateUsers: String,
+    onEndpointGateUsersChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
     AppCard(
@@ -224,7 +240,7 @@ fun ConfigurationCard(
                     )
                     if (host.isNotEmpty()) {
                         Text(
-                            text = "Endpoints: $endpointSync, $endpointConductores",
+                            text = "Endpoints: $endpointSync, $endpointConductores, $endpointRegisterGate",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.Gray,
                             maxLines = 1,
@@ -343,6 +359,70 @@ fun ConfigurationCard(
                 singleLine = true,
                 leadingIcon = {
                     Icon(Icons.Default.Download, null, tint = Color.Gray)
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary
+                )
+            )
+
+            // Endpoint Register Gate
+            OutlinedTextField(
+                value = endpointRegisterGate,
+                onValueChange = onEndpointRegisterGateChange,
+                label = { Text("Ruta Registrar Portón") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                leadingIcon = {
+                    Icon(Icons.Default.AddCircle, null, tint = Color.Gray)
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary
+                )
+            )
+
+            // Endpoint Gates List
+            OutlinedTextField(
+                value = endpointGatesList,
+                onValueChange = onEndpointGatesListChange,
+                label = { Text("Ruta Listar Portones") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                leadingIcon = {
+                    Icon(Icons.Default.List, null, tint = Color.Gray)
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary
+                )
+            )
+
+            // Endpoint Gate Update
+            OutlinedTextField(
+                value = endpointGateUpdate,
+                onValueChange = onEndpointGateUpdateChange,
+                label = { Text("Ruta Actualizar Portón") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                leadingIcon = {
+                    Icon(Icons.Default.Edit, null, tint = Color.Gray)
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.secondary
+                )
+            )
+
+            // Endpoint Gate Users
+            OutlinedTextField(
+                value = endpointGateUsers,
+                onValueChange = onEndpointGateUsersChange,
+                label = { Text("Ruta Usuarios de Portón") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                singleLine = true,
+                leadingIcon = {
+                    Icon(Icons.Default.Group, null, tint = Color.Gray)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.secondary
