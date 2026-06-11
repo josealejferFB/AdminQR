@@ -1,8 +1,10 @@
 package com.example.escanqradmin.presentation.ui.home
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +14,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import com.example.escanqradmin.domain.repository.ThemeRepository
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.HistoryRepository
@@ -42,6 +46,7 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val repository: HistoryRepository,
     private val bluetoothRepository: BluetoothRepository,
     private val syncRepository: SyncRepository,
@@ -85,6 +90,24 @@ class HomeViewModel @Inject constructor(
 
     private val _localGates = MutableStateFlow<List<GateInfo>>(emptyList())
 
+    private val localGatesPrefs: android.content.SharedPreferences =
+        context.getSharedPreferences("local_gates", Context.MODE_PRIVATE)
+    private val localGatesKey = "local_gates_v1"
+
+    private fun saveLocalGates(gates: List<GateInfo>) {
+        val json = Json.encodeToString(gates)
+        localGatesPrefs.edit().putString(localGatesKey, json).apply()
+    }
+
+    private fun loadLocalGates(): List<GateInfo> {
+        val json = localGatesPrefs.getString(localGatesKey, "[]") ?: "[]"
+        return try {
+            Json.decodeFromString(json)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
     fun addLocalGate(name: String, macAddress: String, btName: String, hostname: String) {
         val gate = GateInfo(
             id = null,
@@ -95,6 +118,7 @@ class HomeViewModel @Inject constructor(
             isOdooRegistered = false
         )
         _localGates.update { it + gate }
+        saveLocalGates(_localGates.value)
         loadGates()
     }
 
@@ -102,10 +126,21 @@ class HomeViewModel @Inject constructor(
         _localGates.update { gates ->
             gates.map { if (it.macAddress == macAddress) it.copy(id = odooId, isOdooRegistered = true) else it }
         }
+        saveLocalGates(_localGates.value)
+        loadGates()
+    }
+
+    fun deleteLocalGate(macAddress: String) {
+        _localGates.update { gates -> gates.filter { it.macAddress != macAddress } }
+        saveLocalGates(_localGates.value)
+        if (_uiState.value.selectedMacAddress == macAddress) {
+            _uiState.update { it.copy(selectedMacAddress = null) }
+        }
         loadGates()
     }
 
     init {
+        _localGates.value = loadLocalGates()
         observeHistory()
         observeBluetoothConnection()
         refreshData()

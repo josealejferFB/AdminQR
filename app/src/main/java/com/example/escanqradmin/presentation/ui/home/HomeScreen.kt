@@ -310,6 +310,9 @@ fun HomeScreen(
                                     selectedGateForDialog = gate
                                     showOdooDialog = true
                                 },
+                                onDeleteLocalGate = { gate ->
+                                    viewModel.deleteLocalGate(gate.macAddress)
+                                },
                                 onDetails = { gate ->
                                     // TODO: details dialog
                                 }
@@ -737,6 +740,7 @@ private fun GateChipRow(
     onChangeHostname: (GateInfo) -> Unit,
     onRename: (GateInfo) -> Unit,
     onConfigureOdoo: (GateInfo) -> Unit,
+    onDeleteLocalGate: (GateInfo) -> Unit,
     onDetails: (GateInfo) -> Unit
 ) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -792,6 +796,11 @@ private fun GateChipRow(
                                 DropdownMenuItem(
                                     text = { Text("Renombrar") },
                                     onClick = { showMenu = false; onRename(gate) }
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Eliminar") },
+                                    onClick = { showMenu = false; onDeleteLocalGate(gate) }
                                 )
                             }
                         }

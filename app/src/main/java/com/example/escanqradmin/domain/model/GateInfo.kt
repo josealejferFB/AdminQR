@@ -1,5 +1,8 @@
 package com.example.escanqradmin.domain.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class GateInfo(
     val id: Int? = null,
     val name: String,
