@@ -30,7 +30,8 @@ data class ActiveUser(
     val name: String,
     val document: String,
     val status: String,
-    val plate: String
+    val plate: String,
+    val authorizedGates: List<String> = emptyList()
 )
 
 data class HomeUiState(
@@ -156,7 +157,8 @@ class HomeViewModel @Inject constructor(
                         name     = qr.userName,
                         document = qr.cedula,
                         status   = "VALIDADO",
-                        plate    = qr.plate
+                        plate    = qr.plate,
+                        authorizedGates = qr.authorizedGates
                     )
                 }
                 _uiState.update {
@@ -251,13 +253,11 @@ class HomeViewModel @Inject constructor(
 
     fun selectGate(macAddress: String?) {
         if (macAddress != null) {
-            val gate = _uiState.value.gates.find { it.macAddress == macAddress }
             _uiState.update { it.copy(selectedMacAddress = macAddress) }
-            if (gate?.id != null) {
-                loadGateUsers(gate.id!!)
-            } else {
-                _uiState.update { it.copy(gateUsers = emptyList()) }
+            val filtered = _uiState.value.activeUsers.filter { user ->
+                user.authorizedGates.contains(macAddress)
             }
+            _uiState.update { it.copy(gateUsers = filtered) }
         } else {
             _uiState.update { it.copy(selectedMacAddress = null, gateUsers = emptyList()) }
         }
