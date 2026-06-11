@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,14 +28,12 @@ import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.ui.home.ActiveUser
 
-private data class BadgeInfo(val icon: ImageVector, val color: Color)
-
 @Composable
-private fun statusInfo(status: String): BadgeInfo {
+private fun statusColor(status: String): Color {
     return when (status.lowercase()) {
-        "activo", "validado" -> BadgeInfo(Icons.Default.CheckCircle, MaterialTheme.colorScheme.secondary)
-        "inactivo", "rechazado" -> BadgeInfo(Icons.Default.Cancel, MaterialTheme.colorScheme.error)
-        else -> BadgeInfo(Icons.Default.Schedule, MaterialTheme.colorScheme.outline)
+        "activo", "validado" -> MaterialTheme.colorScheme.secondary
+        "inactivo", "rechazado" -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.outline
     }
 }
 
@@ -53,7 +50,7 @@ fun ActiveUserCard(
     var plate by remember(user) { mutableStateOf(user.plate) }
     var selectedGates by remember(user) { mutableStateOf(user.authorizedGates.toSet()) }
 
-    val status = statusInfo(user.status)
+    val status = statusColor(user.status)
     val noRipple = remember { MutableInteractionSource() }
 
     AppCard(
@@ -80,35 +77,26 @@ fun ActiveUserCard(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(status.color.copy(alpha = 0.12f)),
+                        .background(status.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         user.name.take(2).uppercase(),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = status.color
+                        color = status
                     )
                 }
                 Spacer(Modifier.width(12.dp))
 
                 Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            user.name,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Icon(
-                            status.icon,
-                            contentDescription = user.status,
-                            tint = status.color,
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
+                    Text(
+                        user.name,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
                     Spacer(Modifier.height(1.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
