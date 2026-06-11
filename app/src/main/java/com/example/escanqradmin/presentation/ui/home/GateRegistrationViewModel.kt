@@ -242,8 +242,9 @@ class GateRegistrationViewModel @Inject constructor(
                         btName = state.gateName,
                         hostname = safeHostname
                     ))
-                    _events.emit(GateRegistrationEvent.CloseDialog)
                     _uiState.update { it.copy(step = GateStep.LocalDone, isSubmitting = false) }
+                    _events.emit(GateRegistrationEvent.CloseDialog)
+                    resetState()
                     return@launch
                 }
             }
@@ -258,6 +259,12 @@ class GateRegistrationViewModel @Inject constructor(
     }
 
     fun resetToSelectBluetooth() {
+        verificationJob?.cancel()
+        lastDeviceAddress = null
+        _uiState.update { GateRegistrationUiState() }
+    }
+
+    private fun resetState() {
         verificationJob?.cancel()
         lastDeviceAddress = null
         _uiState.update { GateRegistrationUiState() }
@@ -290,10 +297,9 @@ class GateRegistrationViewModel @Inject constructor(
     }
 
     fun closeDialog() {
-        verificationJob?.cancel()
+        resetState()
         viewModelScope.launch {
             bluetoothRepository.disconnect()
-            _uiState.update { GateRegistrationUiState() }
             _events.emit(GateRegistrationEvent.CloseDialog)
         }
     }

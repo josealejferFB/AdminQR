@@ -119,8 +119,8 @@ void setup() {
 
   cargarConfig();
 
-  // Nombre BT mantenido por compatibilidad con la app de configuración
-  SerialBT.begin("ESP32_Seguro");
+  // Nombre BT desde configuración guardada (por defecto "ESP32_Seguro")
+  SerialBT.begin(config.btName.c_str());
 
   // Inicialización pantalla OLED
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
@@ -268,6 +268,14 @@ void loop() {
                   prefs.putString("hostname", hostname);
                   prefs.end();
                   config.hostname = String(hostname);
+                }
+
+                // Reiniciar BT con el nuevo nombre inmediatamente
+                if (strlen(btName) > 0) {
+                  SerialBT.flush();
+                  delay(100);
+                  SerialBT.end();
+                  SerialBT.begin(config.btName.c_str());
                 }
 
                 String mac = obtenerMacAddress();
