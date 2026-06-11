@@ -152,6 +152,14 @@ void setup() {
   sistema.wifiConnecting = false;
   sistema.macAddress     = obtenerMacAddress();
 
+  // Hostname único por dispositivo (basado en MAC)
+  if (config.hostname.length() == 0) {
+    String mac = sistema.macAddress;
+    mac.replace(":", "");
+    mac.toLowerCase();
+    config.hostname = "esp32-" + mac.substring(6);  // ej: esp32-4a5b6c
+  }
+
   conectarWiFi();
   mostrarIdle();
 }
@@ -556,7 +564,7 @@ void cargarConfig() {
   config.staticGateway = prefs.getString("static_gw", "");
   config.staticNetmask = prefs.getString("static_mask", "");
   config.btName        = prefs.getString("bt_name", "ESP32_Seguro");
-  config.hostname      = prefs.getString("hostname", "ESP32-Gate");
+  config.hostname      = prefs.getString("hostname", "");
   prefs.end();
 
   // URL por defecto si no hay configuración guardada
