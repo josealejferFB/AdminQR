@@ -95,28 +95,32 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun startDiscovery() {
-        updatePairedDevices()
-        if (bluetoothAdapter?.isDiscovering == true) {
-            bluetoothAdapter.cancelDiscovery()
-        }
-        _scannedDevices.value = emptyList()
+        try {
+            updatePairedDevices()
+            if (bluetoothAdapter?.isDiscovering == true) {
+                bluetoothAdapter.cancelDiscovery()
+            }
+            _scannedDevices.value = emptyList()
 
-        if (isReceiverRegistered) {
-            try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
-            isReceiverRegistered = false
-        }
+            if (isReceiverRegistered) {
+                try { context.unregisterReceiver(receiver) } catch (_: Exception) {}
+                isReceiverRegistered = false
+            }
 
-        val filter = IntentFilter(BluetoothDevice.ACTION_FOUND).apply {
-            addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
-            addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+            val filter = IntentFilter(BluetoothDevice.ACTION_FOUND).apply {
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
+                addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(receiver, filter)
+            }
+            isReceiverRegistered = true
+            bluetoothAdapter?.startDiscovery()
+        } catch (s: SecurityException) {
+            _scannedDevices.value = emptyList()
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, filter)
-        }
-        isReceiverRegistered = true
-        bluetoothAdapter?.startDiscovery()
     }
 
     @SuppressLint("MissingPermission")
