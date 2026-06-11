@@ -52,6 +52,7 @@ import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
 import com.example.escanqradmin.presentation.ui.home.components.ChangeHostnameDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateIpConfigDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
+import com.example.escanqradmin.presentation.ui.home.components.OdooConfigDialog
 import com.example.escanqradmin.presentation.ui.home.components.RenameGateDialog
 import com.example.escanqradmin.presentation.ui.home.components.SearchBar
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
@@ -89,6 +90,7 @@ fun HomeScreen(
     var showGateIpDialog by remember { mutableStateOf(false) }
     var showHostnameDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+    var showOdooDialog by remember { mutableStateOf(false) }
     var selectedGateForDialog by remember { mutableStateOf<GateInfo?>(null) }
 
     LaunchedEffect(Unit) {
@@ -303,6 +305,10 @@ fun HomeScreen(
                                 onRename = { gate ->
                                     selectedGateForDialog = gate
                                     showRenameDialog = true
+                                },
+                                onConfigureOdoo = { gate ->
+                                    selectedGateForDialog = gate
+                                    showOdooDialog = true
                                 },
                                 onDetails = { gate ->
                                     // TODO: details dialog
@@ -544,6 +550,7 @@ fun HomeScreen(
                                 showGateRegistrationDialog = false
                             }
                             is GateRegistrationEvent.GateConfiguredLocally -> {
+                                viewModel.addLocalGate(event.name, event.macAddress, event.btName, event.hostname)
                                 showGateRegistrationDialog = false
                             }
                         }
@@ -609,6 +616,22 @@ fun HomeScreen(
                     onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
                     onDismiss = { showHostnameDialog = false; selectedGateForDialog = null },
                     onSuccess = { showHostnameDialog = false; selectedGateForDialog = null }
+                )
+            }
+
+            if (showOdooDialog && selectedGateForDialog != null) {
+                OdooConfigDialog(
+                    gate = selectedGateForDialog!!,
+                    connectionStateProvider = { bluetoothConnectionState },
+                    onConnect = { address -> viewModel.connectToDevice(address) },
+                    onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
+                    onRegisterInOdoo = { name, mac -> viewModel.registerGateInOdoo(name, mac) },
+                    onDismiss = { showOdooDialog = false; selectedGateForDialog = null },
+                    onSuccess = { odooId ->
+                        viewModel.markGateAsOdooRegistered(selectedGateForDialog!!.macAddress, odooId)
+                        showOdooDialog = false
+                        selectedGateForDialog = null
+                    }
                 )
             }
         }
@@ -713,6 +736,7 @@ private fun GateChipRow(
     onConfigureIp: (GateInfo) -> Unit,
     onChangeHostname: (GateInfo) -> Unit,
     onRename: (GateInfo) -> Unit,
+    onConfigureOdoo: (GateInfo) -> Unit,
     onDetails: (GateInfo) -> Unit
 ) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -723,42 +747,62 @@ private fun GateChipRow(
                 label = { Text("Todas") }
             )
         }
-        items(gates) { gate ->
+
+        items(gates, key = { it.macAddress }) { gate ->
             var showMenu by remember { mutableStateOf(false) }
-            Box {
-                FilterChip(
-                    selected = selectedMacAddress == gate.macAddress,
-                    onClick = { onSelect(gate.macAddress) },
-                    label = { Text(gate.name) },
-                    trailingIcon = {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, "Opciones")
+            FilterChip(
+                selected = selectedMacAddress == gate.macAddress,
+                onClick = { onSelect(gate.macAddress) },
+                label = {
+                    Column {
+                        Text(gate.name)
+                        if (!gate.isOdooRegistered) {
+                            Text(
+                                "No configurada",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
-                )
-                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Configurar IP") },
-                        onClick = { showMenu = false; onConfigureIp(gate) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Cambiar Hostname") },
-                        onClick = { showMenu = false; onChangeHostname(gate) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Renombrar") },
-                        onClick = { showMenu = false; onRename(gate) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Ver detalles") },
-                        onClick = { showMenu = false; onDetails(gate) }
-                    )
+                },
+                trailingIcon = {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                            if (gate.isOdooRegistered) {
+                                DropdownMenuItem(
+                                    text = { Text("Ver detalles") },
+                                    onClick = { showMenu = false; onDetails(gate) }
+                                )
+                            } else {
+                                DropdownMenuItem(
+                                    text = { Text("Configurar con Odoo") },
+                                    onClick = { showMenu = false; onConfigureOdoo(gate) }
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Configurar IP") },
+                                onClick = { showMenu = false; onConfigureIp(gate) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Cambiar Hostname") },
+                                onClick = { showMenu = false; onChangeHostname(gate) }
+                            )
+                            if (gate.isOdooRegistered) {
+                                DropdownMenuItem(
+                                    text = { Text("Renombrar") },
+                                    onClick = { showMenu = false; onRename(gate) }
+                                )
+                            }
+                        }
+                    }
                 }
-            }
+            )
         }
+
         item {
             IconButton(onClick = onAddGate) {
-                Icon(Icons.Default.Add, "Registrar tarjeta")
+                Icon(Icons.Default.Add, contentDescription = "Agregar portón")
             }
         }
     }

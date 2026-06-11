@@ -19,7 +19,7 @@ fun ChangeHostnameDialog(
     onDismiss: () -> Unit,
     onSuccess: () -> Unit
 ) {
-    var hostname by remember { mutableStateOf("") }
+    var hostname by remember { mutableStateOf(gate.name.ifBlank { "ESP32-Gate" }) }
     var isSending by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<String?>(null) }
     var statusMessage by remember { mutableStateOf<String?>(null) }

@@ -245,6 +245,12 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    suspend fun registerGateInOdoo(name: String, macAddress: String): Result<Int> {
+        return syncRepository.registerGate(name, macAddress).map { response ->
+            requireNotNull(response.gateId) { response.message ?: "ID de portón no recibido" }
+        }
+    }
+
     fun renameGate(gateId: Int, newName: String) {
         viewModelScope.launch {
             gateRepository.updateGateName(gateId, newName).onSuccess {
