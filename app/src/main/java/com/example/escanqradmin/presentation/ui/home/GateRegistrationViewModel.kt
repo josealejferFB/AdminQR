@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.domain.repository.BluetoothRepository
+import com.example.escanqradmin.domain.repository.SyncRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -31,7 +32,8 @@ sealed class GateStep {
     data object SelectBluetooth : GateStep()
     data class WiFiConfig(val macAddress: String? = null) : GateStep()
     data object VerifyingWifi : GateStep()
-    data object LocalDone : GateStep()
+    data object RegisteringInOdoo : GateStep()
+    data class LocalDone(val odooId: Int? = null, val message: String = "") : GateStep()
     data class Error(val message: String) : GateStep()
 }
 
@@ -41,6 +43,8 @@ data class GateRegistrationUiState(
     val ssid: String = "",
     val password: String = "",
     val macAddress: String = "",
+    val odooRegistered: Boolean = false,
+    val odooMessage: String = "",
     val isSubmitting: Boolean = false,
     val availableNetworks: List<String> = emptyList(),
     val isLoadingNetworks: Boolean = false
@@ -48,18 +52,20 @@ data class GateRegistrationUiState(
 
 sealed class GateRegistrationEvent {
     data object CloseDialog : GateRegistrationEvent()
-    data class GateConfiguredLocally(
+    data class GateRegisteredInOdoo(
         val name: String,
         val macAddress: String,
         val btName: String,
-        val hostname: String
+        val hostname: String,
+        val odooId: Int?
     ) : GateRegistrationEvent()
 }
 
 @HiltViewModel
 class GateRegistrationViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val bluetoothRepository: BluetoothRepository
+    private val bluetoothRepository: BluetoothRepository,
+    private val syncRepository: SyncRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GateRegistrationUiState())
@@ -236,15 +242,39 @@ class GateRegistrationViewModel @Inject constructor(
                         .trim('-')
                         .take(63)
                         .ifEmpty { "gate" }
-                    _events.emit(GateRegistrationEvent.GateConfiguredLocally(
-                        name = state.gateName,
-                        macAddress = state.macAddress,
-                        btName = state.gateName,
-                        hostname = safeHostname
-                    ))
-                    _uiState.update { it.copy(step = GateStep.LocalDone, isSubmitting = false) }
-                    _events.emit(GateRegistrationEvent.CloseDialog)
-                    resetState()
+
+                    _uiState.update { it.copy(step = GateStep.RegisteringInOdoo, isSubmitting = true) }
+
+                    syncRepository.registerGate(state.gateName, state.macAddress)
+                        .onSuccess { response ->
+                            val gateId = response.gateId
+                            val msg = response.message ?: "Portón registrado exitosamente"
+                            _uiState.update {
+                                it.copy(
+                                    step = GateStep.LocalDone(odooId = gateId, message = msg),
+                                    odooRegistered = true,
+                                    odooMessage = msg,
+                                    isSubmitting = false
+                                )
+                            }
+                            _events.emit(GateRegistrationEvent.GateRegisteredInOdoo(
+                                name = state.gateName,
+                                macAddress = state.macAddress,
+                                btName = state.gateName,
+                                hostname = safeHostname,
+                                odooId = gateId
+                            ))
+                            _events.emit(GateRegistrationEvent.CloseDialog)
+                            resetState()
+                        }
+                        .onFailure { e ->
+                            _uiState.update {
+                                it.copy(
+                                    step = GateStep.Error("Error al registrar en Odoo: ${e.message}"),
+                                    isSubmitting = false
+                                )
+                            }
+                        }
                     return@launch
                 }
             }

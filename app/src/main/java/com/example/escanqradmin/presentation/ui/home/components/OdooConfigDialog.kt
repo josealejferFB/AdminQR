@@ -20,7 +20,7 @@ fun OdooConfigDialog(
     connectionStateProvider: () -> BluetoothConnectionState,
     onConnect: (String) -> Unit,
     onSendMessageAndWaitForReply: suspend (String, Long) -> String?,
-    onRegisterInOdoo: suspend (String, String) -> Result<Int>,
+    onRegisterInOdoo: suspend (String, String) -> Result<Int?>,
     onDismiss: () -> Unit,
     onSuccess: (odooId: Int) -> Unit
 ) {
@@ -120,6 +120,12 @@ fun OdooConfigDialog(
                                 val registerResult = onRegisterInOdoo(gateName, gate.macAddress)
                                 registerResult.fold(
                                     onSuccess = { odooId ->
+                                        if (odooId == null) {
+                                            phase = null
+                                            result = "Registrado en Odoo, pero no se recibió el ID del portón."
+                                            isWorking = false
+                                            return@launch
+                                        }
                                         phase = "Conectando al ESP32..."
                                         onConnect(gate.macAddress)
 

@@ -108,15 +108,15 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun addLocalGate(name: String, macAddress: String, btName: String, hostname: String) {
+    fun addLocalGate(name: String, macAddress: String, btName: String, hostname: String, odooId: Int? = null) {
         if (_localGates.value.any { it.macAddress == macAddress }) return
         val gate = GateInfo(
-            id = null,
+            id = odooId,
             name = name,
             macAddress = macAddress,
             btName = btName,
             hostname = hostname,
-            isOdooRegistered = false
+            isOdooRegistered = odooId != null
         )
         _localGates.update { it + gate }
         saveLocalGates(_localGates.value)
@@ -282,9 +282,9 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    suspend fun registerGateInOdoo(name: String, macAddress: String): Result<Int> {
+    suspend fun registerGateInOdoo(name: String, macAddress: String): Result<Int?> {
         return syncRepository.registerGate(name, macAddress).map { response ->
-            requireNotNull(response.gateId) { response.message ?: "ID de portón no recibido" }
+            response.gateId
         }
     }
 

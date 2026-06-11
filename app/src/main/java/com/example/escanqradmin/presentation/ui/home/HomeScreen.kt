@@ -552,8 +552,14 @@ fun HomeScreen(
                             is GateRegistrationEvent.CloseDialog -> {
                                 showGateRegistrationDialog = false
                             }
-                            is GateRegistrationEvent.GateConfiguredLocally -> {
-                                viewModel.addLocalGate(event.name, event.macAddress, event.btName, event.hostname)
+                            is GateRegistrationEvent.GateRegisteredInOdoo -> {
+                                viewModel.addLocalGate(
+                                    name = event.name,
+                                    macAddress = event.macAddress,
+                                    btName = event.btName,
+                                    hostname = event.hostname,
+                                    odooId = event.odooId
+                                )
                                 showGateRegistrationDialog = false
                             }
                         }
@@ -631,7 +637,9 @@ fun HomeScreen(
                     onRegisterInOdoo = { name, mac -> viewModel.registerGateInOdoo(name, mac) },
                     onDismiss = { showOdooDialog = false; selectedGateForDialog = null },
                     onSuccess = { odooId ->
-                        viewModel.markGateAsOdooRegistered(selectedGateForDialog!!.macAddress, odooId)
+                        if (odooId != null) {
+                            viewModel.markGateAsOdooRegistered(selectedGateForDialog!!.macAddress, odooId)
+                        }
                         showOdooDialog = false
                         selectedGateForDialog = null
                     }

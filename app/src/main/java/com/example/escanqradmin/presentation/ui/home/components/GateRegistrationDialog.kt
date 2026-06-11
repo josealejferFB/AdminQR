@@ -79,7 +79,8 @@ fun GateRegistrationDialog(
                                 is GateStep.SelectBluetooth -> "Conectar al ESP32"
                                 is GateStep.WiFiConfig -> "Configurar WiFi del ESP32"
                                 is GateStep.VerifyingWifi -> "Verificando conexión WiFi"
-                                is GateStep.LocalDone -> "Portón configurado"
+                                is GateStep.RegisteringInOdoo -> "Registrando en Odoo"
+                                is GateStep.LocalDone -> "Portón registrado"
                                 is GateStep.Error -> "Error"
                             },
                             style = MaterialTheme.typography.bodySmall,
@@ -121,6 +122,7 @@ fun GateRegistrationDialog(
                             onGateNameChange = onGateNameChange
                         )
                         is GateStep.VerifyingWifi -> VerifyingWifiContent()
+                        is GateStep.RegisteringInOdoo -> RegisteringInOdooContent()
                         is GateStep.LocalDone -> LocalDoneContent(
                             uiState = uiState,
                             onDismiss = onDismiss
@@ -387,6 +389,28 @@ private fun VerifyingWifiContent() {
 }
 
 @Composable
+private fun RegisteringInOdooContent() {
+    Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Registrando en Odoo...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "El portón se está registrando en el servidor.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun LocalDoneContent(
     uiState: GateRegistrationUiState,
     onDismiss: () -> Unit
@@ -403,13 +427,13 @@ private fun LocalDoneContent(
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            "Portón '${uiState.gateName}' configurado",
+            "Portón '${uiState.gateName}' registrado",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "El portón está listo para usar. Puedes registrarlo en Odoo desde el menú del chip.",
+            if (uiState.odooMessage.isNotBlank()) uiState.odooMessage else "Portón registrado exitosamente.",
             style = MaterialTheme.typography.bodySmall,
             color = Color.Gray,
             modifier = Modifier.padding(horizontal = 16.dp)

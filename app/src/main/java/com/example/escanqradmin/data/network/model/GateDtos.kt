@@ -13,8 +13,7 @@ data class EspConfigResponse(
 @Serializable
 data class GateRegisterRequest(
     val name: String,
-    @SerialName("mac_address") val macAddress: String,
-    val description: String = ""
+    @SerialName("mac_address") val macAddress: String
 )
 
 @Serializable

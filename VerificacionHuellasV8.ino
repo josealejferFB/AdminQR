@@ -295,8 +295,6 @@ void loop() {
 
                 pantalla("CONFIG JSON OK", ("MAC: " + mac).c_str());
 
-                SerialBT.end();
-
                 sistema.wifiConnecting = true;
                 sistema.wifiStartTime = millis();
                 sistema.estado = MODO_CONECTANDO_WIFI;

@@ -222,15 +222,13 @@ class SyncRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun registerGate(name: String, macAddress: String, description: String): Result<GateRegisterResponse> = withContext(Dispatchers.IO) {
+    override suspend fun registerGate(name: String, macAddress: String): Result<GateRegisterResponse> = withContext(Dispatchers.IO) {
         try {
             val jsonBody = buildJsonObject {
                 put("jsonrpc", "2.0")
-                put("method", "call")
                 put("params", buildJsonObject {
                     put("name", name)
                     put("mac_address", macAddress)
-                    put("description", description)
                 })
             }.toString()
 
