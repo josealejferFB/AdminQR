@@ -2,6 +2,8 @@ package com.example.escanqradmin.presentation.ui.home.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -29,13 +31,14 @@ private data class BadgeInfo(val icon: ImageVector, val color: Color)
 
 @Composable
 private fun statusBadgeInfo(status: String): BadgeInfo {
-    return when (status) {
-        "VALIDADO" -> BadgeInfo(Icons.Default.Done, MaterialTheme.colorScheme.secondary)
-        "RECHAZADO" -> BadgeInfo(Icons.Default.Close, MaterialTheme.colorScheme.error)
+    return when (status.lowercase()) {
+        "activo", "validado" -> BadgeInfo(Icons.Default.Done, MaterialTheme.colorScheme.secondary)
+        "inactivo", "rechazado" -> BadgeInfo(Icons.Default.Close, MaterialTheme.colorScheme.error)
         else -> BadgeInfo(Icons.Default.Schedule, MaterialTheme.colorScheme.outline)
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ActiveUserCard(
     user: ActiveUser,
@@ -154,6 +157,36 @@ fun ActiveUserCard(
                     Spacer(modifier = Modifier.height(12.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                     Spacer(modifier = Modifier.height(12.dp))
+                    
+                    if (user.authorizedGateNames.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "PUERTAS AUTORIZADAS",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            user.authorizedGateNames.forEach { gateName ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                                ) {
+                                    Text(
+                                        text = gateName,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),

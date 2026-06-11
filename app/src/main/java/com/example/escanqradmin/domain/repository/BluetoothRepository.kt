@@ -21,7 +21,7 @@ interface BluetoothRepository {
 
 sealed class BluetoothConnectionState {
     object Idle : BluetoothConnectionState()
-    object Connecting : BluetoothConnectionState()
+    data class Connecting(val deviceAddress: String) : BluetoothConnectionState()
     data class Connected(val deviceAddress: String) : BluetoothConnectionState()
     data class Error(val message: String) : BluetoothConnectionState()
 }

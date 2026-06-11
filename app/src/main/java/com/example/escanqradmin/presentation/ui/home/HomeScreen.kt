@@ -202,12 +202,12 @@ fun HomeScreen(
                                     Box(
                                         modifier = Modifier
                                             .size(10.dp)
-                                            .background(Color(0xFF22C55E), CircleShape)
+                                            .background(MaterialTheme.colorScheme.secondary, CircleShape)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = "Sistema en línea",
-                                        color = Color(0xFF22C55E),
+                                        color = MaterialTheme.colorScheme.secondary,
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Medium
                                     )
@@ -221,13 +221,15 @@ fun HomeScreen(
                                 )
                             } else {
                                 AppCard(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp),
-                                    colors = AppCardDefaults.colors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)),
-                                    border = AppCardDefaults.border(color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = AppCardDefaults.colors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer
+                                    ),
+                                    border = AppCardDefaults.border(
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                                    )
                                 ) {
-                                    Column(modifier = Modifier.padding(16.dp)) {
+                                    Column(modifier = Modifier.padding(20.dp)) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
@@ -236,33 +238,34 @@ fun HomeScreen(
                                                     .size(8.dp)
                                                     .background(MaterialTheme.colorScheme.error, CircleShape)
                                             )
-                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Spacer(modifier = Modifier.width(10.dp))
                                             Text(
                                                 text = "SIN CONEXIÓN AL SERVIDOR",
                                                 color = MaterialTheme.colorScheme.error,
-                                                fontSize = 11.sp,
+                                                fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(12.dp))
                                         Text(
-                                            text = "No se pudo establecer comunicación con el servidor Odoo. Por favor, comprueba tu conexión de red o la configuración de tus endpoints.",
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            text = "No se pudo conectar con el servidor Odoo. Verifica tu conexión de red o la configuración de endpoints.",
+                                            style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
-                                        Spacer(modifier = Modifier.height(16.dp))
-                                        Button(
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                        OutlinedButton(
                                             onClick = { navController.navigate(Config) },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = MaterialTheme.colorScheme.error
+                                            colors = ButtonDefaults.outlinedButtonColors(
+                                                contentColor = MaterialTheme.colorScheme.error
                                             ),
+                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.3f)),
                                             shape = RoundedCornerShape(12.dp),
                                             modifier = Modifier.fillMaxWidth()
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Settings,
                                                 contentDescription = null,
-                                                modifier = Modifier.size(18.dp)
+                                                modifier = Modifier.size(16.dp)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
@@ -273,7 +276,7 @@ fun HomeScreen(
                                         }
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                                 Text(
                                     text = "Panel de Control",
                                     color = MaterialTheme.colorScheme.onBackground,
@@ -417,35 +420,55 @@ fun HomeScreen(
                         }
                     }
                     
+                    val displayUsers = if (uiState.selectedMacAddress != null) uiState.gateUsers else uiState.activeUsers
+                    val filteredUsers = displayUsers.filter {
+                        it.name.contains(searchQuery, ignoreCase = true) || it.document.contains(searchQuery, ignoreCase = true)
+                    }
+
                     item {
                         Column {
                             SearchBar(query = searchQuery, onQueryChange = { searchQuery = it })
-                            Spacer(modifier = Modifier.height(20.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                             Row(
-                                modifier = Modifier.fillMaxWidth().clickable { showActiveUsers = !showActiveUsers },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showActiveUsers = !showActiveUsers },
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(text = "Usuarios Activos", color = MaterialTheme.colorScheme.onBackground, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = "Usuarios",
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Box(modifier = Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 4.dp)) {
-                                        Text(text = "${uiState.activeUsers.size} En línea", color = MaterialTheme.colorScheme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                                RoundedCornerShape(12.dp)
+                                            )
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "${filteredUsers.size} en línea",
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                                 Icon(
-                                    imageVector = if (showActiveUsers) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    imageVector = if (showActiveUsers) Icons.Default.KeyboardArrowUp
+                                                  else Icons.Default.KeyboardArrowDown,
                                     contentDescription = if (showActiveUsers) "Contraer sección" else "Expandir sección",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
-                    }
-
-                    val displayUsers = if (uiState.selectedMacAddress != null) uiState.gateUsers else uiState.activeUsers
-                    val filteredUsers = displayUsers.filter {
-                        it.name.contains(searchQuery, ignoreCase = true) || it.document.contains(searchQuery, ignoreCase = true)
                     }
 
                     item {

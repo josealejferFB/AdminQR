@@ -114,6 +114,7 @@ class SyncRepositoryImpl @Inject constructor(
                                     userName = dto.nombre ?: "",
                                     cedula = dto.cedula ?: "",
                                     plate = dto.placas ?: "",
+                                    estado = dto.estado ?: "",
                                     authorizedGates = dto.puertasAutorizadas?.map { it.macAddress } ?: emptyList()
                                 )
                             }
@@ -302,7 +303,9 @@ class SyncRepositoryImpl @Inject constructor(
                                     androidId = dto.id?.toString() ?: "",
                                     userName = dto.nombre ?: "",
                                     cedula = dto.cedula ?: "",
-                                    plate = dto.placas ?: ""
+                                    plate = dto.placas ?: "",
+                                    estado = dto.estado ?: "",
+                                    authorizedGates = dto.puertasAutorizadas?.map { it.macAddress } ?: emptyList()
                                 )
                             }
                             Result.success(qrContents)

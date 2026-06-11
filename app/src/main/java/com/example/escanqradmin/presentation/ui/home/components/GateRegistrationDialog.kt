@@ -174,9 +174,11 @@ private fun ColumnScope.SelectBluetoothContent(
             item { DeviceSectionHeader(title = "Dispositivos Vinculados") }
             items(pairedDevices) { device ->
                 val isThisDeviceConnected = (connectionState as? BluetoothConnectionState.Connected)?.deviceAddress == device.address
+                val isThisDeviceConnecting = (connectionState as? BluetoothConnectionState.Connecting)?.deviceAddress == device.address
                 DeviceItem(
                     device = device,
                     isDeviceConnected = isThisDeviceConnected,
+                    isDeviceConnecting = isThisDeviceConnecting,
                     onClick = { onConnectToDevice(device.address, device.name) },
                     onDisconnect = onCancelConnection,
                     connectionState = connectionState
@@ -207,9 +209,11 @@ private fun ColumnScope.SelectBluetoothContent(
         } else {
             items(scannedDevices) { device ->
                 val isThisDeviceConnected = (connectionState as? BluetoothConnectionState.Connected)?.deviceAddress == device.address
+                val isThisDeviceConnecting = (connectionState as? BluetoothConnectionState.Connecting)?.deviceAddress == device.address
                 DeviceItem(
                     device = device,
                     isDeviceConnected = isThisDeviceConnected,
+                    isDeviceConnecting = isThisDeviceConnecting,
                     onClick = { onConnectToDevice(device.address, device.name) },
                     onDisconnect = onCancelConnection,
                     connectionState = connectionState
@@ -521,11 +525,12 @@ private fun DeviceSectionHeader(title: String, modifier: Modifier = Modifier) {
 private fun DeviceItem(
     device: BluetoothDeviceDomain,
     isDeviceConnected: Boolean,
+    isDeviceConnecting: Boolean,
     onClick: () -> Unit,
     onDisconnect: () -> Unit,
     connectionState: BluetoothConnectionState
 ) {
-    val isConnecting = connectionState is BluetoothConnectionState.Connecting
+    val isConnecting = isDeviceConnecting
 
     AppCard(
         modifier = Modifier.fillMaxWidth(),

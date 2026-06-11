@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -31,7 +33,8 @@ data class ActiveUser(
     val document: String,
     val status: String,
     val plate: String,
-    val authorizedGates: List<String> = emptyList()
+    val authorizedGates: List<String> = emptyList(),
+    val authorizedGateNames: List<String> = emptyList()
 )
 
 data class HomeUiState(
@@ -145,27 +148,34 @@ class HomeViewModel @Inject constructor(
         _localGates.value = loadLocalGates()
         observeHistory()
         observeBluetoothConnection()
+        observeGatesForUserResolution()
         refreshData()
     }
 
     private fun observeHistory() {
         viewModelScope.launch {
             repository.getHistory().collect { history ->
+                val gates = _uiState.value.gates
                 val activeUsers = history.map { qr ->
+                    val resolvedGates = qr.authorizedGates.mapNotNull { mac ->
+                        gates.firstOrNull { it.macAddress == mac }?.name ?: mac
+                    }
                     ActiveUser(
                         id       = qr.androidId,
                         name     = qr.userName,
                         document = qr.cedula,
-                        status   = "VALIDADO",
+                        status   = qr.estado.ifEmpty { "VALIDADO" },
                         plate    = qr.plate,
-                        authorizedGates = qr.authorizedGates
+                        authorizedGates = qr.authorizedGates,
+                        authorizedGateNames = resolvedGates
                     )
                 }
                 _uiState.update {
                     it.copy(
                         activeUsers = activeUsers,
                         totalUsers  = activeUsers.size,
-                        totalScans  = activeUsers.size
+                        totalScans  = activeUsers.size,
+                        isServerOnline = true
                     )
                 }
             }
@@ -193,6 +203,22 @@ class HomeViewModel @Inject constructor(
                 }
 
                 previousConnectionState = state
+            }
+        }
+    }
+
+    private fun observeGatesForUserResolution() {
+        viewModelScope.launch {
+            _uiState.map { it.gates }.distinctUntilChanged().collect { gates ->
+                val currentUsers = _uiState.value.activeUsers
+                if (currentUsers.isEmpty()) return@collect
+                val updated = currentUsers.map { user ->
+                    val resolvedGates = user.authorizedGates.mapNotNull { mac ->
+                        gates.firstOrNull { it.macAddress == mac }?.name ?: mac
+                    }
+                    user.copy(authorizedGateNames = resolvedGates)
+                }
+                _uiState.update { it.copy(activeUsers = updated) }
             }
         }
     }
@@ -240,20 +266,24 @@ class HomeViewModel @Inject constructor(
     // ── Multi-Gate support (V8) ────────────────────────────────────
     fun loadGates() {
         viewModelScope.launch {
-            gateRepository.getGates().onSuccess { odooGates ->
-                val odooMacs = odooGates.map { it.macAddress }.toSet()
-                val local = _localGates.value.filter { !it.isOdooRegistered && it.macAddress !in odooMacs }
-                _uiState.update { it.copy(gates = odooGates + local, isServerOnline = true) }
-            }.onFailure {
-                val local = _localGates.value.filter { !it.isOdooRegistered }
-                _uiState.update { it.copy(gates = local, isServerOnline = false) }
-            }
+            loadGatesSuspend()
+        }
+    }
+
+    private suspend fun loadGatesSuspend() {
+        gateRepository.getGates().onSuccess { odooGates ->
+            val odooMacs = odooGates.map { it.macAddress }.toSet()
+            val local = _localGates.value.filter { !it.isOdooRegistered && it.macAddress !in odooMacs }
+            _uiState.update { it.copy(gates = odooGates + local) }
+        }.onFailure {
+            val local = _localGates.value.filter { !it.isOdooRegistered }
+            _uiState.update { it.copy(gates = local) }
         }
     }
 
     fun selectGate(macAddress: String?) {
         if (macAddress != null) {
-            _uiState.update { it.copy(selectedMacAddress = macAddress) }
+            _uiState.update { it.copy(selectedMacAddress = macAddress, isServerOnline = true) }
             val filtered = _uiState.value.activeUsers.filter { user ->
                 user.authorizedGates.contains(macAddress)
             }
@@ -268,11 +298,12 @@ class HomeViewModel @Inject constructor(
             syncRepository.getGateUsers(gateId).onSuccess { users ->
                 val activeUsers = users.map { qr ->
                     ActiveUser(
-                        id = qr.androidId,
-                        name = qr.userName,
+                        id       = qr.androidId,
+                        name     = qr.userName,
                         document = qr.cedula,
-                        status = "VALIDADO",
-                        plate = qr.plate
+                        status   = qr.estado.ifEmpty { "VALIDADO" },
+                        plate    = qr.plate,
+                        authorizedGates = qr.authorizedGates
                     )
                 }
                 _uiState.update { it.copy(gateUsers = activeUsers) }
@@ -340,15 +371,16 @@ class HomeViewModel @Inject constructor(
     fun refreshData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
-            syncRepository.refreshConductores()
+            val conductorsResult = syncRepository.refreshConductores()
+            conductorsResult
                 .onSuccess { records ->
                     repository.syncWithServer(records)
-                    _uiState.update { it.copy(isServerOnline = true) }
                 }
                 .onFailure {
                     _uiState.update { it.copy(isServerOnline = false) }
                 }
-            loadGates()
+            loadGatesSuspend()
+            _uiState.update { it.copy(isServerOnline = conductorsResult.isSuccess) }
             delay(500)
             _uiState.update { it.copy(isRefreshing = false) }
         }

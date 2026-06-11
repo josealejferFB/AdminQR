@@ -5,5 +5,6 @@ data class QrContent(
     val userName: String,
     val cedula: String,
     val plate: String,
+    val estado: String = "",
     val authorizedGates: List<String> = emptyList()
 )

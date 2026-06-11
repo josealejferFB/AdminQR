@@ -113,9 +113,11 @@ fun BluetoothDialog(
                         item { DeviceSectionHeader(title = "Dispositivos Vinculados") }
                         items(pairedDevices) { device ->
                             val isThisDeviceConnected = (connectionState as? BluetoothConnectionState.Connected)?.deviceAddress == device.address
+                            val isThisDeviceConnecting = (connectionState as? BluetoothConnectionState.Connecting)?.deviceAddress == device.address
                             DeviceItem(
                                 device            = device,
                                 isDeviceConnected = isThisDeviceConnected,
+                                isDeviceConnecting = isThisDeviceConnecting,
                                 onClick           = {
                                     connectionInitiated = true
                                     onConnect(device.address)
@@ -149,9 +151,11 @@ fun BluetoothDialog(
                     } else {
                         items(scannedDevices) { device ->
                             val isThisDeviceConnected = (connectionState as? BluetoothConnectionState.Connected)?.deviceAddress == device.address
+                            val isThisDeviceConnecting = (connectionState as? BluetoothConnectionState.Connecting)?.deviceAddress == device.address
                             DeviceItem(
                                 device          = device,
                                 isDeviceConnected = isThisDeviceConnected,
+                                isDeviceConnecting = isThisDeviceConnecting,
                                 onClick         = {
                                     connectionInitiated = true
                                     onConnect(device.address)
@@ -212,11 +216,12 @@ private fun DeviceSectionHeader(title: String, modifier: Modifier = Modifier) {
 private fun DeviceItem(
     device           : BluetoothDeviceDomain,
     isDeviceConnected: Boolean,
+    isDeviceConnecting: Boolean,
     onClick          : () -> Unit,
     onDisconnect     : () -> Unit,
     connectionState  : BluetoothConnectionState
 ) {
-    val isConnecting = connectionState is BluetoothConnectionState.Connecting
+    val isConnecting = isDeviceConnecting
     // Note: We don't have the "connecting address" in the state easily here without modifying the state class, 
     // but we can assume it's connecting if the state is Connecting. 
     // To be precise, we'd need the address in the Connecting state.

@@ -142,7 +142,7 @@ class BluetoothRepositoryImpl @Inject constructor(
         readBuffer.clear()
 
         connectionJob = scope.launch {
-            _connectionState.value = BluetoothConnectionState.Connecting
+            _connectionState.value = BluetoothConnectionState.Connecting(address)
             val device = bluetoothAdapter?.getRemoteDevice(address) ?: run {
                 _connectionState.value = BluetoothConnectionState.Error("Dispositivo no encontrado")
                 return@launch
