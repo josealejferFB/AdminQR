@@ -22,7 +22,7 @@ fun OdooConfigDialog(
     onSendMessageAndWaitForReply: suspend (String, Long) -> String?,
     onRegisterInOdoo: suspend (String, String) -> Result<Int?>,
     onDismiss: () -> Unit,
-    onSuccess: (odooId: Int) -> Unit
+    onSuccess: (odooId: Int?) -> Unit
 ) {
     var gateName by remember { mutableStateOf(gate.name) }
     var protocol by remember { mutableStateOf("http") }

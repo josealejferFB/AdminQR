@@ -3,12 +3,11 @@
 //  Apertura de portón: señal HTTP desde Odoo → relé
 //  Bluetooth: Protocolo dual (JSON + texto V6 legacy)
 //  Novedades V8:
-//    - Comandos JSON: config_network, config_ip, set_bt_name, set_hostname
-//    - IP estática configurable vía BT (config_ip)
+//    - Comandos JSON: config_network, set_bt_name, set_hostname
 //    - Nombre Bluetooth configurable vía set_bt_name
 //    - Hostname DHCP configurable vía set_hostname
 //    - BT se reinicia automáticamente tras conexión WiFi
-//    - GET /status expone static_ip, bt_name y hostname
+//    - GET /status expone bt_name y hostname
 // ============================================================
 
 #include <BluetoothSerial.h>
@@ -51,10 +50,6 @@ struct {
   String ssid, pass;
   String odooUrl;
   bool   wifiConfigurado;
-  // [V8] IP estática
-  String staticIp;
-  String staticGateway;
-  String staticNetmask;
   // [V8] Nombre Bluetooth configurable
   String btName;
   // [V8] Nombre de host para DHCP
@@ -301,31 +296,6 @@ void loop() {
 
                 Serial.println("[V7] JSON config_network OK. MAC: " + mac);
               }
-            } else if (strcmp(action, "config_ip") == 0) {
-              const char* ip      = doc["ip"]      | "";
-              const char* gateway = doc["gateway"] | "";
-              const char* netmask = doc["netmask"] | "";
-
-              if (strlen(ip) == 0 || strlen(gateway) == 0 || strlen(netmask) == 0) {
-                SerialBT.println("{\"status\":\"error\",\"message\":\"IP, gateway y netmask requeridos\"}");
-                pantalla("ERROR IP", "Campos incompletos");
-              } else {
-                prefs.begin("cfg", false);
-                prefs.putString("static_ip",  ip);
-                prefs.putString("static_gw",  gateway);
-                prefs.putString("static_mask", netmask);
-                prefs.end();
-
-                SerialBT.println("{\"status\":\"success\",\"message\":\"IP estática configurada\"}");
-                SerialBT.flush();
-                delay(200);
-                pantalla("IP GUARDADA", "Reiniciando...");
-                delay(1000);
-                ESP.restart();
-              }
-              sistema.msjDesde = millis();
-              sistema.mostrandoMsj = true;
-              sistema.estado = ESPERA_CONEXION;
             } else if (strcmp(action, "set_bt_name") == 0) {
               const char* name = doc["name"] | "";
 
@@ -578,9 +548,6 @@ void cargarConfig() {
   config.pass            = prefs.getString("pass", "");
   config.odooUrl         = prefs.getString("odoo_url", "");
   config.wifiConfigurado = (config.ssid.length() > 0);
-  config.staticIp      = prefs.getString("static_ip", "");
-  config.staticGateway = prefs.getString("static_gw", "");
-  config.staticNetmask = prefs.getString("static_mask", "");
   config.btName        = prefs.getString("bt_name", "ESP32_Seguro");
   config.hostname      = prefs.getString("hostname", "");
   prefs.end();
@@ -623,16 +590,6 @@ void conectarWiFi() {
   }
 
   pantalla("Conectando WiFi...", config.ssid.c_str());
-
-  if (config.staticIp.length() > 0) {
-    IPAddress ip, gw, mask;
-    if (ip.fromString(config.staticIp.c_str()) &&
-        gw.fromString(config.staticGateway.c_str()) &&
-        mask.fromString(config.staticNetmask.c_str())) {
-      WiFi.config(ip, gw, mask);
-      Serial.println("[V8] IP estática: " + config.staticIp);
-    }
-  }
 
   WiFi.setHostname(config.hostname.c_str());
   WiFi.begin(config.ssid.c_str(), config.pass.c_str());
@@ -825,7 +782,6 @@ void agregarEndpointStatus() {
     }
 
     doc["uptime"] = millis() / 1000;
-    doc["static_ip"] = config.staticIp;
     doc["bt_name"] = config.btName;
     doc["hostname"] = config.hostname;
 

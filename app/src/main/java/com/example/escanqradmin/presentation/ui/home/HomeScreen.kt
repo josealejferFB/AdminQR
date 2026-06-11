@@ -50,7 +50,6 @@ import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothConnectionPanel
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
 import com.example.escanqradmin.presentation.ui.home.components.ChangeHostnameDialog
-import com.example.escanqradmin.presentation.ui.home.components.GateIpConfigDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
 import com.example.escanqradmin.presentation.ui.home.components.OdooConfigDialog
 import com.example.escanqradmin.presentation.ui.home.components.RenameGateDialog
@@ -87,7 +86,6 @@ fun HomeScreen(
     var showProvisioningDialog by remember { mutableStateOf(false) }
     var showGateRegistrationDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
-    var showGateIpDialog by remember { mutableStateOf(false) }
     var showHostnameDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showOdooDialog by remember { mutableStateOf(false) }
@@ -294,10 +292,6 @@ fun HomeScreen(
                                 selectedMacAddress = uiState.selectedMacAddress,
                                 onSelect = { viewModel.selectGate(it) },
                                 onAddGate = { showGateRegistrationDialog = true },
-                                onConfigureIp = { gate ->
-                                    selectedGateForDialog = gate
-                                    showGateIpDialog = true
-                                },
                                 onChangeHostname = { gate ->
                                     selectedGateForDialog = gate
                                     showHostnameDialog = true
@@ -592,17 +586,6 @@ fun HomeScreen(
                 )
             }
 
-            if (showGateIpDialog && selectedGateForDialog != null) {
-                GateIpConfigDialog(
-                    gate = selectedGateForDialog!!,
-                    connectionStateProvider = { bluetoothConnectionState },
-                    onConnect = { address -> viewModel.connectToDevice(address) },
-                    onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
-                    onDismiss = { showGateIpDialog = false; selectedGateForDialog = null },
-                    onSuccess = { showGateIpDialog = false; selectedGateForDialog = null }
-                )
-            }
-
             if (showRenameDialog && selectedGateForDialog != null) {
                 RenameGateDialog(
                     gate = selectedGateForDialog!!,
@@ -744,7 +727,6 @@ private fun GateChipRow(
     selectedMacAddress: String?,
     onSelect: (String?) -> Unit,
     onAddGate: () -> Unit,
-    onConfigureIp: (GateInfo) -> Unit,
     onChangeHostname: (GateInfo) -> Unit,
     onRename: (GateInfo) -> Unit,
     onConfigureOdoo: (GateInfo) -> Unit,
@@ -792,10 +774,6 @@ private fun GateChipRow(
                                     onClick = { showMenu = false; onConfigureOdoo(gate) }
                                 )
                             }
-                            DropdownMenuItem(
-                                text = { Text("Configurar IP") },
-                                onClick = { showMenu = false; onConfigureIp(gate) }
-                            )
                             DropdownMenuItem(
                                 text = { Text("Cambiar Hostname") },
                                 onClick = { showMenu = false; onChangeHostname(gate) }
