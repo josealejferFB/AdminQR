@@ -239,6 +239,11 @@ class HomeViewModel @Inject constructor(
         bluetoothRepository.disconnect()
     }
 
+    fun unpairGate(gate: GateInfo) {
+        bluetoothRepository.unpairDevice(gate.macAddress)
+        _snackbarMessages.tryEmit("${gate.name} desvinculado")
+    }
+
     fun connectToGate(gate: GateInfo) {
         viewModelScope.launch {
             val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected

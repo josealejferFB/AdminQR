@@ -187,6 +187,16 @@ class BluetoothRepositoryImpl @Inject constructor(
         _connectionState.value = BluetoothConnectionState.Idle
     }
 
+    @SuppressLint("MissingPermission")
+    override fun unpairDevice(address: String) {
+        disconnect()
+        try {
+            val device = bluetoothAdapter?.getRemoteDevice(address) ?: return
+            device.javaClass.getMethod("removeBond").invoke(device)
+            updatePairedDevices()
+        } catch (_: Exception) { }
+    }
+
     override suspend fun sendMessage(message: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {

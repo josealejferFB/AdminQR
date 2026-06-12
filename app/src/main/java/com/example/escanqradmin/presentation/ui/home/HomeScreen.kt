@@ -335,6 +335,7 @@ fun HomeScreen(
                                 selectedGateForDialog = it
                                 requestBluetoothAction()
                             },
+                            onUnpairGate = { viewModel.unpairGate(it) },
                             onRegisterNew = { showGateRegistrationDialog = true }
                         )
                     }

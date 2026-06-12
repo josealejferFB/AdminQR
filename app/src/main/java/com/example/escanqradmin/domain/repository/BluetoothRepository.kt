@@ -15,6 +15,7 @@ interface BluetoothRepository {
     fun stopDiscovery()
     fun connectToDevice(address: String)
     fun disconnect()
+    fun unpairDevice(address: String)
     suspend fun sendMessage(message: String): Boolean
     suspend fun sendMessageAndWaitForReply(message: String, timeoutMs: Long = 10000): String?
 }

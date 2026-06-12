@@ -34,6 +34,7 @@ fun BluetoothConnectionPanel(
     onConnectToGate: (GateInfo) -> Unit,
     onDisconnect: () -> Unit,
     onPairGate: (GateInfo) -> Unit,
+    onUnpairGate: (GateInfo) -> Unit,
     onRegisterNew: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -149,7 +150,8 @@ fun BluetoothConnectionPanel(
                                 isConnecting = isConnecting,
                                 onConnect = { onConnectToGate(gate) },
                                 onDisconnect = onDisconnect,
-                                onPair = { onPairGate(gate) }
+                                onPair = { onPairGate(gate) },
+                                onUnpair = { onUnpairGate(gate) }
                             )
                             if (index < gates.lastIndex) {
                                 Spacer(Modifier.height(6.dp))
@@ -196,7 +198,8 @@ private fun GateConnectionCard(
     isConnecting: Boolean,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
-    onPair: () -> Unit
+    onPair: () -> Unit,
+    onUnpair: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -300,19 +303,35 @@ private fun GateConnectionCard(
                     )
                 }
                 isPaired -> {
-                    Button(
-                        onClick = onConnect,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(
-                            "Conectar",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Button(
+                            onClick = onConnect,
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text("Conectar", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                        TextButton(
+                            onClick = onUnpair,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.BluetoothDisabled,
+                                contentDescription = "Desvincular",
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                "Desvincular",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
                 else -> {
