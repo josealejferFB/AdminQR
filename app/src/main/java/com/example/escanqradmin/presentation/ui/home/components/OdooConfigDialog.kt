@@ -28,11 +28,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.escanqradmin.domain.model.GateInfo
-import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.ui.config.ServerHistory
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.time.Duration
@@ -44,9 +42,6 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun OdooConfigDialog(
     gate: GateInfo,
-    connectionStateProvider: () -> BluetoothConnectionState,
-    onConnect: (String) -> Unit,
-    onSendMessageAndWaitForReply: suspend (String, Long) -> String?,
     onRegisterInOdoo: suspend (String, String) -> Result<Int?>,
     onDismiss: () -> Unit,
     onSuccess: (odooId: Int?) -> Unit
@@ -113,7 +108,7 @@ fun OdooConfigDialog(
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(
-                                "Configurar Portón",
+                                "Registrar Portón",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -265,7 +260,7 @@ fun OdooConfigDialog(
                         OutlinedTextField(
                             value = ip,
                             onValueChange = { ip = it; ipError = null },
-                            label = { Text("IP del servidor") },
+                            label = { Text("IP del servidor Odoo") },
                             placeholder = { Text("ej. 192.168.1.100") },
                             isError = ipError != null,
                             supportingText = if (ipError != null) {{ Text(ipError!!) }} else null,
@@ -387,7 +382,7 @@ fun OdooConfigDialog(
                         )
                     )
 
-                    // ── Flow info ───────────────────────────
+                    // ── Info ────────────────────────────────
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f)
@@ -404,8 +399,8 @@ fun OdooConfigDialog(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                if (isRegistered) "Se enviará la URL de Odoo al ESP32 vía Bluetooth."
-                                else "Se registrará el portón en Odoo y se enviará la URL al ESP32.",
+                                if (isRegistered) "Portón ya registrado en Odoo. El ESP32 reportará su IP automáticamente."
+                                else "El portón se registrará en Odoo. El ESP32 reportará su IP automáticamente al conectarse.",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -431,8 +426,8 @@ fun OdooConfigDialog(
                                 val valid = isValidIp(ip)
                                 if (!valid) { ipError = "IP inválida"; return@Button }
                                 isWorking = true
-                                phase = if (!isRegistered) "Registrando en servidor..."
-                                        else "Conectando al ESP32..."
+                                phase = if (!isRegistered) "Registrando portón en Odoo..."
+                                        else "Portón ya registrado"
                                 scope.launch {
                                     val registerResult = if (!isRegistered) {
                                         onRegisterInOdoo(gateName, gate.macAddress)
@@ -446,43 +441,10 @@ fun OdooConfigDialog(
                                                 isWorking = false; return@launch
                                             }
                                             val effectiveId = odooId ?: gate.id
-                                            phase = "Conectando al ESP32..."
-                                            onConnect(gate.macAddress)
-                                            val maxWait = System.currentTimeMillis() + 10000
-                                            while (System.currentTimeMillis() < maxWait) {
-                                                val state = connectionStateProvider()
-                                                if (state is BluetoothConnectionState.Connected) break
-                                                if (state is BluetoothConnectionState.Error) {
-                                                    phase = null; isWorking = false
-                                                    result = if (!isRegistered)
-                                                        "Registrado en Odoo, pero no se pudo enviar la URL al ESP32."
-                                                    else "No se pudo conectar al ESP32. Reintenta desde el chip."
-                                                    return@launch
-                                                }
-                                                delay(500)
-                                            }
-                                            if (connectionStateProvider() !is BluetoothConnectionState.Connected) {
-                                                phase = null; isWorking = false
-                                                result = if (!isRegistered)
-                                                    "Registrado en Odoo, pero sin conexión BT."
-                                                else "Sin conexión Bluetooth al ESP32."
-                                                return@launch
-                                            }
-                                            phase = "Enviando configuración..."
-                                            val payload = "{\"protocolo\":\"$protocol\",\"ip_odoo\":\"$ip\",\"port\":$port}"
-                                            val reply = onSendMessageAndWaitForReply("config\n$payload\n", 10000)
-                                            if (reply != null && reply.contains("CONFIG_OK")) {
-                                                phase = "Reiniciando ESP32..."
-                                                delay(1500)
-                                                result = "Portón configurado correctamente"
-                                                onSuccess(effectiveId)
-                                            } else {
-                                                isWorking = false
-                                                result = if (!isRegistered)
-                                                    "Registrado, pero el ESP32 no confirmó la URL."
-                                                else "El ESP32 no confirmó la configuración. Reintenta."
-                                            }
+                                            phase = null
+                                            result = "Portón registrado correctamente"
                                             isWorking = false
+                                            onSuccess(effectiveId)
                                         },
                                         onFailure = { e ->
                                             phase = null
@@ -500,13 +462,13 @@ fun OdooConfigDialog(
                             enabled = gateName.isNotBlank() && ip.isNotBlank() && port.isNotBlank() && !isWorking
                         ) {
                             Icon(
-                                if (isRegistered) Icons.Default.Wifi else Icons.Default.CloudUpload,
+                                Icons.Default.CloudUpload,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                if (isRegistered) "ENVIAR CONFIG" else "CONFIGURAR",
+                                "REGISTRAR",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )

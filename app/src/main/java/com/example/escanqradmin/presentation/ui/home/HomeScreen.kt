@@ -649,9 +649,6 @@ fun HomeScreen(
             if (showOdooDialog && selectedGateForDialog != null) {
                 OdooConfigDialog(
                     gate = selectedGateForDialog!!,
-                    connectionStateProvider = { bluetoothConnectionState },
-                    onConnect = { address -> viewModel.connectToDevice(address) },
-                    onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
                     onRegisterInOdoo = { name, mac -> viewModel.registerGateInOdoo(name, mac) },
                     onDismiss = { showOdooDialog = false; selectedGateForDialog = null },
                     onSuccess = { odooId ->
