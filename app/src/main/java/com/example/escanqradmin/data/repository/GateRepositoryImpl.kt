@@ -57,15 +57,15 @@ class GateRepositoryImpl @Inject constructor(
                         val resultElement = jsonObject["result"] ?: throw Exception("Missing result in response")
                         val gateResponse = json.decodeFromJsonElement<GateListResponse>(resultElement)
 
-                        if (gateResponse.isSuccess && gateResponse.gates != null) {
-                            val gateInfos = gateResponse.gates.map { dto ->
+                        if (gateResponse.isSuccess && gateResponse.data != null) {
+                            val gateInfos = gateResponse.data.map { dto ->
                                 GateInfo(
                                     id = dto.id,
                                     name = dto.name,
                                     macAddress = dto.macAddress,
                                     ipAddress = dto.ipAddress,
                                     isOnline = dto.isOnline,
-                                    btName = dto.btName,
+                                    hostname = dto.hostname,
                                     isOdooRegistered = dto.id != null
                                 )
                             }

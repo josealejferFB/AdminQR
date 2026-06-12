@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.escanqradmin.data.network.ApiConstants
+import com.example.escanqradmin.domain.model.GateInfo
+import com.example.escanqradmin.domain.repository.GateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -42,12 +44,15 @@ data class ConfigUiState(
     val endpointGateUpdate: String = "/api/v1/gates/update",
     val endpointGateUsers: String = "/api/v1/gates/{id}/users",
     val serverHistory: List<ServerHistory> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    val gates: List<GateInfo> = emptyList(),
+    val isLoadingGates: Boolean = false
 )
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val gateRepository: GateRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ConfigUiState())
@@ -225,5 +230,20 @@ class ConfigViewModel @Inject constructor(
         _uiState.update { it.copy(serverHistory = newList) }
         val json = Json.encodeToString(newList)
         prefs.edit().putString(historyKey, json).apply()
+    }
+
+    fun fetchGates() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingGates = true) }
+            gateRepository.getGates()
+                .onSuccess { gates ->
+                    _uiState.update { it.copy(gates = gates) }
+                }
+                .onFailure { e ->
+                    _uiState.update { it.copy(gates = emptyList()) }
+                    _snackbarMessages.emit("Error al listar portones: ${e.message}")
+                }
+            _uiState.update { it.copy(isLoadingGates = false) }
+        }
     }
 }

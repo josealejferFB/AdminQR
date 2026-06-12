@@ -32,7 +32,7 @@ data class GateRegisterResponse(
 @Serializable
 data class GateListResponse(
     val success: JsonElement = JsonPrimitive(""),
-    val gates: List<GateDto>? = null,
+    val data: List<GateDto>? = null,
     val message: String? = null
 ) {
     val isSuccess: Boolean get() = success.jsonPrimitive.let { it.content == "success" || it.booleanOrNull == true }
@@ -45,7 +45,8 @@ data class GateDto(
     @SerialName("mac_address") val macAddress: String,
     @SerialName("ip_address") val ipAddress: String? = null,
     @SerialName("is_online") val isOnline: Boolean = false,
-    @SerialName("bt_name") val btName: String = "ESP32_Seguro"
+    val hostname: String = "",
+    @SerialName("is_active") val isActive: Boolean = true
 )
 
 @Serializable

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import com.example.escanqradmin.domain.model.GateInfo
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.theme.color.PrimaryBlue
@@ -176,7 +177,115 @@ fun ConfigScreen(
                 }
             }
 
+            // Gate listing
+            item {
+                GateListCard(
+                    gates = uiState.gates,
+                    isLoading = uiState.isLoadingGates,
+                    onFetch = viewModel::fetchGates
+                )
+            }
+
             item { Spacer(modifier = Modifier.height(16.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun GateListCard(
+    gates: List<GateInfo>,
+    isLoading: Boolean,
+    onFetch: () -> Unit
+) {
+    AppCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    Icons.Default.Sensors,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Portones registrados",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                FilledTonalButton(
+                    onClick = onFetch,
+                    enabled = !isLoading,
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Text("Listar", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            if (gates.isEmpty() && !isLoading) {
+                Spacer(Modifier.height(20.dp))
+                Text(
+                    "Presiona \"Listar\" para obtener los portones desde Odoo",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)
+                )
+            }
+            if (gates.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(Modifier.height(8.dp))
+                gates.forEach { gate ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (gate.isOnline) MaterialTheme.colorScheme.secondary
+                                    else MaterialTheme.colorScheme.outline,
+                                    CircleShape
+                                )
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(gate.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                            Text(
+                                "MAC: ${gate.macAddress}",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (gate.hostname.isNotEmpty()) {
+                            Text(
+                                gate.hostname,
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                    if (gate != gates.last()) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 18.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
+                        )
+                    }
+                }
+            }
         }
     }
 }
