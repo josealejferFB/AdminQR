@@ -57,7 +57,7 @@ class GateRepositoryImpl @Inject constructor(
                         val resultElement = jsonObject["result"] ?: throw Exception("Missing result in response")
                         val gateResponse = json.decodeFromJsonElement<GateListResponse>(resultElement)
 
-                        if (gateResponse.success && gateResponse.gates != null) {
+                        if (gateResponse.isSuccess && gateResponse.gates != null) {
                             val gateInfos = gateResponse.gates.map { dto ->
                                 GateInfo(
                                     id = dto.id,

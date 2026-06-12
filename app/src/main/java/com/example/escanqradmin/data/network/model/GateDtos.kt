@@ -18,17 +18,21 @@ data class GateRegisterRequest(
 
 @Serializable
 data class GateRegisterResponse(
-    val success: Boolean,
+    val success: String = "",
     @SerialName("gate_id") val gateId: Int? = null,
     val message: String? = null
-)
+) {
+    val isSuccess: Boolean get() = success == "success" || success == "true"
+}
 
 @Serializable
 data class GateListResponse(
-    val success: Boolean,
+    val success: String = "",
     val gates: List<GateDto>? = null,
     val message: String? = null
-)
+) {
+    val isSuccess: Boolean get() = success == "success" || success == "true"
+}
 
 @Serializable
 data class GateDto(

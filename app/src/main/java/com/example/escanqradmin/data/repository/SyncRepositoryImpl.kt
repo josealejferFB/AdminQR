@@ -262,7 +262,7 @@ class SyncRepositoryImpl @Inject constructor(
                         val resultElement = jsonObject["result"] ?: throw Exception("Missing result in response")
                         val gateResponse = json.decodeFromJsonElement<GateRegisterResponse>(resultElement)
 
-                        if (gateResponse.success) {
+                        if (gateResponse.isSuccess) {
                             Result.success(gateResponse)
                         } else {
                             Result.failure(Exception(gateResponse.message ?: "Error desconocido"))
