@@ -132,7 +132,8 @@ class HomeViewModel @Inject constructor(
             gates.map { if (it.macAddress == macAddress) it.copy(id = odooId, isOdooRegistered = true) else it }
         }
         saveLocalGates(_localGates.value)
-        loadGates()
+        val updated = _localGates.value.filter { !it.isOdooRegistered }
+        _uiState.update { it.copy(gates = updated + _localGates.value.filter { it.isOdooRegistered }) }
     }
 
     fun deleteLocalGate(macAddress: String) {
