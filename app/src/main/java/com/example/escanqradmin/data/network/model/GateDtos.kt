@@ -2,6 +2,10 @@ package com.example.escanqradmin.data.network.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class EspConfigResponse(
@@ -18,20 +22,20 @@ data class GateRegisterRequest(
 
 @Serializable
 data class GateRegisterResponse(
-    val success: String = "",
+    val success: JsonElement = JsonPrimitive(""),
     @SerialName("gate_id") val gateId: Int? = null,
     val message: String? = null
 ) {
-    val isSuccess: Boolean get() = success == "success" || success == "true"
+    val isSuccess: Boolean get() = success.jsonPrimitive.let { it.content == "success" || it.booleanOrNull == true }
 }
 
 @Serializable
 data class GateListResponse(
-    val success: String = "",
+    val success: JsonElement = JsonPrimitive(""),
     val gates: List<GateDto>? = null,
     val message: String? = null
 ) {
-    val isSuccess: Boolean get() = success == "success" || success == "true"
+    val isSuccess: Boolean get() = success.jsonPrimitive.let { it.content == "success" || it.booleanOrNull == true }
 }
 
 @Serializable
