@@ -2,6 +2,7 @@ package com.example.escanqradmin.data.repository
 
 import com.example.escanqradmin.data.network.ApiConstants
 import com.example.escanqradmin.data.network.ApiConstants.Endpoints.GET_CONDUCTORES
+import com.example.escanqradmin.data.network.NetworkUtil
 import com.example.escanqradmin.data.network.ApiConstants.Endpoints.SYNC_VEHICULAR
 import com.example.escanqradmin.data.network.model.ConductoresResponse
 import com.example.escanqradmin.data.network.model.GateRegisterResponse
@@ -34,6 +35,8 @@ class SyncRepositoryImpl @Inject constructor(
         coerceInputValues = true
         encodeDefaults = true
     }
+
+    private fun friendly(e: Exception): Exception = Exception(NetworkUtil.mapException(e))
 
     override suspend fun syncEntry(data: QrContent): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -78,7 +81,7 @@ class SyncRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(friendly(e))
         }
     }
 
@@ -130,7 +133,7 @@ class SyncRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(friendly(e))
         }
     }
 
@@ -175,7 +178,7 @@ class SyncRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(friendly(e))
         }
     }
 
@@ -229,7 +232,7 @@ class SyncRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(friendly(e))
         }
     }
 
@@ -273,7 +276,7 @@ class SyncRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(friendly(e))
         }
     }
 
@@ -327,7 +330,7 @@ class SyncRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(friendly(e))
         }
     }
 }

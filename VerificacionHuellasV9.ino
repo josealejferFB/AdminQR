@@ -190,6 +190,16 @@ void loop() {
         digitalWrite(PIN_LED_WAIT, sistema.ledState);
       }
 
+      // Reconexión WiFi automática si hay credenciales guardadas
+      if (config.wifiConfigurado && WiFi.status() != WL_CONNECTED &&
+          !sistema.wifiConnecting && !SerialBT.hasClient()) {
+        pantalla("RECONECTANDO", "WiFi perdido...");
+        sistema.wifiConnecting = true;
+        sistema.wifiStartTime = millis();
+        sistema.estado = MODO_CONECTANDO_WIFI;
+        break;
+      }
+
       if (SerialBT.hasClient()) {
         digitalWrite(PIN_LED_WAIT, HIGH);
         pantalla("BT CONECTADO", "Comandos:", "  config / wifi", "  o JSON");
@@ -595,10 +605,6 @@ void conectarWiFi() {
 void reportarIPyMAC() {
   if (WiFi.status() != WL_CONNECTED || config.odooUrl.length() == 0) return;
 
-  HTTPClient http;
-  http.begin(config.odooUrl);
-  http.addHeader("Content-Type", "application/json");
-
   StaticJsonDocument<256> doc;
   doc["jsonrpc"] = "2.0";
   JsonObject params = doc.createNestedObject("params");
@@ -610,14 +616,31 @@ void reportarIPyMAC() {
   String payload;
   serializeJson(doc, payload);
 
-  int code = http.POST(payload);
-  if (code > 0) {
-    Serial.println("[HTTP] Auto-reporte enviado a Odoo. Codigo: " + String(code));
-  } else {
-    Serial.println("[HTTP] Error en auto-reporte. Codigo: " + String(code));
+  // Retry con backoff: 3 intentos, 5s / 15s / 30s
+  int delays[] = {5000, 15000, 30000};
+  int maxRetries = 3;
+
+  for (int i = 0; i < maxRetries; i++) {
+    HTTPClient http;
+    http.begin(config.odooUrl);
+    http.addHeader("Content-Type", "application/json");
+    http.setTimeout(10000);
+
+    int code = http.POST(payload);
+    if (code == 200) {
+      Serial.println("[HTTP] Auto-reporte OK a Odoo. Intento " + String(i + 1));
+      http.end();
+      return;
+    }
+
+    Serial.println("[HTTP] Error en auto-reporte (intento " + String(i + 1) +
+                   "/" + String(maxRetries) + "). Codigo: " + String(code));
+    http.end();
+
+    if (i < maxRetries - 1) delay(delays[i]);
   }
 
-  http.end();
+  Serial.println("[HTTP] Auto-reporte fallo tras " + String(maxRetries) + " intentos");
 }
 
 // ============================================================

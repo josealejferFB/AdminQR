@@ -29,7 +29,7 @@ class BluetoothRepositoryImpl @Inject constructor(
 ) : BluetoothRepository {
 
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-    private val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
+    val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
 
     private val _scannedDevices = MutableStateFlow<List<BluetoothDeviceDomain>>(emptyList())
     override val scannedDevices: StateFlow<List<BluetoothDeviceDomain>> = _scannedDevices.asStateFlow()
@@ -95,9 +95,13 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun startDiscovery() {
+        if (bluetoothAdapter == null) {
+            _scannedDevices.value = emptyList()
+            return
+        }
         try {
             updatePairedDevices()
-            if (bluetoothAdapter?.isDiscovering == true) {
+            if (bluetoothAdapter.isDiscovering) {
                 bluetoothAdapter.cancelDiscovery()
             }
             _scannedDevices.value = emptyList()
@@ -117,7 +121,7 @@ class BluetoothRepositoryImpl @Inject constructor(
                 context.registerReceiver(receiver, filter)
             }
             isReceiverRegistered = true
-            bluetoothAdapter?.startDiscovery()
+            bluetoothAdapter.startDiscovery()
         } catch (s: SecurityException) {
             _scannedDevices.value = emptyList()
         }
@@ -142,8 +146,13 @@ class BluetoothRepositoryImpl @Inject constructor(
         readBuffer.clear()
 
         connectionJob = scope.launch {
+            if (bluetoothAdapter == null) {
+                _connectionState.value = BluetoothConnectionState.Error(
+                    "Bluetooth no disponible en este dispositivo")
+                return@launch
+            }
             _connectionState.value = BluetoothConnectionState.Connecting(address)
-            val device = bluetoothAdapter?.getRemoteDevice(address) ?: run {
+            val device = bluetoothAdapter.getRemoteDevice(address) ?: run {
                 _connectionState.value = BluetoothConnectionState.Error("Dispositivo no encontrado")
                 return@launch
             }

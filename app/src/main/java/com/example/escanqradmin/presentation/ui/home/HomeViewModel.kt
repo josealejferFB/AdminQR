@@ -280,7 +280,8 @@ class HomeViewModel @Inject constructor(
             val odooMacs = odooGates.map { it.macAddress }.toSet()
             val local = _localGates.value.filter { !it.isOdooRegistered && it.macAddress !in odooMacs }
             _uiState.update { it.copy(gates = odooGates + local) }
-        }.onFailure {
+        }.onFailure { e ->
+            _snackbarMessages.tryEmit("Error al cargar portones: ${e.message}")
             val local = _localGates.value.filter { !it.isOdooRegistered }
             _uiState.update { it.copy(gates = local) }
         }

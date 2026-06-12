@@ -1,6 +1,7 @@
 package com.example.escanqradmin.data.repository
 
 import com.example.escanqradmin.data.network.ApiConstants
+import com.example.escanqradmin.data.network.NetworkUtil
 import com.example.escanqradmin.data.network.model.GateListResponse
 import com.example.escanqradmin.domain.model.GateInfo
 import com.example.escanqradmin.domain.repository.GateRepository
@@ -29,6 +30,8 @@ class GateRepositoryImpl @Inject constructor(
         coerceInputValues = true
         encodeDefaults = true
     }
+
+    private fun friendly(e: Exception): Exception = Exception(NetworkUtil.mapException(e))
 
     override suspend fun getGates(): Result<List<GateInfo>> = withContext(Dispatchers.IO) {
         try {
@@ -79,7 +82,7 @@ class GateRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(friendly(e))
         }
     }
 
@@ -124,7 +127,7 @@ class GateRepositoryImpl @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(friendly(e))
         }
     }
 }

@@ -216,18 +216,21 @@ class GateRegistrationViewModel @Inject constructor(
                 return@launch
             }
 
-            delay(3000)
+            // Esperar 5s iniciales para que el ESP32 procese WiFi
+            delay(5000)
 
             val startTime = System.currentTimeMillis()
-            val maxDuration = 45_000L
+            val maxDuration = 50_000L
+            var attempt = 0
 
             while (System.currentTimeMillis() - startTime < maxDuration) {
+                attempt++
                 bluetoothRepository.disconnect()
-                delay(300)
+                delay(500)
                 bluetoothRepository.connectToDevice(address)
 
                 val connected = try {
-                    withTimeout(5000) {
+                    withTimeout(8000) {
                         bluetoothRepository.connectionState.first { state ->
                             state is BluetoothConnectionState.Connected || state is BluetoothConnectionState.Error
                         }
@@ -279,6 +282,11 @@ class GateRegistrationViewModel @Inject constructor(
                             }
                         }
                     return@launch
+                }
+
+                // Backoff progresivo entre reintentos
+                if (System.currentTimeMillis() - startTime < maxDuration) {
+                    delay(minOf(2000L * attempt, 10_000L))
                 }
             }
 
