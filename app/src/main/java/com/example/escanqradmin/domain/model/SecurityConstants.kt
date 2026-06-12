@@ -5,6 +5,8 @@ object SecurityConstants {
         private set
     var PROVISIONING_TOKEN: String = "ALCARAVAN_2025"
         private set
+    var IOT_TOKEN: String = "iot_secret_2024"
+        private set
 
     fun init(aesKey: String, provisioningToken: String) {
         SHARED_AES_KEY = aesKey

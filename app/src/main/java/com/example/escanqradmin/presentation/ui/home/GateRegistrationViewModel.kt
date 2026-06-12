@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.wifi.WifiManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.escanqradmin.data.network.ApiConstants
+import com.example.escanqradmin.domain.model.SecurityConstants
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.SyncRepository
@@ -168,12 +170,15 @@ class GateRegistrationViewModel @Inject constructor(
                 .take(63)
                 .ifEmpty { "gate" }
 
+            val odooUrl = "${ApiConstants.BASE_URL}/api/update_esp_ip"
             val payload = buildJsonObject {
                 put("action", "config_network")
                 put("ssid", state.ssid)
                 put("password", state.password)
                 put("bt_name", state.gateName)
                 put("hostname", safeHostname)
+                put("iot_token", SecurityConstants.IOT_TOKEN)
+                put("odoo_url", odooUrl)
             }.toString()
 
             val response = bluetoothRepository.sendMessageAndWaitForReply(payload)

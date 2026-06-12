@@ -54,6 +54,7 @@ WebServer       server(80);
 struct {
   String ssid, pass;
   String odooUrl;
+  String iotToken;
   bool   wifiConfigurado;
   // [V8] Nombre Bluetooth configurable
   String btName;
@@ -268,6 +269,22 @@ void loop() {
                   prefs.putString("hostname", hostname);
                   prefs.end();
                   config.hostname = String(hostname);
+                }
+
+                const char* iotToken = doc["iot_token"] | "";
+                if (strlen(iotToken) > 0) {
+                  prefs.begin("cfg", false);
+                  prefs.putString("iot_token", iotToken);
+                  prefs.end();
+                  config.iotToken = String(iotToken);
+                }
+
+                const char* odooUrl = doc["odoo_url"] | "";
+                if (strlen(odooUrl) > 0) {
+                  prefs.begin("cfg", false);
+                  prefs.putString("odoo_url", odooUrl);
+                  prefs.end();
+                  config.odooUrl = String(odooUrl);
                 }
 
                 String mac = obtenerMacAddress();
@@ -552,6 +569,7 @@ void cargarConfig() {
   config.ssid            = prefs.getString("ssid", "");
   config.pass            = prefs.getString("pass", "");
   config.odooUrl         = prefs.getString("odoo_url", "");
+  config.iotToken        = prefs.getString("iot_token", IOT_TOKEN);
   config.wifiConfigurado = (config.ssid.length() > 0);
   config.btName        = prefs.getString("bt_name", "ESP32_Seguro");
   config.hostname      = prefs.getString("hostname", "");
@@ -660,7 +678,7 @@ void reportarIPyMAC() {
   StaticJsonDocument<256> doc;
   doc["jsonrpc"] = "2.0";
   JsonObject params = doc.createNestedObject("params");
-  params["iot_token"]    = IOT_TOKEN;
+  params["iot_token"]    = config.iotToken;
   params["mac_address"]  = obtenerMacAddress();
   params["ip"]           = WiFi.localIP().toString();
   params["hostname"]     = config.hostname;
