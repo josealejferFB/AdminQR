@@ -18,7 +18,6 @@ import androidx.navigation.toRoute
 import com.example.escanqradmin.domain.model.QrContent
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppBottomBar
 import com.example.escanqradmin.presentation.ui.config.ConfigScreen
-import com.example.escanqradmin.presentation.ui.espconfig.ESPConfigScreen
 import com.example.escanqradmin.presentation.ui.home.HomeScreen
 import com.example.escanqradmin.presentation.ui.result.ResultScreen
 import com.example.escanqradmin.presentation.ui.result.ResultViewModel
@@ -101,9 +100,6 @@ fun AppNavigation(navController: NavHostController) {
                     navController = navController,
                     onScanAgain = { navController.popBackStack(Home, inclusive = false) }
                 )
-            }
-            composable<ESPConfig> {
-                ESPConfigScreen(navController = navController)
             }
             composable<Config> {
                 ConfigScreen(navController = navController)

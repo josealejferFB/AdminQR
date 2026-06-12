@@ -47,7 +47,6 @@ import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnack
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.navigation.Config
-import com.example.escanqradmin.presentation.navigation.ESPConfig
 import com.example.escanqradmin.presentation.theme.color.*
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothConnectionPanel

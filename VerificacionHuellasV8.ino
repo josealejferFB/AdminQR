@@ -279,14 +279,6 @@ void loop() {
                   config.iotToken = String(iotToken);
                 }
 
-                const char* odooUrl = doc["odoo_url"] | "";
-                if (strlen(odooUrl) > 0) {
-                  prefs.begin("cfg", false);
-                  prefs.putString("odoo_url", odooUrl);
-                  prefs.end();
-                  config.odooUrl = String(odooUrl);
-                }
-
                 String mac = obtenerMacAddress();
 
                 {
