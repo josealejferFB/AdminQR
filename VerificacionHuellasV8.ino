@@ -34,6 +34,11 @@
 // Sin token válido, el ESP32 responde 401 No autorizado.
 #define API_TOKEN "secreto123"
 
+// Token compartido con Odoo para auto-discovery IoT.
+// El ESP32 lo envía en cada reporte de IP para que Odoo
+// valide que la petición viene de un dispositivo autorizado.
+#define IOT_TOKEN "iot_secret_2024"
+
 // ========== PANTALLA OLED ==========
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
@@ -383,7 +388,7 @@ void loop() {
         String json = SerialBT.readStringUntil('\n');
         json.trim();
 
-        StaticJsonDocument<256> doc;
+  StaticJsonDocument<384> doc;
         if (deserializeJson(doc, json) == DeserializationError::Ok) {
           const char* proto  = doc["protocolo"] | "http";
           const char* ip     = doc["ip_odoo"]   | "";
@@ -652,16 +657,22 @@ void reportarIPyMAC() {
   http.begin(config.odooUrl);
   http.addHeader("Content-Type", "application/json");
 
-  String mac = obtenerMacAddress();
-  String payload = "{\"jsonrpc\":\"2.0\",\"method\":\"call\",\"params\":{"
-                   "\"ip\":\"" + WiFi.localIP().toString()
-                   + "\",\"mac_address\":\"" + mac + "\"}}";
+  StaticJsonDocument<256> doc;
+  doc["jsonrpc"] = "2.0";
+  JsonObject params = doc.createNestedObject("params");
+  params["iot_token"]    = IOT_TOKEN;
+  params["mac_address"]  = obtenerMacAddress();
+  params["ip"]           = WiFi.localIP().toString();
+  params["hostname"]     = config.hostname;
+
+  String payload;
+  serializeJson(doc, payload);
 
   int code = http.POST(payload);
   if (code > 0) {
-    Serial.println("[HTTP] IP+MAC reportada a Odoo. Codigo: " + String(code));
+    Serial.println("[HTTP] Auto-reporte enviado a Odoo. Codigo: " + String(code));
   } else {
-    Serial.println("[HTTP] Error reportando IP+MAC. Codigo: " + String(code));
+    Serial.println("[HTTP] Error en auto-reporte. Codigo: " + String(code));
   }
 
   http.end();
