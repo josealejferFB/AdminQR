@@ -1,8 +1,13 @@
 // ============================================================
-//  SISTEMA VEHICULAR - VERSIÓN 8
+//  SISTEMA VEHICULAR - VERSIÓN 9
 //  Apertura de portón: señal HTTP desde Odoo → relé
-//  Bluetooth: Protocolo dual (JSON + texto V6 legacy)
-//  Novedades V8:
+//  Bluetooth: Solo protocolo JSON (config_network, set_bt_name, set_hostname)
+//  Novedades V9:
+//    - Eliminado protocolo texto V6 (config, wifi legacy)
+//    - Eliminado MODO_CONFIG_ODOO + construirUrlOdoo + guardarConfigOdoo
+//    - Auto-discovery: ESP32 reporta IP a Odoo tras WiFi connect
+//    - IoT token configurable vía config_network
+//  Legado V8:
 //    - Comandos JSON: config_network, set_bt_name, set_hostname
 //    - Nombre Bluetooth configurable vía set_bt_name
 //    - Hostname DHCP configurable vía set_hostname
@@ -91,9 +96,8 @@ struct {
 
 // ========== ESTADOS ==========
 #define ESPERA_CONEXION   0   // Idle: BT parpadeando, WebServer activo
-#define MODO_CONFIG_BT    1   // BT conectado: espera comando "config" o "wifi"
-#define MODO_CONFIG_ODOO  2   // Espera JSON con datos de Odoo
-#define MODO_WIFI_SSID    3   // Espera SSID por BT
+#define MODO_CONFIG_BT    1   // BT conectado: espera comando JSON
+#define MODO_WIFI_SSID    2   // Espera SSID por BT
 #define MODO_WIFI_PASS    4   // Espera contraseña WiFi por BT
 #define MODO_CONECTANDO_WIFI 5   // [V7] WiFi.begin no bloqueante
 
@@ -101,8 +105,6 @@ struct {
 void pantalla(const char* l1, const char* l2 = "", const char* l3 = "", const char* l4 = "");
 void mostrarIdle();
 void cargarConfig();
-void guardarConfigOdoo(const char* url);
-void construirUrlOdoo(const char* proto, const char* ip, int puerto);
 void conectarWiFi();
 // [V7] Prototipos nuevos
 void reportarIPyMAC();
@@ -361,13 +363,7 @@ void loop() {
             }
           }
         }
-        // ── V6 Legacy: comandos texto ──────────────────────────
-        else if (cmd == "config") {
-          pantalla("CONFIG ODOO", "Envie JSON:");
-          SerialBT.println("OK_CONFIG");
-          sistema.estado  = MODO_CONFIG_ODOO;
-          sistema.timeout = millis();
-        }
+        // ── Fallback texto: wifi (SSID manual) ──────────────
         else if (cmd == "wifi") {
           pantalla("CONFIG WIFI", "Envie SSID:");
           SerialBT.println("SSID:");
@@ -378,48 +374,6 @@ void loop() {
           SerialBT.println("CMD_DESCONOCIDO");
           sistema.timeout = millis();
         }
-      }
-      break;
-
-    // ----------------------------------------------------------
-    // MODO_CONFIG_ODOO — Recibe JSON: {protocolo, ip_odoo, port}
-    // ----------------------------------------------------------
-    case MODO_CONFIG_ODOO:
-      if (!SerialBT.hasClient()) { sistema.estado = ESPERA_CONEXION; break; }
-
-      if (millis() - sistema.timeout > 30000) {
-        SerialBT.println("TIMEOUT");
-        sistema.estado = ESPERA_CONEXION;
-        break;
-      }
-
-      if (SerialBT.available()) {
-        String json = SerialBT.readStringUntil('\n');
-        json.trim();
-
-  StaticJsonDocument<384> doc;
-        if (deserializeJson(doc, json) == DeserializationError::Ok) {
-          const char* proto  = doc["protocolo"] | "http";
-          const char* ip     = doc["ip_odoo"]   | "";
-          int         puerto = doc["port"]       | 0;
-
-          if (strlen(ip) > 0) {
-            construirUrlOdoo(proto, ip, puerto);
-            pantalla("CONFIG OK", "URL guardada");
-            SerialBT.println("CONFIG_OK");
-            if (WiFi.status() == WL_CONNECTED) reportarIPyMAC();
-          } else {
-            pantalla("ERROR", "IP requerida");
-            SerialBT.println("ERROR_IP");
-          }
-        } else {
-          pantalla("ERROR", "JSON invalido");
-          SerialBT.println("JSON_ERROR");
-        }
-
-        sistema.msjDesde     = millis();
-        sistema.mostrandoMsj = true;
-        sistema.estado       = ESPERA_CONEXION;
       }
       break;
 
@@ -573,34 +527,12 @@ void cargarConfig() {
   }
 }
 
-void guardarConfigOdoo(const char* url) {
-  prefs.begin("cfg", false);
-  prefs.putString("odoo_url", url);
-  prefs.end();
-  config.odooUrl = String(url);
-}
-
-void construirUrlOdoo(const char* proto, const char* ip, int puerto) {
-  String url = String(proto) + "://" + String(ip);
-
-  // Omitir puerto si es el estándar del protocolo
-  bool puertoEstandar = ((String(proto) == "http"  && puerto == 80) ||
-                         (String(proto) == "https" && puerto == 443));
-  if (puerto > 0 && !puertoEstandar) {
-    url += ":" + String(puerto);
-  }
-
-  url += "/api/update_esp_ip";
-  guardarConfigOdoo(url.c_str());
-  Serial.println("[CONFIG] URL Odoo: " + url);
-}
-
 // ============================================================
 //  RED — WiFi + WebServer + Reporte de IP
 // ============================================================
 void conectarWiFi() {
   if (!config.wifiConfigurado) {
-    pantalla("SIN WIFI", "Conecte por BT", "y use 'wifi'");
+    pantalla("SIN WIFI", "Configure por BT");
     return;
   }
 
