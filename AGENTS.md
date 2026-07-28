@@ -23,6 +23,9 @@ Full docs in `docs/`:
 
 ## Key conventions
 - `ApiConstants` is a singleton with `init(context)` — must be called before use (done in `EscanQRApp.onCreate`)
+- `updateEntry()` in `SyncRepositoryImpl` now sends `add_gate_ids`/`remove_gate_ids` arrays instead of the old `puertas_autorizadas` (MACs)
+- New endpoint `POST /api/v1/gates/delete` for archiving gates (soft delete) — implemented in `GateRepositoryImpl`
+- Response format for `/api/v1/gates/*` endpoints uses `result.success` (boolean), not `result.status` (string)
 - All API config (protocol, host, port, endpoints) is stored in SharedPreferences `api_config_prefs`
 - ESP32 discovery matches devices whose name starts with `"ESP32"` (case-insensitive)
 - Design tokens defined in `docs/directrices_de_diseno.md` — use `AppCard`/`AppCardDefaults` consistently; no hardcoded colors for backgrounds/text
@@ -41,7 +44,7 @@ Full docs in `docs/`:
 - Network: cleartext HTTP is allowed via `network_security_config.xml`
 - AES key `SHARED_AES_KEY` and provisioning `PROVISIONING_TOKEN` are hardcoded in `SecurityConstants.kt`
 - The repo includes an Arduino companion sketch (`VerificacionHuellasV9.ino`) for the ESP32 gate controller; V9 removes V6 text protocol (`config`, `wifi` legacy), keeps only JSON commands (`config_network`, `set_bt_name`, `set_hostname`). ESP32 auto-reports IP to Odoo after WiFi.
-- ESP32 V7/V8 firmware uses a state machine: `ESPERA_CONEXION → MODO_CONFIG_BT → {ODOO | WIFI | config_ip | set_bt_name | config_network}` with 30-60s timeouts
+- ESP32 V9 firmware uses a state machine: `ESPERA_CONEXION → MODO_CONFIG_BT → {config_network | set_bt_name | set_hostname} → MODO_CONECTANDO_WIFI` with 30-60s timeouts. Max 3 WiFi reconnect attempts.
 - QR between apps uses AES-256-GCM with shared key (`SecurityConstants.SHARED_AES_KEY`)
 - Spanish language throughout the codebase (UI strings, comments, variable names)
 - `material-icons-extended` is a direct dependency (not via BOM)

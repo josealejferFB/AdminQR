@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-27T13:35:00Z",
+  "title": "Design System: EscanQR Admin",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Gris Pizarra Profundo" },
+      "secondary": { "role": "secondary", "displayName": "Verde Seguridad" }
+    }
+  },
+  "components": [
+    {
+      "name": "Botón Principal (Gris)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Botón táctil y contundente para acciones neutras.",
+      "html": "<button class=\"ds-btn-primary\">ESCANEAR</button>",
+      "css": ".ds-btn-primary { background: #1E293B; color: #FFFFFF; padding: 16px 24px; border-radius: 12px; font-weight: 500; font-family: Roboto, sans-serif; border: none; cursor: pointer; transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }\n.ds-btn-primary:active { transform: scale(0.92); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Fluidez Táctica",
+    "overview": "El sistema visual de EscanQR está diseñado para priorizar las operaciones rápidas y las interacciones fluidas en campo. Es sencillo, minimalista y funcional, aprovechando a fondo las convenciones nativas de Material Design 3 de Android. Rechaza explícitamente cualquier estética web empaquetada o sobrecargada que distraiga del escaneo rápido y la validación de accesos.",
+    "keyCharacteristics": [
+      "Táctil y evidente: botones obvios y áreas de toque extra grandes.",
+      "Alto contraste indispensable.",
+      "Enfoque total en el uso a una sola mano y retroalimentación inmediata."
+    ],
+    "rules": [
+      {
+        "name": "The Native Contrast Rule",
+        "body": "El color debe ser estrictamente funcional, no decorativo. Cada cambio de estado debe tener un contraste evidente con el fondo para asegurar la visibilidad en exteriores bajo el sol.",
+        "section": "colors"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Las superficies descansan planas. Las sombras solo aparecen para denotar superposición funcional (barras de navegación, diálogos) o agrupación interactiva.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do priorizar el contraste alto para garantizar visibilidad en exteriores.",
+      "Do diseñar pensando en botones y áreas de toque grandes (operación principal a una sola mano).",
+      "Do usar la animación tipo \"spring\" (escala 0.92x en presionar) para brindar retroalimentación táctil física inmediata a cada toque."
+    ],
+    "donts": [
+      "Don't diseñar interfaces que parezcan una página web empaquetada. La app tiene que sentirse 100% nativa Android (Material 3).",
+      "Don't sobrecargar la pantalla con menús complejos ni elementos decorativos que distraigan de las funciones vitales (escanear y validar).",
+      "Don't sobrescribir la forma (shape) ni la elevación de `AppCardDefaults` manualmente. Usar siempre las constantes predefinidas."
+    ]
+  }
+}

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.escanqradmin.presentation.theme.shape.AppShapes
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -103,7 +104,7 @@ fun ResultScreen(
                 OutlinedButton(
                     onClick  = onScanAgain,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape    = RoundedCornerShape(16.dp),
+                    shape    = AppShapes.Input,
                     border   = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
                 ) {
                     Icon(Icons.Default.QrCodeScanner, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
@@ -131,10 +132,10 @@ private fun UserInfoCard(data: QrContent) {
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(data.userName, fontWeight = FontWeight.Bold, fontSize = 17.sp, color = MaterialTheme.colorScheme.onSurface)
-                Text("Cédula: ${data.cedula}", fontSize = 13.sp, color = Color.Gray)
+                Text("Cédula: ${data.cedula}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Surface(
-                shape = RoundedCornerShape(8.dp),
+                shape = AppShapes.Chip,
                 color = MaterialTheme.colorScheme.secondaryContainer
             ) {
                 Text(
@@ -182,16 +183,16 @@ private fun StepCard(
                     contentAlignment = Alignment.Center
                 ) {
                     if (status is StepStatus.Loading)
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
                     else if (status is StepStatus.Done)
-                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
                     else
-                        Text("$number", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("$number", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = if (isLocked) Color.Gray else MaterialTheme.colorScheme.onSurface)
-                    Text(subtitle, fontSize = 12.sp, color = Color.Gray)
+                    Text(title, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = if (isLocked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                    Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             if (!isLocked) {
@@ -223,7 +224,7 @@ private fun ServerStepContent(syncStatus: SyncStatus, viewModel: ResultViewModel
         Button(
             onClick  = { viewModel.registerEntry() },
             modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape    = RoundedCornerShape(12.dp),
+            shape    = AppShapes.Button,
             colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             enabled  = syncStatus !is SyncStatus.Loading
         ) {
@@ -238,7 +239,7 @@ private fun QrStepContent(unlocked: Boolean, showQr: Boolean, onToggleQr: () -> 
         Button(
             onClick  = onToggleQr,
             modifier = Modifier.fillMaxWidth().height(48.dp),
-            shape    = RoundedCornerShape(12.dp),
+            shape    = AppShapes.Button,
             colors   = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
         ) {
             Icon(Icons.Default.QrCode, null, modifier = Modifier.size(18.dp))
@@ -257,7 +258,7 @@ private fun QrStepContent(unlocked: Boolean, showQr: Boolean, onToggleQr: () -> 
                 Text(
                     "Pide al usuario que escanee este código desde su aplicación para recibir la configuración.",
                     fontSize    = 12.sp,
-                    color       = Color.Gray,
+                    color       = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign   = TextAlign.Center,
                     modifier    = Modifier.padding(horizontal = 16.dp)
                 )
@@ -271,7 +272,7 @@ private fun StepDoneChip(msg: String) {
     Row(
         modifier          = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.secondaryContainer, AppShapes.Chip)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

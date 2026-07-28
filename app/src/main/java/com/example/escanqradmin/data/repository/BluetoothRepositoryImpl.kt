@@ -21,6 +21,7 @@ import java.io.InputStream
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
+import android.util.Log
 
 @Singleton
 class BluetoothRepositoryImpl @Inject constructor(
@@ -152,38 +153,55 @@ class BluetoothRepositoryImpl @Inject constructor(
                 return@launch
             }
             _connectionState.value = BluetoothConnectionState.Connecting(address)
-            val device = bluetoothAdapter.getRemoteDevice(address) ?: run {
-                _connectionState.value = BluetoothConnectionState.Error("Dispositivo no encontrado")
-                return@launch
-            }
-            
-            // Cancelar discovery mejora la velocidad de conexión
-            bluetoothAdapter.cancelDiscovery()
-
             try {
-                // Método estándar con UUID SPP
-                socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-                withContext(Dispatchers.IO) { socket?.connect() }
+                val device = bluetoothAdapter.getRemoteDevice(address) ?: run {
+                    _connectionState.value = BluetoothConnectionState.Error("Dispositivo no encontrado")
+                    return@launch
+                }
+                
+                // Cancelar discovery mejora la velocidad de conexión
+                bluetoothAdapter.cancelDiscovery()
+
+                try {
+                    withTimeout(12000) {
+                        try {
+                            // Método estándar con UUID SPP
+                            socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                            var connectJob = launch(Dispatchers.IO) { socket?.connect() }
+                            connectJob.join()
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e // Don't catch the timeout's cancellation
+                            // FALLBACK: Conexión por reflexión (canal 1)
+                            socket?.close()
+                            socket = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                                .invoke(device, 1) as BluetoothSocket
+                            var connectJob = launch(Dispatchers.IO) { socket?.connect() }
+                            connectJob.join()
+                        }
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    socket?.close() // This forcefully interrupts the native connect()!
+                    throw e
+                }
                 
                 _connectionState.value = BluetoothConnectionState.Connected(address)
                 listenForMessages()
                 
-            } catch (e: IOException) {
-                // FALLBACK: Conexión por reflexión (canal 1)
-                try {
-                    socket?.close()
-                    socket = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
-                        .invoke(device, 1) as BluetoothSocket
-                    withContext(Dispatchers.IO) { socket?.connect() }
-                    
-                    _connectionState.value = BluetoothConnectionState.Connected(address)
-                    listenForMessages()
-                    
-                } catch (e2: Exception) {
-                    _connectionState.value = BluetoothConnectionState.Error("Fallo de conexión: ${e2.message}")
-                    socket?.close()
-                    socket = null
-                }
+            } catch (e: SecurityException) {
+                Log.e("BluetoothRepository", "SecurityException al conectar", e)
+                _connectionState.value = BluetoothConnectionState.Error("Faltan permisos de Bluetooth")
+                socket?.close()
+                socket = null
+            } catch (e: TimeoutCancellationException) {
+                Log.e("BluetoothRepository", "TimeoutCancellationException al conectar", e)
+                _connectionState.value = BluetoothConnectionState.Error("Tiempo de espera agotado al conectar")
+                socket?.close()
+                socket = null
+            } catch (e: Exception) {
+                Log.e("BluetoothRepository", "Exception al conectar", e)
+                _connectionState.value = BluetoothConnectionState.Error("Fallo de conexión: ${e.message}")
+                socket?.close()
+                socket = null
             }
         }
     }
@@ -222,7 +240,9 @@ class BluetoothRepositoryImpl @Inject constructor(
             try {
                 socket?.outputStream?.write("$message\n".toByteArray())
                 kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
-                    _messages.first { it.isNotBlank() }
+                    _messages.first { msg -> 
+                        msg.isNotBlank() && !msg.contains("\"status\":\"processing\"")
+                    }
                 }
             } catch (e: Exception) {
                 null

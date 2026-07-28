@@ -9,11 +9,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.escanqradmin.presentation.theme.shape.AppShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -36,6 +38,7 @@ fun BluetoothConnectionPanel(
     onPairGate: (GateInfo) -> Unit,
     onUnpairGate: (GateInfo) -> Unit,
     onRegisterNew: () -> Unit,
+    onSendReportIp: (GateInfo) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(gates.isNotEmpty() && connectedGateName != null) }
@@ -97,7 +100,7 @@ fun BluetoothConnectionPanel(
                         Text(
                             "Bluetooth",
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         if (isFullyConnected) {
@@ -109,7 +112,7 @@ fun BluetoothConnectionPanel(
                         if (connectedGateName != null) "Conectado: $connectedGateName"
                         else if (gates.isEmpty()) "Sin tarjetas registradas"
                         else "${gates.size} tarjeta${if (gates.size != 1) "s" else ""} disponible${if (gates.size != 1) "s" else ""}",
-                        fontSize = 11.sp,
+                        style = MaterialTheme.typography.labelSmall,
                         color = if (isFullyConnected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.8f)
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -151,7 +154,8 @@ fun BluetoothConnectionPanel(
                                 onConnect = { onConnectToGate(gate) },
                                 onDisconnect = onDisconnect,
                                 onPair = { onPairGate(gate) },
-                                onUnpair = { onUnpairGate(gate) }
+                                onUnpair = { onUnpairGate(gate) },
+                                onSendReportIp = { onSendReportIp(gate) }
                             )
                             if (index < gates.lastIndex) {
                                 Spacer(Modifier.height(6.dp))
@@ -164,11 +168,11 @@ fun BluetoothConnectionPanel(
                     FilledTonalButton(
                         onClick = onRegisterNew,
                         modifier = Modifier.fillMaxWidth().height(42.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = AppShapes.Button
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Registrar tarjeta", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        Text("Registrar tarjeta", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.labelLarge)
                     }
                 }
             }
@@ -199,11 +203,22 @@ private fun GateConnectionCard(
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onPair: () -> Unit,
-    onUnpair: () -> Unit
+    onUnpair: () -> Unit,
+    onSendReportIp: () -> Unit = {}
 ) {
+    var sendingReport by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+
+    if (sendingReport) {
+        LaunchedEffect(Unit) {
+            delay(3000)
+            sendingReport = false
+        }
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = AppShapes.Button,
         color = if (isConnected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.06f)
                 else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
         border = if (isConnected) androidx.compose.foundation.BorderStroke(
@@ -253,7 +268,7 @@ private fun GateConnectionCard(
                     Text(
                         gate.name,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
+                        style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     if (isConnected) {
@@ -264,7 +279,7 @@ private fun GateConnectionCard(
                         ) {
                             Text(
                                 "Conectado",
-                                fontSize = 9.sp,
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.secondary,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -275,7 +290,7 @@ private fun GateConnectionCard(
                 Text(
                     if (gate.macAddress.isNotEmpty()) "MAC: ${gate.macAddress}"
                     else "BT: ${gate.btName}",
-                    fontSize = 10.sp,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -283,16 +298,44 @@ private fun GateConnectionCard(
             // Action
             when {
                 isConnected -> {
-                    TextButton(
-                        onClick = onDisconnect,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            "Desconectar",
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(if (sendingReport) "Enviando..." else "Reenviar IP", color = MaterialTheme.colorScheme.secondary) },
+                                    onClick = {
+                                        if (!sendingReport) {
+                                            sendingReport = true
+                                            onSendReportIp()
+                                            showMenu = false
+                                        }
+                                    },
+                                    leadingIcon = {
+                                        if (sendingReport) {
+                                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.secondary)
+                                        } else {
+                                            Icon(Icons.Default.Sync, contentDescription = null, tint = MaterialTheme.colorScheme.secondary)
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Desconectar", color = MaterialTheme.colorScheme.error) },
+                                    onClick = {
+                                        onDisconnect()
+                                        showMenu = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.BluetoothDisabled, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
                 isConnecting -> {
@@ -306,47 +349,47 @@ private fun GateConnectionCard(
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Button(
                             onClick = onConnect,
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = AppShapes.Chip,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
                             )
                         ) {
-                            Text("Conectar", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("Conectar", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                         }
-                        TextButton(
-                            onClick = onUnpair,
-                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.BluetoothDisabled,
-                                contentDescription = "Desvincular",
-                                modifier = Modifier.size(12.dp),
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Text(
-                                "Desvincular",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.error
-                            )
+                        Box {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Desvincular", color = MaterialTheme.colorScheme.error) },
+                                    onClick = {
+                                        onUnpair()
+                                        showMenu = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.BluetoothDisabled, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
                 else -> {
                     TextButton(
                         onClick = onPair,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
+                        ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 Icons.Default.Bluetooth,
                                 contentDescription = null,
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(16.dp)
                             )
-                            Spacer(Modifier.width(4.dp))
-                            Text("Vincular", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Vincular", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -371,18 +414,17 @@ private fun EmptyConnectionState(onRegisterNew: () -> Unit) {
         Text(
             "No hay tarjetas registradas",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 12.sp,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium
         )
         Spacer(Modifier.height(10.dp))
         Button(
             onClick = onRegisterNew,
-            shape = RoundedCornerShape(10.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text("Registrar primera", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            shape = AppShapes.Surface,
+            ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Registrar primera", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
         }
     }
 }

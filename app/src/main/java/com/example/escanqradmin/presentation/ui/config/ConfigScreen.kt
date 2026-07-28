@@ -1,6 +1,7 @@
 package com.example.escanqradmin.presentation.ui.config
 
 import androidx.compose.animation.*
+import com.example.escanqradmin.presentation.theme.shape.AppShapes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
@@ -33,9 +34,7 @@ import androidx.navigation.NavHostController
 import com.example.escanqradmin.domain.model.GateInfo
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
-import com.example.escanqradmin.presentation.theme.color.PrimaryBlue
-import com.example.escanqradmin.presentation.theme.color.SecondaryOrange
-import com.example.escanqradmin.presentation.theme.color.SurfaceGrey
+import com.example.escanqradmin.presentation.navigation.LocalSnackbarHostState
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -48,7 +47,7 @@ fun ConfigScreen(
     viewModel: ConfigViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarHostState = LocalSnackbarHostState.current
     var showHistory by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -59,7 +58,6 @@ fun ConfigScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0.dp),
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 windowInsets = WindowInsets(0.dp),
@@ -133,7 +131,7 @@ fun ConfigScreen(
                         Icon(
                             Icons.Default.Storage,
                             contentDescription = null,
-                            tint = SecondaryOrange,
+                            tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -314,6 +312,7 @@ fun ConfigurationCard(
     onEndpointGateUsersChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
+    var showAdvanced by remember { mutableStateOf(false) }
     AppCard(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -325,9 +324,9 @@ fun ConfigurationCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(AppShapes.Input)
                     .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), AppShapes.Input)
                     .padding(16.dp)
             ) {
                 Column {
@@ -343,7 +342,7 @@ fun ConfigurationCard(
                         text = previewUrl,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = if (host.isEmpty()) Color.Gray else MaterialTheme.colorScheme.onSurface,
+                        color = if (host.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -351,7 +350,7 @@ fun ConfigurationCard(
                         Text(
                             text = "Endpoints: $endpointSync, $endpointConductores, $endpointRegisterGate",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -365,14 +364,14 @@ fun ConfigurationCard(
                     "Protocolo",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(44.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(AppShapes.Button)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(4.dp)
                 ) {
@@ -398,14 +397,14 @@ fun ConfigurationCard(
                 label = { Text("Servidor / IP") },
                 placeholder = { Text("ej. api.servidor.com") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.Input,
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 leadingIcon = {
                     Icon(
                         if (host.matches(Regex("^\\d.*"))) Icons.Default.Router else Icons.Default.Language,
                         contentDescription = null,
-                        tint = if (host.isNotEmpty()) MaterialTheme.colorScheme.primary else Color.Gray
+                        tint = if (host.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 },
                 colors = OutlinedTextFieldDefaults.colors(
@@ -421,11 +420,11 @@ fun ConfigurationCard(
                     label = { Text("Puerto") },
                     placeholder = { Text("Opcional") },
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = AppShapes.Input,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     leadingIcon = {
-                        Icon(Icons.Default.Cable, null, tint = if (port.isNotEmpty()) SecondaryOrange else Color.Gray)
+                        Icon(Icons.Default.Cable, null, tint = if (port.isNotEmpty()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant)
                     },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.secondary
@@ -433,13 +432,22 @@ fun ConfigurationCard(
                 )
             }
 
-            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.2f), thickness = 1.dp)
+            
+            TextButton(
+                onClick = { showAdvanced = !showAdvanced },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (showAdvanced) "Ocultar configuración avanzada" else "Configuración avanzada")
+            }
+            AnimatedVisibility(visible = showAdvanced) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), thickness = 1.dp)
 
             Text(
                 "Rutas de API (Endpoints)",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             // Endpoint Sync
@@ -448,10 +456,10 @@ fun ConfigurationCard(
                 onValueChange = onEndpointSyncChange,
                 label = { Text("Ruta Control Acceso") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.Input,
                 singleLine = true,
                 leadingIcon = {
-                    Icon(Icons.Default.Upload, null, tint = Color.Gray)
+                    Icon(Icons.Default.Upload, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.secondary
@@ -464,10 +472,10 @@ fun ConfigurationCard(
                 onValueChange = onEndpointConductoresChange,
                 label = { Text("Ruta Conductores") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.Input,
                 singleLine = true,
                 leadingIcon = {
-                    Icon(Icons.Default.Download, null, tint = Color.Gray)
+                    Icon(Icons.Default.Download, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.secondary
@@ -480,10 +488,10 @@ fun ConfigurationCard(
                 onValueChange = onEndpointRegisterGateChange,
                 label = { Text("Ruta Registrar Portón") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.Input,
                 singleLine = true,
                 leadingIcon = {
-                    Icon(Icons.Default.AddCircle, null, tint = Color.Gray)
+                    Icon(Icons.Default.AddCircle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.secondary
@@ -496,10 +504,10 @@ fun ConfigurationCard(
                 onValueChange = onEndpointGatesListChange,
                 label = { Text("Ruta Listar Portones") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.Input,
                 singleLine = true,
                 leadingIcon = {
-                    Icon(Icons.Default.List, null, tint = Color.Gray)
+                    Icon(Icons.Default.List, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.secondary
@@ -512,10 +520,10 @@ fun ConfigurationCard(
                 onValueChange = onEndpointGateUpdateChange,
                 label = { Text("Ruta Actualizar Portón") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.Input,
                 singleLine = true,
                 leadingIcon = {
-                    Icon(Icons.Default.Edit, null, tint = Color.Gray)
+                    Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.secondary
@@ -528,16 +536,19 @@ fun ConfigurationCard(
                 onValueChange = onEndpointGateUsersChange,
                 label = { Text("Ruta Usuarios de Portón") },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.Input,
                 singleLine = true,
                 leadingIcon = {
-                    Icon(Icons.Default.Group, null, tint = Color.Gray)
+                    Icon(Icons.Default.Group, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.secondary
                 )
             )
 
+            
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
 
             Button(
@@ -545,7 +556,7 @@ fun ConfigurationCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = AppShapes.Input,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 enabled = !isLoading
             ) {
@@ -571,7 +582,7 @@ fun ProtocolOption(
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(AppShapes.Chip)
             .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
             .clickable { onClick() }
             .padding(horizontal = 16.dp),
@@ -580,7 +591,7 @@ fun ProtocolOption(
         Text(
             text = label,
             fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Medium,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp
         )
     }
@@ -609,9 +620,9 @@ fun HistoryCatalogItem(
                     .clip(CircleShape)
                     .background(
                         if (history.protocol == "https") {
-                            if (isSystemInDarkTheme()) Color(0xFF1B5E20).copy(alpha = 0.2f) else Color(0xFFE8F5E9)
+                            MaterialTheme.colorScheme.secondaryContainer
                         } else {
-                            if (isSystemInDarkTheme()) Color(0xFFE65100).copy(alpha = 0.2f) else Color(0xFFFFF3E0)
+                            MaterialTheme.colorScheme.tertiaryContainer
                         }
                     ),
                 contentAlignment = Alignment.Center
@@ -619,7 +630,7 @@ fun HistoryCatalogItem(
                 Icon(
                     imageVector = if (history.protocol == "https") Icons.Default.Lock else Icons.Default.LockOpen,
                     contentDescription = null,
-                    tint = if (history.protocol == "https") Color(0xFF4CAF50) else Color(0xFFFF9800),
+                    tint = if (history.protocol == "https") MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -639,15 +650,15 @@ fun HistoryCatalogItem(
                     Text(
                         text = "${history.protocol.uppercase()}${if (history.port.isEmpty()) "" else " : ${history.port}"}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(Color.LightGray))
+                    Box(modifier = Modifier.size(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.outline))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = formatTimestamp(history.timestamp),
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.LightGray
+                        color = MaterialTheme.colorScheme.outline
                     )
                 }
             }
@@ -656,7 +667,7 @@ fun HistoryCatalogItem(
                 Icon(
                     Icons.Default.DeleteOutline,
                     contentDescription = "Eliminar",
-                    tint = Color.LightGray,
+                    tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -678,14 +689,14 @@ fun EmptyHistoryPlaceholder() {
             Icon(
                 Icons.Default.History,
                 contentDescription = null,
-                tint = Color.LightGray.copy(alpha = 0.5f),
+                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
                 modifier = Modifier.size(48.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 "Sin historial reciente",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.LightGray,
+                color = MaterialTheme.colorScheme.outline,
                 textAlign = TextAlign.Center
             )
         }

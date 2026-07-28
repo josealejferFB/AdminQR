@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.example.escanqradmin.domain.repository.ThemeRepository
 import com.example.escanqradmin.domain.repository.BluetoothRepository
 import com.example.escanqradmin.domain.repository.HistoryRepository
@@ -45,7 +47,8 @@ data class HomeUiState(
     val isServerOnline: Boolean = true,
     val gates: List<GateInfo> = emptyList(),
     val selectedMacAddress: String? = null,
-    val gateUsers: List<ActiveUser> = emptyList()
+    val gateUsers: List<ActiveUser> = emptyList(),
+    val showOnboarding: Boolean = false
 )
 
 @HiltViewModel
@@ -85,6 +88,10 @@ class HomeViewModel @Inject constructor(
     // SharedFlow para eventos únicos de UI (como el Snackbar)
     private val _snackbarMessages = MutableSharedFlow<String>()
     val snackbarMessages = _snackbarMessages.asSharedFlow()
+
+    fun postSnackbar(message: String) {
+        _snackbarMessages.tryEmit(message)
+    }
 
     // true = la desconexión fue iniciada por el usuario
     @Volatile private var isManualDisconnect = false
@@ -144,8 +151,13 @@ class HomeViewModel @Inject constructor(
         loadGates()
     }
 
-    init {
+        private val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+
+init {
         _localGates.value = loadLocalGates()
+        if (!prefs.getBoolean("has_seen_onboarding", false)) {
+            _uiState.update { it.copy(showOnboarding = true) }
+        }
         observeHistory()
         observeBluetoothConnection()
         observeGatesForUserResolution()
@@ -199,6 +211,9 @@ class HomeViewModel @Inject constructor(
                         isManualDisconnect = false
                         isConnecting = false
                     }
+                    is BluetoothConnectionState.Error, BluetoothConnectionState.Idle -> {
+                        isConnecting = false
+                    }
                     else -> { /* nada especial */ }
                 }
 
@@ -249,7 +264,7 @@ class HomeViewModel @Inject constructor(
             val isConnected = bluetoothConnectionState.value is BluetoothConnectionState.Connected
             if (isConnected) {
                 val currentAddress = (bluetoothConnectionState.value as BluetoothConnectionState.Connected).deviceAddress
-                if (currentAddress == gate.macAddress) {
+                if (currentAddress.equals(gate.macAddress, ignoreCase = true)) {
                     _snackbarMessages.emit("Ya conectado a ${gate.name}")
                     return@launch
                 }
@@ -263,7 +278,7 @@ class HomeViewModel @Inject constructor(
     fun getConnectedGate(gates: List<GateInfo>): GateInfo? {
         val state = bluetoothConnectionState.value
         if (state is BluetoothConnectionState.Connected) {
-            return gates.firstOrNull { it.macAddress == state.deviceAddress }
+            return gates.firstOrNull { it.macAddress.equals(state.deviceAddress, ignoreCase = true) }
         }
         return null
     }
@@ -351,7 +366,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    fun updateUser(user: ActiveUser) {
+    fun updateUser(user: ActiveUser, addGateIds: List<Int> = emptyList(), removeGateIds: List<Int> = emptyList()) {
         viewModelScope.launch {
             val qrContent = com.example.escanqradmin.domain.model.QrContent(
                 androidId = user.id,
@@ -360,7 +375,7 @@ class HomeViewModel @Inject constructor(
                 plate     = user.plate,
                 authorizedGates = user.authorizedGates
             )
-            syncRepository.updateEntry(qrContent).onSuccess {
+            syncRepository.updateEntry(qrContent, addGateIds, removeGateIds).onSuccess {
                 repository.updateRecord(qrContent)
                 _snackbarMessages.emit("Usuario modificado correctamente")
                 _uiState.update { it.copy(isServerOnline = true) }
@@ -371,8 +386,52 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    fun deleteGate(gateId: Int) {
+        viewModelScope.launch {
+            gateRepository.deleteGate(gateId).onSuccess {
+                val updatedGates = _uiState.value.gates.filter { it.id != gateId }
+                _uiState.update { it.copy(gates = updatedGates) }
+                _snackbarMessages.emit("Portón eliminado correctamente")
+            }.onFailure { e ->
+                _snackbarMessages.emit("Error al eliminar portón: ${e.message}")
+            }
+        }
+    }
+
     suspend fun sendMessageAndWaitForReply(message: String, timeoutMs: Long = 10000): String? {
         return bluetoothRepository.sendMessageAndWaitForReply(message, timeoutMs)
+    }
+
+    /**
+     * Envía comando report_ip al ESP32 conectado para que re-envíe
+     * su MAC e IP a Odoo (auto-discovery recovery).
+     */
+    suspend fun sendReportIp(): Boolean {
+        val payload = """{"action":"report_ip"}"""
+        val response = bluetoothRepository.sendMessageAndWaitForReply(payload, timeoutMs = 15000)
+        if (response == null) return false
+        return try {
+            val obj = Json.parseToJsonElement(response).jsonObject
+            obj["status"]?.jsonPrimitive?.content == "success"
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun sendReportIpWithFeedback() {
+        viewModelScope.launch {
+            val ok = sendReportIp()
+            _snackbarMessages.emit(
+                if (ok) "IP reenviada a Odoo correctamente"
+                else "Error al reenviar IP. Verifica la conexión Bluetooth."
+            )
+        }
+    }
+
+    
+    fun dismissOnboarding() {
+        prefs.edit().putBoolean("has_seen_onboarding", true).apply()
+        _uiState.update { it.copy(showOnboarding = false) }
     }
 
     fun refreshData() {

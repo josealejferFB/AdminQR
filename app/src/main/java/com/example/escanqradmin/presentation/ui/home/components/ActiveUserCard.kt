@@ -43,12 +43,13 @@ fun ActiveUserCard(
     user: ActiveUser,
     gates: List<GateInfo>,
     onDelete: () -> Unit,
-    onUpdate: (ActiveUser) -> Unit
+    onUpdate: (ActiveUser, addGateIds: List<Int>, removeGateIds: List<Int>) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     var name by remember(user) { mutableStateOf(user.name) }
     var plate by remember(user) { mutableStateOf(user.plate) }
     var selectedGates by remember(user) { mutableStateOf(user.authorizedGates.toSet()) }
+    val initialGates = remember(user) { user.authorizedGates.toSet() }
 
     val status = statusColor(user.status)
     val noRipple = remember { MutableInteractionSource() }
@@ -274,13 +275,19 @@ fun ActiveUserCard(
                         Button(
                             onClick = {
                                 val resolvedNames = gates.filter { it.macAddress in selectedGates }.map { it.name }
+                                val addedMACs = selectedGates - initialGates
+                                val removedMACs = initialGates - selectedGates
+                                val addedIds = addedMACs.mapNotNull { mac -> gates.find { it.macAddress == mac }?.id }
+                                val removedIds = removedMACs.mapNotNull { mac -> gates.find { it.macAddress == mac }?.id }
                                 onUpdate(
                                     user.copy(
                                         name = name,
                                         plate = plate,
                                         authorizedGates = selectedGates.toList(),
                                         authorizedGateNames = resolvedNames
-                                    )
+                                    ),
+                                    addedIds,
+                                    removedIds
                                 )
                                 isExpanded = false
                             },

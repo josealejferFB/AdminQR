@@ -18,7 +18,7 @@
 
 - **Protocolo:** Bluetooth Classic SPP (Serial Port Profile)
 - **UUID SPP:** `00001101-0000-1000-8000-00805F9B34FB`
-- **Nombre del dispositivo:** `ESP32_Seguro` (configurado en `SerialBT.begin("ESP32_Seguro")`)
+- **Nombre del dispositivo:** `ESP32_Seguro` (por defecto, configurable vía `set_bt_name` o `bt_name` en `config_network`)
 - **Baudrate:** 115200 (solo para debug serial, no influye en BT)
 
 ### Descubrimiento desde la app Admin
@@ -59,7 +59,7 @@ socket?.outputStream?.write("$message\n".toByteArray())
 
 Se lee el stream de entrada con un buffer de 1024 bytes. Los mensajes se dividen por `\n` (el ESP32 usa `SerialBT.println()` que termina con `\n`). Cada línea completa se emite al `SharedFlow<String>` del repositorio.
 
-## Máquina de Estados del ESP32 (V7)
+## Máquina de Estados del ESP32 (V9)
 
 El ESP32 corre una máquina de estados que determina qué comandos acepta vía Bluetooth.
 
@@ -67,47 +67,56 @@ El ESP32 corre una máquina de estados que determina qué comandos acepta vía B
 
 ```
 ESPERA_CONEXION (0)  →  MODO_CONFIG_BT (1)
-                             ├─ "config" → MODO_CONFIG_ODOO (2)
-                             └─ "wifi"   → MODO_WIFI_SSID (3)
-                                            └─ MODO_WIFI_PASS (4)
-                                                 └─ REINICIANDO
+                             ├─ "config" → MODO_CONFIG_ODOO (2)   [ELIMINADO en V9]
+                             └─ JSON directo (config_network / set_bt_name / set_hostname)
+                                                                      └─ MODO_CONECTANDO_WIFI (5) — asíncrono
 ```
 
 | Estado | Valor | Descripción |
 |---|---|---|
-| `ESPERA_CONEXION` | 0 | Idle. Parpadea LED. Espera conexión BT. WebServer HTTP activo. |
-| `MODO_CONFIG_BT` | 1 | Cliente BT conectado. Solo acepta los comandos `config` o `wifi`. |
-| `MODO_CONFIG_ODOO` | 2 | Espera JSON `{protocolo, ip_odoo, port}`. |
-| `MODO_WIFI_SSID` | 3 | Espera SSID de red WiFi. |
-| `MODO_WIFI_PASS` | 4 | Espera contraseña WiFi. Guarda y reinicia. |
+| `ESPERA_CONEXION` | 0 | Idle. Parpadea LED. WebServer HTTP activo. Reconexión WiFi automática (max 3 intentos). |
+| `MODO_CONFIG_BT` | 1 | Cliente BT conectado. Acepta comandos JSON: `config_network`, `set_bt_name`, `set_hostname`. |
+| `MODO_WIFI_SSID` | 3 | (Legacy) Espera SSID de red WiFi por texto. |
+| `MODO_WIFI_PASS` | 4 | (Legacy) Espera contraseña WiFi por texto. Guarda y reinicia. |
+| `MODO_CONECTANDO_WIFI` | 5 | (V7+) Conexión WiFi asíncrona no bloqueante. Procesa BT solo para limpiar buffer. |
 
-### Diagrama de flujo
+### Diagrama de flujo (V9)
 
 ```
-            ┌─────────────────┐
-            │  ESPERA_CONEXION │ ◄──── WebServer HTTP siempre activo
-            └────────┬────────┘
+            ┌──────────────────────┐
+            │   ESPERA_CONEXION     │ ◄──── WebServer HTTP siempre activo
+            │ Reconexión WiFi auto  │        Reconexión WiFi automática (max 3)
+            │ Parpadeo LED          │
+            └────────┬─────────────┘
                      │ SerialBT.hasClient() = true
                      ▼
-            ┌─────────────────┐
-            │  MODO_CONFIG_BT  │
-            └───┬─────────┬───┘
-       "config" │         │ "wifi"
-                ▼         ▼
-    ┌──────────────────┐  ┌──────────────────┐
-    │ MODO_CONFIG_ODOO │  │ MODO_WIFI_SSID   │
-    │ Espera JSON...   │  │ Espera SSID...   │
-    └────────┬─────────┘  └────────┬─────────┘
-             │                     │
-             │                     ▼
-             │              ┌──────────────────┐
-             │              │ MODO_WIFI_PASS   │
-             │              │ Espera Password  │
-             │              └────────┬─────────┘
-             │                       │ Guarda y reinicia
-             ▼                       ▼
-      Vuelve a ESPERA_CONEXION    REINICIANDO
-      (tras mostrar mensaje)
+            ┌──────────────────────┐
+            │    MODO_CONFIG_BT     │
+            │ Timeout: 30s          │
+            └───┬──────────┬───────┘
+       JSON    │          │  "wifi" (legacy)
+               ▼          ▼
+   ┌────────────────────┐  ┌──────────────────┐
+   │ Procesa JSON       │  │ MODO_WIFI_SSID   │
+   │  • config_network  │  │ (legacy V6)       │
+   │  • set_bt_name     │  └────────┬─────────┘
+   │  • set_hostname    │           ▼
+   └────────┬───────────┘  ┌──────────────────┐
+            │              │ MODO_WIFI_PASS   │
+            │              │ (legacy V6)       │
+            │              └────────┬─────────┘
+            │                       │ Guarda y reinicia
+            ▼                       ▼
+   ┌────────────────────┐      REINICIANDO
+   │ MODO_CONECTANDO_WIFI│
+   │ WiFi asíncrono      │
+   │ Timeout: 30s        │
+   │ Max 3 reintentos    │
+   └────────┬───────────┘
+            │ WiFi OK
+            ▼
+   ESPERA_CONEXION
+   (BT reiniciado con nuevo nombre si cambió)
 ```
 
 ### Timeouts
@@ -115,56 +124,89 @@ ESPERA_CONEXION (0)  →  MODO_CONFIG_BT (1)
 | Estado | Timeout |
 |---|---|
 | `MODO_CONFIG_BT` | 30 segundos |
-| `MODO_CONFIG_ODOO` | 30 segundos |
-| `MODO_WIFI_SSID` | 60 segundos |
-| `MODO_WIFI_PASS` | 60 segundos |
-| `MODO_CONECTANDO_WIFI` | 30 segundos | [V7] |
+| `MODO_WIFI_SSID` | 60 segundos (legacy) |
+| `MODO_WIFI_PASS` | 60 segundos (legacy) |
+| `MODO_CONECTANDO_WIFI` | 30 segundos (max 3 intentos totales) |
 
-Al expirar, el ESP32 envía `"TIMEOUT"` y vuelve a `ESPERA_CONEXION`.
+Al expirar el timeout o superar los reintentos, el ESP32 vuelve a `ESPERA_CONEXION` y muestra error en pantalla. Si se superan los 3 intentos de WiFi, se enciende LED_ERROR fijo.
 
-## Comandos y Respuestas
+## Comandos y Respuestas (V9)
 
-### Comandos que acepta el ESP32
+### Comandos JSON que acepta el ESP32
 
-| Comando | Estado Requerido | Descripción |
-|---|---|---|
-| `config` | `MODO_CONFIG_BT` | Inicia configuración de URL de Odoo |
-| `wifi` | `MODO_CONFIG_BT` | Inicia configuración de red WiFi |
-
-Cualquier otro comando en `MODO_CONFIG_BT` recibe `CMD_DESCONOCIDO`.
-
-### Códigos de respuesta del ESP32
-
-| Respuesta | Significado |
+| Comando | Descripción |
 |---|---|
-| `OK_CONFIG` | Listo para recibir JSON de configuración Odoo |
-| `SSID:` | Solicita el nombre de la red WiFi |
-| `PASS:` | Solicita la contraseña WiFi |
-| `CONFIG_OK` | Configuración Odoo guardada exitosamente |
-| `ERROR_IP` | El JSON no incluyó IP (campo `ip_odoo` vacío) |
-| `JSON_ERROR` | El JSON enviado no es válido |
-| `TIMEOUT` | Se agotó el tiempo de espera para responder |
-| `CMD_DESCONOCIDO` | Comando no reconocido en el estado actual |
-| `REINICIANDO` | WiFi configurado, el ESP32 se reinicia |
-| `SISTEMA LISTO` | Mensaje de estado idle en la pantalla OLED (no se envía por BT) |
+| `config_network` | Configura WiFi, nombre BT, hostname e IoT token en un solo JSON |
+| `set_bt_name` | Cambia el nombre Bluetooth en caliente |
+| `set_hostname` | Cambia el hostname DHCP y reinicia |
 
-## Configuración de Odoo vía Bluetooth (Comando `config`)
+Cualquier comando no reconocido recibe `{"status":"error","message":"Acción desconocida"}`.
 
-1. Admin envía `"config"` → ESP32 responde `"OK_CONFIG"`
+### Comando legacy texto
+
+| Comando | Descripción |
+|---|---|
+| `wifi` | (Legacy V6) Configuración secuencial de WiFi: SSID → PASS → reinicia |
+
+### Formato de respuesta del ESP32
+
+Todas las respuestas exitosas a comandos JSON son en formato JSON:
+
+```json
+{"status":"success","mac_address":"A1:B2:C3:D4:E5:F6","message":"Red configurada"}
+```
+
+Respuestas de error:
+```json
+{"status":"error","message":"SSID requerido"}
+```
+
+## Configuración Completa vía Bluetooth (Comando `config_network`)
+
+Este es el flujo principal en V9. La app Admin envía un solo JSON con todos los parámetros:
+
+1. Admin se conecta al ESP32 por Bluetooth
 2. Admin envía JSON:
    ```json
    {
-       "protocolo": "http",
-       "ip_odoo": "192.168.1.100",
-       "port": 8059
+       "action": "config_network",
+       "ssid": "MiRed",
+       "password": "password123",
+       "bt_name": "ESP32_Puerta1",
+       "hostname": "porton-principal",
+       "iot_token": "iot_secret_2024"
    }
    ```
-3. ESP32 construye la URL: `{protocolo}://{ip_odoo}:{port}/api/update_esp_ip`
-   - Omite el puerto si es estándar (80 para http, 443 para https)
-4. Responde `"CONFIG_OK"` o `"ERROR_IP"`/`"JSON_ERROR"`
-5. La URL se guarda en NVS (Preferences, clave `odoo_url`)
+3. ESP32 guarda todo en NVS y responde: `{"status":"success","mac_address":"...","message":"Red configurada"}`
+4. ESP32 inmediatamente entra en `MODO_CONECTANDO_WIFI` (no reinicia, no corta BT)
+5. Mientras WiFi conecta, el teléfono permanece conectado por BT (el BT restart se hace DESPUÉS de WiFi exitoso)
+6. Al conectar WiFi: BT se reinicia con el nuevo nombre, se reporta IP a Odoo, se inicia WebServer
+7. Si WiFi falla tras 3 intentos: LED_ERROR fijo, muestra "WIFI ERROR / Sin conexion / Reintente via BT"
 
-## Configuración de WiFi vía Bluetooth (Comando `wifi`)
+**Campos opcionales:** `bt_name`, `hostname`, `iot_token` — si no se envían, se mantienen los valores actuales.
+
+## Comando `set_bt_name`
+
+```json
+{"action":"set_bt_name","name":"ESP32_Puerta1"}
+```
+
+- Cambia el nombre Bluetooth en caliente
+- Responde: `{"status":"success","message":"Nombre BT actualizado"}`
+- Persiste en NVS (clave `bt_name`)
+
+## Comando `set_hostname`
+
+```json
+{"action":"set_hostname","hostname":"porton-principal"}
+```
+
+- Cambia el hostname DHCP
+- Responde: `{"status":"success","message":"Hostname configurado"}`
+- Persiste en NVS (clave `hostname`)
+- **Reinicia el ESP32** para aplicar el cambio
+
+## Configuración de WiFi vía Bluetooth (Comando legacy `wifi`)
 
 1. Admin envía `"wifi"` → ESP32 responde `"SSID:"`
 2. Admin envía el SSID de la red → ESP32 responde `"PASS:"`
@@ -193,21 +235,41 @@ El ESP32 corre un servidor HTTP en el puerto 80 cuando tiene WiFi configurado.
 
 **Propósito:** El ESP32 reporta su IP al Odoo.
 
-- Se llama al iniciar (si WiFi configurado) y al reconfigurar
-- Body: `{"jsonrpc":"2.0","method":"call","params":{"ip":"192.168.x.x"}}`
-- La URL de destino es la configurada vía Bluetooth (`odoo_url`)
+- Se llama al iniciar (si WiFi configurado) y al conectar WiFi post-configuración
+- Body: `{"jsonrpc":"2.0","params":{"iot_token":"...","mac_address":"...","ip":"192.168.x.x","hostname":"..."}}`
+- La URL de destino es la configurada vía Bluetooth (valor por defecto: `http://192.168.1.100:8059/api/update_esp_ip`)
+- Hasta 3 intentos con backoff (5s / 15s / 30s)
+
+### `GET /status`
+
+Expone el estado interno del ESP32:
+
+```json
+{
+    "mac": "A1:B2:C3:D4:E5:F6",
+    "wifi": "connected" | "connecting" | "disconnected",
+    "ip": "192.168.1.100",
+    "uptime": 3600,
+    "bt_name": "ESP32_Puerta1",
+    "hostname": "porton-principal"
+}
+```
 
 ## Persistencia en el ESP32
 
 El ESP32 usa la librería `Preferences` (NVS) para almacenar:
 
-| Clave | Valor |
-|---|---|
-| `ssid` | Nombre de red WiFi |
-| `pass` | Contraseña WiFi |
-| `odoo_url` | URL completa del endpoint Odoo para reporte de IP |
-
-Valor por defecto de `odoo_url`: `http://192.168.1.100:8059/api/update_esp_ip`
+| Clave | Valor | Default |
+|---|---|---|
+| `ssid` | Nombre de red WiFi | — |
+| `pass` | Contraseña WiFi | — |
+| `bt_name` | Nombre Bluetooth | `"ESP32_Seguro"` |
+| `hostname` | Nombre host DHCP | `"esp32-" + últimos 6 dígitos MAC |
+| `iot_token` | Token IoT para auto-reporte | `"iot_secret_2024"` |
+| `odoo_url` | URL endpoint Odoo | `http://192.168.1.100:8059/api/update_esp_ip` |
+| `static_ip` | IP estática (V8) | — |
+| `static_gateway` | Gateway estático (V8) | — |
+| `static_netmask` | Máscara estática (V8) | — |
 
 ## Consola Bluetooth en la App Admin
 
@@ -215,7 +277,6 @@ La pantalla `ESPConfigScreen` implementa una consola tipo terminal para interact
 
 - **Modo libre (IDLE):** barra de comandos donde se puede escribir cualquier texto
 - **Modo guiado:** formularios que se muestran automáticamente según la respuesta del ESP32:
-  - `WAIT_JSON_CONFIG`: campos Protocolo, IP Odoo, Puerto
   - `WAIT_WIFI_SSID`: campo SSID
   - `WAIT_WIFI_PASS`: campo Password
 - **Botones rápidos:** "Config" y "WiFi" para enviar los comandos raíz
@@ -226,44 +287,38 @@ La pantalla `ESPConfigScreen` implementa una consola tipo terminal para interact
 ```kotlin
 enum class EspFlowState {
     IDLE,
-    WAIT_JSON_CONFIG,   // Espera JSON {protocolo, ip_odoo, port}
     WAIT_WIFI_SSID,     // Espera SSID
     WAIT_WIFI_PASS,     // Espera Password
 }
 ```
 
-El ViewModel escucha los mensajes del ESP32 y avanza automáticamente entre estados:
-
-```kotlin
-when (msg) {
-    "OK_CONFIG"  -> WAIT_JSON_CONFIG
-    "SSID:"      -> WAIT_WIFI_SSID
-    "PASS:"      -> WAIT_WIFI_PASS
-    // Cualquier terminal vuelve a IDLE
-}
-```
-
 ### Terminales que finalizan el flujo
 
-- `CONFIG_OK`
-- `ERROR_IP`
-- `JSON_ERROR`
 - `TIMEOUT`
 - `CMD_DESCONOCIDO`
 - `REINICIANDO`
-- `SISTEMA LISTO` (por prefijo)
+- Cualquier respuesta JSON completa
 
-## V8 — Nuevas Funcionalidades
+## V8/V9 — Comandos JSON y Configuraciones Avanzadas
 
-A partir de V8 se añadieron comandos JSON y configuración de IP estática y nombre Bluetooth.
+### Resumen de cambios V9 respecto a V8
 
-### Comandos JSON (V8)
-
-| Comando | Estado Requerido | Descripción |
+| Cambio | V8 | V9 |
 |---|---|---|
-| `config_ip` | `MODO_CONFIG_BT` | Recibe JSON con `ip`, `gateway`, `netmask`. Guarda en Preferences y reinicia. |
-| `set_bt_name` | `MODO_CONFIG_BT` | Recibe JSON con `name`. Cambia nombre BT en caliente y persiste en Preferences. |
-| `config_network` | `MODO_CONFIG_BT` | Ahora acepta `bt_name` opcional además de `ssid`/`pass`. |
+| Protocolo texto V6 (`config`, `wifi` legacy) | Soporte completo | Solo `wifi` legacy, `config` eliminado |
+| `MODO_CONFIG_ODOO` | Existente | Eliminado |
+| BT restart en `config_network` | Inmediato, cortaba conexión | Diferido hasta después de WiFi OK |
+| Reconexión WiFi automática | Infinita | Máximo 3 intentos, luego error fijo |
+| Limpieza buffer BT durante WiFi | No | Sí (evita saturación) |
+
+### Comandos JSON disponibles (V8+)
+
+| Comando | Descripción |
+|---|---|
+| `config_ip` | Configura IP estática, gateway, netmask. Guarda y reinicia. [Eliminado en V9] |
+| `set_bt_name` | Cambia nombre Bluetooth en caliente. |
+| `set_hostname` | Cambia hostname DHCP. Reinicia. |
+| `config_network` | Configura WiFi + bt_name + hostname + iot_token en un solo JSON. |
 
 #### `config_ip`
 
@@ -283,48 +338,25 @@ A partir de V8 se añadieron comandos JSON y configuración de IP estática y no
 #### `set_bt_name`
 
 ```json
-{
-    "name": "ESP32_Puerta1"
-}
+{"action":"set_bt_name","name":"ESP32_Puerta1"}
 ```
 
-- Cambia el nombre Bluetooth en caliente usando `SerialBT.flush()` y reiniciando SPP
+- Cambia el nombre Bluetooth en caliente reiniciando SPP
 - Persiste el nombre en Preferences (clave `bt_name`)
 - En boot, si existe la clave `bt_name`, lo usa en `SerialBT.begin(bt_name)`
-- Responde `"CONFIG_OK"` o `"JSON_ERROR"`
+- Responde `{"status":"success","message":"Nombre BT actualizado"}`
 - El nombre BT se expone en `GET /status` como campo `bt_name`
 
-#### `config_network` (mejorado)
+#### `set_hostname`
 
 ```json
-{
-    "ssid": "MiRed",
-    "pass": "password123",
-    "bt_name": "ESP32_Puerta1"
-}
+{"action":"set_hostname","hostname":"porton-principal"}
 ```
 
-- `bt_name` es opcional. Si se incluye, actualiza el nombre BT además del WiFi.
-- Mantiene compatibilidad hacia atrás con el flujo `wifi` (V7).
-
-### Estados V8
-
-Sin cambios respecto a V7. La máquina de estados sigue siendo:
-
-```
-ESPERA_CONEXION (0) → MODO_CONFIG_BT (1)
-                         ├─ "config" → MODO_CONFIG_ODOO (2)
-                         ├─ "wifi"   → MODO_WIFI_SSID (3)
-                         │              └─ MODO_WIFI_PASS (4)
-                         │                   └─ REINICIANDO
-                         ├─ "config_ip"     → guarda IP y reinicia
-                         ├─ "set_bt_name"   → cambia BT name
-                         └─ "config_network" → guarda WiFi + BT name
-```
-
-### Timeouts V8
-
-Sin cambios respecto a V7.
+- Cambia el hostname DHCP
+- Persiste en NVS (clave `hostname`)
+- Responde `{"status":"success","message":"Hostname configurado"}`
+- **Reinicia el ESP32** para aplicar el cambio
 
 ### IP Estática
 
@@ -339,12 +371,3 @@ Sin cambios respecto a V7.
 - **Aplicación en boot:** si existe, se pasa a `SerialBT.begin(bt_name)`
 - **Cambio en caliente:** vía `set_bt_name` o `bt_name` en `config_network`
 - **Exposición:** campo `bt_name` en `GET /status`
-
-### Persistencia V8 (adicional a V7)
-
-| Clave | Valor |
-|---|---|
-| `static_ip` | IP estática (String) |
-| `static_gateway` | Gateway (String) |
-| `static_netmask` | Máscara de red (String) |
-| `bt_name` | Nombre Bluetooth personalizado (String) |

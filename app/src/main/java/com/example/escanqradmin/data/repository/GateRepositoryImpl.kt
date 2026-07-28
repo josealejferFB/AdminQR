@@ -12,6 +12,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -75,6 +76,49 @@ class GateRepositoryImpl @Inject constructor(
                             Result.success(gateInfos)
                         } else {
                             Result.failure(Exception(gateResponse.message ?: "Error desconocido"))
+                        }
+                    }
+                } else {
+                    Result.failure(Exception("Error ${response.code}: ${response.message}"))
+                }
+            }
+        } catch (e: Exception) {
+            Result.failure(friendly(e))
+        }
+    }
+
+    override suspend fun deleteGate(gateId: Int): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            val jsonBody = buildJsonObject {
+                put("jsonrpc", "2.0")
+                put("params", buildJsonObject {
+                    put("gate_id", gateId)
+                })
+            }.toString()
+
+            val request = Request.Builder()
+                .url(ApiConstants.Endpoints.GATE_DELETE)
+                .addHeader("Content-Type", "application/json")
+                .post(jsonBody.toRequestBody(mediaType))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val bodyString = response.body?.string() ?: throw Exception("Empty body")
+                    val jsonElement = json.parseToJsonElement(bodyString)
+                    val jsonObject = jsonElement.jsonObject
+
+                    if (jsonObject.containsKey("error")) {
+                        val errObj = jsonObject["error"]
+                        Result.failure(Exception("Odoo Error: $errObj"))
+                    } else {
+                        val resultObj = jsonObject["result"]?.jsonObject ?: throw Exception("Missing result in response")
+                        val isSuccess = resultObj["success"]?.jsonPrimitive?.booleanOrNull ?: false
+                        if (isSuccess) {
+                            Result.success(Unit)
+                        } else {
+                            val msg = resultObj["message"]?.jsonPrimitive?.content ?: "Error desconocido"
+                            Result.failure(Exception(msg))
                         }
                     }
                 } else {

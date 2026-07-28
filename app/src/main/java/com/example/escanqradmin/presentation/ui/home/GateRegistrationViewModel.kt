@@ -80,6 +80,19 @@ class GateRegistrationViewModel @Inject constructor(
         coerceInputValues = true
     }
 
+    /** Envía comando report_ip al ESP32 para re-enviar MAC+IP a Odoo */
+    suspend fun sendReportIp(): Boolean {
+        val payload = """{"action":"report_ip"}"""
+        val response = bluetoothRepository.sendMessageAndWaitForReply(payload, timeoutMs = 15000)
+        if (response == null) return false
+        return try {
+            val obj = json.parseToJsonElement(response).jsonObject
+            obj["status"]?.jsonPrimitive?.content == "success"
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private var lastDeviceAddress: String? = null
     private var verificationJob: Job? = null
 
@@ -178,7 +191,7 @@ class GateRegistrationViewModel @Inject constructor(
                 put("iot_token", SecurityConstants.IOT_TOKEN)
             }.toString()
 
-            val response = bluetoothRepository.sendMessageAndWaitForReply(payload)
+            val response = bluetoothRepository.sendMessageAndWaitForReply(payload, 40000L)
 
             if (response == null) {
                 _uiState.update { it.copy(step = GateStep.Error("No se recibió respuesta del ESP32"), isSubmitting = false) }
@@ -192,8 +205,36 @@ class GateRegistrationViewModel @Inject constructor(
                 if (status == "success") {
                     val mac = obj["mac_address"]?.jsonPrimitive?.content
                     if (mac != null) {
-                        _uiState.update { it.copy(step = GateStep.VerifyingWifi, macAddress = mac, isSubmitting = true) }
-                        verifyWiFiConnection()
+                        _uiState.update { it.copy(step = GateStep.RegisteringInOdoo, macAddress = mac, isSubmitting = true) }
+                        
+                        syncRepository.registerGate(state.gateName, mac)
+                            .onSuccess { response ->
+                                val gateId = response.gateId
+                                val msg = response.message ?: "Portón registrado exitosamente"
+                                _uiState.update {
+                                    it.copy(
+                                        step = GateStep.LocalDone(odooId = gateId, message = msg),
+                                        odooRegistered = true,
+                                        odooMessage = msg,
+                                        isSubmitting = false
+                                    )
+                                }
+                                _events.emit(GateRegistrationEvent.GateRegisteredInOdoo(
+                                    name = state.gateName,
+                                    macAddress = mac,
+                                    btName = state.gateName,
+                                    hostname = safeHostname,
+                                    odooId = gateId
+                                ))
+                            }
+                            .onFailure { e ->
+                                _uiState.update {
+                                    it.copy(
+                                        step = GateStep.Error("Error al registrar en Odoo: ${e.message}"),
+                                        isSubmitting = false
+                                    )
+                                }
+                            }
                     } else {
                         _uiState.update { it.copy(step = GateStep.Error("Respuesta del ESP32 no contiene mac_address"), isSubmitting = false) }
                     }
@@ -207,97 +248,7 @@ class GateRegistrationViewModel @Inject constructor(
         }
     }
 
-    private fun verifyWiFiConnection() {
-        verificationJob?.cancel()
-        verificationJob = viewModelScope.launch {
-            val address = lastDeviceAddress
-            if (address == null) {
-                _uiState.update { it.copy(step = GateStep.Error("Error interno"), isSubmitting = false) }
-                return@launch
-            }
 
-            // Esperar 5s iniciales para que el ESP32 procese WiFi
-            delay(5000)
-
-            val startTime = System.currentTimeMillis()
-            val maxDuration = 50_000L
-            var attempt = 0
-
-            while (System.currentTimeMillis() - startTime < maxDuration) {
-                attempt++
-                bluetoothRepository.disconnect()
-                delay(500)
-                bluetoothRepository.connectToDevice(address)
-
-                val connected = try {
-                    withTimeout(8000) {
-                        bluetoothRepository.connectionState.first { state ->
-                            state is BluetoothConnectionState.Connected || state is BluetoothConnectionState.Error
-                        }
-                    }
-                    bluetoothRepository.connectionState.value is BluetoothConnectionState.Connected
-                } catch (_: Exception) {
-                    false
-                }
-
-                if (connected) {
-                    val state = _uiState.value
-                    val safeHostname = state.gateName.lowercase()
-                        .replace(Regex("[^a-z0-9-]"), "-")
-                        .trim('-')
-                        .take(63)
-                        .ifEmpty { "gate" }
-
-                    _uiState.update { it.copy(step = GateStep.RegisteringInOdoo, isSubmitting = true) }
-
-                    syncRepository.registerGate(state.gateName, state.macAddress)
-                        .onSuccess { response ->
-                            val gateId = response.gateId
-                            val msg = response.message ?: "Portón registrado exitosamente"
-                            _uiState.update {
-                                it.copy(
-                                    step = GateStep.LocalDone(odooId = gateId, message = msg),
-                                    odooRegistered = true,
-                                    odooMessage = msg,
-                                    isSubmitting = false
-                                )
-                            }
-                            bluetoothRepository.disconnect()
-                            _events.emit(GateRegistrationEvent.GateRegisteredInOdoo(
-                                name = state.gateName,
-                                macAddress = state.macAddress,
-                                btName = state.gateName,
-                                hostname = safeHostname,
-                                odooId = gateId
-                            ))
-                            _events.emit(GateRegistrationEvent.CloseDialog)
-                            resetState()
-                        }
-                        .onFailure { e ->
-                            _uiState.update {
-                                it.copy(
-                                    step = GateStep.Error("Error al registrar en Odoo: ${e.message}"),
-                                    isSubmitting = false
-                                )
-                            }
-                        }
-                    return@launch
-                }
-
-                // Backoff progresivo entre reintentos
-                if (System.currentTimeMillis() - startTime < maxDuration) {
-                    delay(minOf(2000L * attempt, 10_000L))
-                }
-            }
-
-            _uiState.update {
-                it.copy(
-                    step = GateStep.Error("No se pudo reconectar con el ESP32 tras enviar la configuración WiFi. Verifica que el nombre de red y contraseña sean correctos."),
-                    isSubmitting = false
-                )
-            }
-        }
-    }
 
     fun resetToSelectBluetooth() {
         verificationJob?.cancel()
@@ -317,7 +268,7 @@ class GateRegistrationViewModel @Inject constructor(
 
     fun goBackOneStep() {
         val currentStep = _uiState.value.step
-        if (currentStep is GateStep.Error || currentStep is GateStep.WiFiConfig || currentStep is GateStep.VerifyingWifi) {
+        if (currentStep is GateStep.Error || currentStep is GateStep.WiFiConfig) {
             val targetStep = when {
                 _uiState.value.ssid.isNotEmpty() -> GateStep.WiFiConfig()
                 else -> GateStep.SelectBluetooth
@@ -342,6 +293,15 @@ class GateRegistrationViewModel @Inject constructor(
         viewModelScope.launch {
             bluetoothRepository.disconnect()
             _events.emit(GateRegistrationEvent.CloseDialog)
+        }
+    }
+
+    /** Cierra el diálogo tras registración exitosa (desconecta BT) */
+    fun closeDone() {
+        viewModelScope.launch {
+            bluetoothRepository.disconnect()
+            _events.emit(GateRegistrationEvent.CloseDialog)
+            resetState()
         }
     }
 }

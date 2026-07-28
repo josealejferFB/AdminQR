@@ -16,6 +16,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.escanqradmin.presentation.theme.shape.AppShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -39,6 +40,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import com.example.escanqradmin.domain.model.QrContent
+import com.example.escanqradmin.presentation.navigation.LocalSnackbarHostState
 import java.util.concurrent.Executors
 
 private val ScannerAccent = Color(0xFF2DD4BF)
@@ -79,7 +81,7 @@ fun ScannerScreen(
     var torchEnabled by remember { mutableStateOf(false) }
     var showManualDialog by remember { mutableStateOf(false) }
 
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarHostState = LocalSnackbarHostState.current
 
     LaunchedEffect(Unit) {
         viewModel.errorEvents.collect { msg ->
@@ -111,19 +113,22 @@ fun ScannerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black),
+                    .background(MaterialTheme.colorScheme.background),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = "Se requiere acceso a la cámara", color = Color.White)
+                Text(text = "Se requiere acceso a la cámara", color = MaterialTheme.colorScheme.onBackground)
             }
         }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
+        
+        IconButton(
+            onClick = { navController.popBackStack() },
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 100.dp)
-        )
+                .align(Alignment.TopStart)
+                .padding(top = 48.dp, start = 16.dp)
+                .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+        ) {
+            Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
+        }
     }
 
     if (showManualDialog) {
@@ -366,7 +371,7 @@ fun ScannerOverlay(
                     modifier = Modifier
                         .height(56.dp)
                         .clickable { onManualEntry() }
-                        .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(28.dp))
+                        .background(Color.White.copy(alpha = 0.2f), AppShapes.Pill)
                         .padding(horizontal = 24.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
@@ -412,7 +417,7 @@ private fun ManualEntryDialog(
                     label = { Text("Android ID") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = AppShapes.Button,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.secondary
                     )
@@ -423,7 +428,7 @@ private fun ManualEntryDialog(
                     label = { Text("Nombre") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = AppShapes.Button,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.secondary
                     )
@@ -434,7 +439,7 @@ private fun ManualEntryDialog(
                     label = { Text("Cédula") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = AppShapes.Button,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.secondary
                     )
@@ -445,7 +450,7 @@ private fun ManualEntryDialog(
                     label = { Text("Placa") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = AppShapes.Button,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MaterialTheme.colorScheme.secondary
                     )
@@ -462,10 +467,10 @@ private fun ManualEntryDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCELAR", color = Color.Gray)
+                Text("CANCELAR", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(24.dp)
+        shape = AppShapes.Card
     )
 }

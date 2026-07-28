@@ -182,7 +182,11 @@ class SyncRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateEntry(data: QrContent): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun updateEntry(
+        data: QrContent,
+        addGateIds: List<Int>,
+        removeGateIds: List<Int>
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val jsonBody = buildJsonObject {
                 put("jsonrpc", "2.0")
@@ -192,11 +196,14 @@ class SyncRepositoryImpl @Inject constructor(
                     put("cedula", data.cedula)
                     put("nombre", data.userName)
                     put("placas", data.plate)
-                    if (data.authorizedGates.isNotEmpty()) {
-                        put("puertas_autorizadas", buildJsonArray {
-                            data.authorizedGates.forEach { mac ->
-                                add(buildJsonObject { put("mac_address", mac) })
-                            }
+                    if (addGateIds.isNotEmpty()) {
+                        put("add_gate_ids", buildJsonArray {
+                            addGateIds.forEach { add(it) }
+                        })
+                    }
+                    if (removeGateIds.isNotEmpty()) {
+                        put("remove_gate_ids", buildJsonArray {
+                            removeGateIds.forEach { add(it) }
                         })
                     }
                 })

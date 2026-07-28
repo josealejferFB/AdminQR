@@ -10,6 +10,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,6 +36,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
@@ -47,14 +50,17 @@ import com.example.escanqradmin.presentation.common.sharedcomponents.CustomSnack
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.navigation.Config
+import com.example.escanqradmin.presentation.theme.shape.AppShapes
+import com.example.escanqradmin.presentation.common.sharedcomponents.SkeletonUserCard
+import com.example.escanqradmin.presentation.ui.home.components.EmptyStateView
+import com.example.escanqradmin.presentation.ui.home.components.EmptyStateType
+import com.example.escanqradmin.presentation.ui.home.components.OnboardingSheet
 import com.example.escanqradmin.presentation.theme.color.*
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothConnectionPanel
 import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
-import com.example.escanqradmin.presentation.ui.home.components.ChangeHostnameDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
-import com.example.escanqradmin.presentation.ui.home.components.OdooConfigDialog
-import com.example.escanqradmin.presentation.ui.home.components.RenameGateDialog
+import com.example.escanqradmin.presentation.ui.home.components.ReconfigureNetworkDialog
 import com.example.escanqradmin.presentation.ui.home.components.SearchBar
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.QrCodeBox
@@ -88,9 +94,7 @@ fun HomeScreen(
     var showProvisioningDialog by remember { mutableStateOf(false) }
     var showGateRegistrationDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
-    var showHostnameDialog by remember { mutableStateOf(false) }
-    var showRenameDialog by remember { mutableStateOf(false) }
-    var showOdooDialog by remember { mutableStateOf(false) }
+    var showReconfigureDialog by remember { mutableStateOf(false) }
     var selectedGateForDialog by remember { mutableStateOf<GateInfo?>(null) }
 
     LaunchedEffect(Unit) {
@@ -131,6 +135,10 @@ fun HomeScreen(
         }
     }
 
+    if (uiState.showOnboarding) {
+        OnboardingSheet(onDismiss = { viewModel.dismissOnboarding() })
+    }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         contentWindowInsets = WindowInsets(0.dp),
@@ -148,8 +156,8 @@ fun HomeScreen(
                         Text(
                             text = "EscanQR",
                             color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 22.sp
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 },
@@ -210,7 +218,7 @@ fun HomeScreen(
                                     Text(
                                         text = "Sistema en línea",
                                         color = MaterialTheme.colorScheme.secondary,
-                                        fontSize = 13.sp,
+                                        style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -218,7 +226,7 @@ fun HomeScreen(
                                 Text(
                                     text = "Panel de Control",
                                     color = MaterialTheme.colorScheme.onBackground,
-                                    fontSize = 28.sp,
+                                    style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
                                 )
                             } else {
@@ -244,7 +252,7 @@ fun HomeScreen(
                                             Text(
                                                 text = "SIN CONEXIÓN AL SERVIDOR",
                                                 color = MaterialTheme.colorScheme.error,
-                                                fontSize = 12.sp,
+                                                style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -272,7 +280,7 @@ fun HomeScreen(
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
                                                 text = "CONFIGURAR ENDPOINT",
-                                                fontSize = 12.sp,
+                                                style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -282,7 +290,7 @@ fun HomeScreen(
                                 Text(
                                     text = "Panel de Control",
                                     color = MaterialTheme.colorScheme.onBackground,
-                                    fontSize = 28.sp,
+                                    style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
                                 )
                             }
@@ -297,23 +305,16 @@ fun HomeScreen(
                                 selectedMacAddress = uiState.selectedMacAddress,
                                 onSelect = { viewModel.selectGate(it) },
                                 onAddGate = { showGateRegistrationDialog = true },
-                                onChangeHostname = { gate ->
+                                onReconfigureNetwork = { gate ->
                                     selectedGateForDialog = gate
-                                    showHostnameDialog = true
+                                    showReconfigureDialog = true
                                 },
-                                onRename = { gate ->
-                                    selectedGateForDialog = gate
-                                    showRenameDialog = true
-                                },
-                                onConfigureOdoo = { gate ->
-                                    selectedGateForDialog = gate
-                                    showOdooDialog = true
-                                },
-                                onDeleteLocalGate = { gate ->
-                                    viewModel.deleteLocalGate(gate.macAddress)
-                                },
-                                onDetails = { gate ->
-                                    // TODO: details dialog
+                                onDeleteGate = { gate ->
+                                    if (gate.isOdooRegistered && gate.id != null) {
+                                        viewModel.deleteGate(gate.id)
+                                    } else {
+                                        viewModel.deleteLocalGate(gate.macAddress)
+                                    }
                                 }
                             )
                         }
@@ -331,7 +332,6 @@ fun HomeScreen(
                             onConnectToGate = { viewModel.connectToGate(it) },
                             onDisconnect = { viewModel.disconnect() },
                             onPairGate = {
-                                selectedGateForDialog = it
                                 requestBluetoothAction()
                             },
                             onUnpairGate = { viewModel.unpairGate(it) },
@@ -369,8 +369,8 @@ fun HomeScreen(
                                             Icon(Icons.Default.QrCode, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(20.dp))
                                         }
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Text("Aprovisionar", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
-                                        Text("QR", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
+                                        Text("Aprovisionar", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                                        Text("QR", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                                     }
                                 }
                             }
@@ -400,8 +400,8 @@ fun HomeScreen(
                                             Icon(Icons.Default.Router, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(20.dp))
                                         }
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        Text("Registrar", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
-                                        Text("Portón", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.tertiary)
+                                        Text("Registrar", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                                        Text("Portón", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
                                     }
                                 }
                             }
@@ -415,9 +415,9 @@ fun HomeScreen(
                                 ) {
                                     Icon(Icons.Default.People, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(24.dp))
                                     Spacer(modifier = Modifier.height(8.dp))
-                                    Text(text = uiState.totalUsers.toString(), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.secondary)
-                                    Text(text = "USUARIOS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
-                                    Text(text = "REGISTRADOS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
+                                    Text(text = uiState.totalUsers.toString(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.secondary)
+                                    Text(text = "USUARIOS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
+                                    Text(text = "REGISTRADOS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f))
                                 }
                             }
                         }
@@ -447,7 +447,7 @@ fun HomeScreen(
                                     Text(
                                         text = "Usuarios",
                                         color = MaterialTheme.colorScheme.onBackground,
-                                        fontSize = 18.sp,
+                                        style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
@@ -462,7 +462,7 @@ fun HomeScreen(
                                         Text(
                                             text = "${filteredUsers.size} en línea",
                                             color = MaterialTheme.colorScheme.primary,
-                                            fontSize = 10.sp,
+                                            style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
@@ -478,8 +478,16 @@ fun HomeScreen(
                         }
                     }
 
-                    item {
-                        if (filteredUsers.isEmpty()) {
+                    if (uiState.isRefreshing) {
+                        item {
+                            AnimatedVisibility(visible = showActiveUsers) {
+                                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    repeat(5) { SkeletonUserCard() }
+                                }
+                            }
+                        }
+                    } else if (filteredUsers.isEmpty()) {
+                        item {
                             AnimatedVisibility(
                                 visible = showActiveUsers,
                                 enter = fadeIn(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
@@ -487,46 +495,36 @@ fun HomeScreen(
                                 exit = fadeOut(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
                                        shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
                             ) {
-                                AppCard(modifier = Modifier.fillMaxWidth()) {
-                                    Column(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Icon(
-                                            Icons.Default.PeopleOutline,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.outline,
-                                            modifier = Modifier.size(40.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(12.dp))
-                                        Text(
-                                            "No hay usuarios activos",
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                    }
-                                }
+                                EmptyStateView(
+                                    type = if (uiState.gates.isEmpty()) EmptyStateType.GATES else EmptyStateType.USERS
+                                )
                             }
                         }
                     }
 
-                    items(filteredUsers, key = { it.id }) { user ->
-                        AnimatedVisibility(
-                            visible = showActiveUsers,
-                            enter = fadeIn(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
-                                    expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)),
-                            exit = fadeOut(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
-                                   shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
-                        ) {
-                            Column {
-                                ActiveUserCard(
-                                    user = user,
-                                    gates = uiState.gates,
-                                    onDelete = { userToDelete = user; showDeleteDialog = true },
-                                    onUpdate = { viewModel.updateUser(it) }
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
+                    if (!uiState.isRefreshing) {
+                        items(filteredUsers, key = { it.id }) { user ->
+                            AnimatedVisibility(
+                                visible = showActiveUsers,
+                                enter = fadeIn(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
+                                        expandVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)),
+                                exit = fadeOut(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)) +
+                                       shrinkVertically(animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow))
+                            ) {
+                                Column {
+                                    ActiveUserCard(
+                                        user = user,
+                                        gates = uiState.gates,
+                                        onDelete = {
+                                            userToDelete = user
+                                            showDeleteDialog = true
+                                        },
+                                        onUpdate = { updatedUser, added, removed ->
+                                            viewModel.updateUser(updatedUser, added, removed)
+                                        }
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
                             }
                         }
                     }
@@ -621,41 +619,14 @@ fun HomeScreen(
                 )
             }
 
-            if (showRenameDialog && selectedGateForDialog != null) {
-                RenameGateDialog(
+            if (showReconfigureDialog && selectedGateForDialog != null) {
+                ReconfigureNetworkDialog(
                     gate = selectedGateForDialog!!,
-                    onConfirm = { newName ->
-                        selectedGateForDialog!!.id?.let { gateId ->
-                            viewModel.renameGate(gateId, newName)
-                        }
-                        showRenameDialog = false
-                        selectedGateForDialog = null
-                    },
-                    onDismiss = { showRenameDialog = false; selectedGateForDialog = null }
-                )
-            }
-
-            if (showHostnameDialog && selectedGateForDialog != null) {
-                ChangeHostnameDialog(
-                    gate = selectedGateForDialog!!,
-                    connectionStateProvider = { bluetoothConnectionState },
-                    onConnect = { address -> viewModel.connectToDevice(address) },
+                    connectionState = bluetoothConnectionState,
+                    onConnect = { viewModel.connectToGate(selectedGateForDialog!!) },
                     onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
-                    onDismiss = { showHostnameDialog = false; selectedGateForDialog = null },
-                    onSuccess = { showHostnameDialog = false; selectedGateForDialog = null }
-                )
-            }
-
-            if (showOdooDialog && selectedGateForDialog != null) {
-                OdooConfigDialog(
-                    gate = selectedGateForDialog!!,
-                    onRegisterInOdoo = { name, mac -> viewModel.registerGateInOdoo(name, mac) },
-                    onDismiss = { showOdooDialog = false; selectedGateForDialog = null },
-                    onSuccess = { odooId ->
-                        if (odooId != null) {
-                            viewModel.markGateAsOdooRegistered(selectedGateForDialog!!.macAddress, odooId)
-                        }
-                        showOdooDialog = false
+                    onDismiss = {
+                        showReconfigureDialog = false
                         selectedGateForDialog = null
                     }
                 )
@@ -759,33 +730,29 @@ private fun GateChipRow(
     selectedMacAddress: String?,
     onSelect: (String?) -> Unit,
     onAddGate: () -> Unit,
-    onChangeHostname: (GateInfo) -> Unit,
-    onRename: (GateInfo) -> Unit,
-    onConfigureOdoo: (GateInfo) -> Unit,
-    onDeleteLocalGate: (GateInfo) -> Unit,
-    onDetails: (GateInfo) -> Unit
+    onReconfigureNetwork: (GateInfo) -> Unit,
+    onDeleteGate: (GateInfo) -> Unit
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.height(48.dp) // Ensure there's enough space for the animation
+    ) {
         item {
-            FilterChip(
-                selected = selectedMacAddress == null,
-                onClick = { onSelect(null) },
-                label = { Text("Todas") }
+            GateChipBase(
+                text = "Todas",
+                isSelected = selectedMacAddress == null,
+                onClick = { onSelect(null) }
             )
         }
 
         items(gates, key = { it.macAddress }) { gate ->
-            var showMenu by remember { mutableStateOf(false) }
             ChipWithMenu(
                 gate = gate,
                 isSelected = selectedMacAddress == gate.macAddress,
                 onSelect = { onSelect(gate.macAddress) },
-                showMenu = showMenu,
-                onToggleMenu = { showMenu = it },
-                onRename = { showMenu = false; onRename(gate) },
-                onChangeHostname = { showMenu = false; onChangeHostname(gate) },
-                onConfigureOdoo = { showMenu = false; onConfigureOdoo(gate) },
-                onDeleteLocalGate = { showMenu = false; onDeleteLocalGate(gate) }
+                onReconfigureNetwork = { onReconfigureNetwork(gate) },
+                onDeleteGate = { onDeleteGate(gate) }
             )
         }
 
@@ -803,62 +770,68 @@ private fun ChipWithMenu(
     gate: GateInfo,
     isSelected: Boolean,
     onSelect: () -> Unit,
-    showMenu: Boolean,
-    onToggleMenu: (Boolean) -> Unit,
-    onRename: () -> Unit,
-    onChangeHostname: () -> Unit,
-    onConfigureOdoo: () -> Unit,
-    onDeleteLocalGate: () -> Unit
+    onReconfigureNetwork: () -> Unit,
+    onDeleteGate: () -> Unit
 ) {
-    val containerColor = if (isSelected)
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    val targetContainerColor = if (isSelected)
         MaterialTheme.colorScheme.secondaryContainer
     else
         MaterialTheme.colorScheme.surfaceVariant
+    val containerColor by animateColorAsState(targetValue = targetContainerColor, label = "containerColor")
 
-    val contentColor = if (isSelected)
+    val targetContentColor = if (isSelected)
         MaterialTheme.colorScheme.onSecondaryContainer
     else
         MaterialTheme.colorScheme.onSurfaceVariant
+    val contentColor by animateColorAsState(targetValue = targetContentColor, label = "contentColor")
 
-    val borderColor = if (isSelected)
+    val targetBorderColor = if (isSelected)
         MaterialTheme.colorScheme.secondary
     else
         MaterialTheme.colorScheme.outline
+    val borderColor by animateColorAsState(targetValue = targetBorderColor, label = "borderColor")
+
+    val height by animateDpAsState(targetValue = if (isSelected) 42.dp else 34.dp, label = "chipHeight")
+    val paddingHorz by animateDpAsState(targetValue = if (isSelected) 16.dp else 12.dp, label = "chipPad")
 
     Box {
         Surface(
-            modifier = Modifier.combinedClickable(
-                onClick = onSelect,
-                onLongClick = { onToggleMenu(true) }
-            ),
+            modifier = Modifier
+                .height(height)
+                .combinedClickable(
+                    onClick = onSelect,
+                    onLongClick = { menuExpanded = true }
+                ),
             shape = RoundedCornerShape(8.dp),
             color = containerColor,
             border = BorderStroke(1.dp, borderColor.copy(alpha = 0.3f)),
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = paddingHorz),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val targetIndicatorColor = if (gate.isOdooRegistered) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
+                val indicatorColor by animateColorAsState(targetValue = targetIndicatorColor, label = "indicatorColor")
+                
                 Box(
                     modifier = Modifier
                         .size(6.dp)
-                        .background(
-                            if (gate.isOdooRegistered) MaterialTheme.colorScheme.secondary
-                            else MaterialTheme.colorScheme.outline,
-                            CircleShape
-                        )
+                        .background(indicatorColor, CircleShape)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Column {
+                Column(verticalArrangement = Arrangement.Center) {
                     Text(
                         text = gate.name,
                         style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         color = contentColor
                     )
                     if (!gate.isOdooRegistered) {
                         Text(
                             "No configurado",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                     }
@@ -867,8 +840,8 @@ private fun ChipWithMenu(
         }
 
         DropdownMenu(
-            expanded = showMenu,
-            onDismissRequest = { onToggleMenu(false) },
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
             modifier = Modifier.width(220.dp)
         ) {
             // Status header
@@ -899,48 +872,67 @@ private fun ChipWithMenu(
                 enabled = false
             )
 
-            if (!gate.isOdooRegistered) {
-                DropdownMenuItem(
-                    text = { Text("Registrar en Odoo") },
-                    onClick = onConfigureOdoo,
-                    leadingIcon = {
-                        Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                    }
-                )
-            } else {
-                DropdownMenuItem(
-                    text = { Text("Enviar URL Odoo al ESP32") },
-                    onClick = onConfigureOdoo,
-                    leadingIcon = {
-                        Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                    }
-                )
-                DropdownMenuItem(
-                    text = { Text("Renombrar") },
-                    onClick = onRename,
-                    leadingIcon = {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                    }
-                )
-            }
-
             DropdownMenuItem(
-                text = { Text("Cambiar Hostname") },
-                onClick = onChangeHostname,
+                text = { Text("Configurar Red WiFi") },
+                onClick = {
+                    menuExpanded = false
+                    onReconfigureNetwork()
+                },
                 leadingIcon = {
-                    Icon(Icons.Default.Computer, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
             )
 
-            if (!gate.isOdooRegistered) {
-                DropdownMenuItem(
-                    text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
-                    onClick = onDeleteLocalGate,
-                    leadingIcon = {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
-                    }
-                )
-            }
+            DropdownMenuItem(
+                text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
+                onClick = {
+                    menuExpanded = false
+                    onDeleteGate()
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun GateChipBase(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val targetContainerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val containerColor by animateColorAsState(targetValue = targetContainerColor, label = "baseContainerColor")
+
+    val targetContentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val contentColor by animateColorAsState(targetValue = targetContentColor, label = "baseContentColor")
+
+    val targetBorderColor = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.outline
+    val borderColor by animateColorAsState(targetValue = targetBorderColor, label = "baseBorderColor")
+
+    val height by animateDpAsState(targetValue = if (isSelected) 42.dp else 34.dp, label = "baseChipHeight")
+    val paddingHorz by animateDpAsState(targetValue = if (isSelected) 20.dp else 16.dp, label = "baseChipPad")
+
+    Surface(
+        modifier = Modifier
+            .height(height)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(8.dp),
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor.copy(alpha = 0.3f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = paddingHorz),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = contentColor
+            )
         }
     }
 }

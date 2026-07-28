@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.escanqradmin.presentation.theme.shape.AppShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,7 +23,6 @@ import androidx.compose.ui.window.Dialog
 import com.example.escanqradmin.domain.model.BluetoothDeviceDomain
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import androidx.compose.foundation.isSystemInDarkTheme
-import com.example.escanqradmin.presentation.theme.color.*
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 
@@ -49,7 +49,7 @@ fun BluetoothDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape          = RoundedCornerShape(28.dp),
+            shape          = AppShapes.Pill,
             color          = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp,
             modifier       = Modifier
@@ -75,14 +75,14 @@ fun BluetoothDialog(
                         Text(
                             text  = "Busca y conecta tu tarjeta",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
                         onClick  = onDismiss,
                         modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -91,15 +91,15 @@ fun BluetoothDialog(
                 // Error feedback
                 if (connectionState is BluetoothConnectionState.Error) {
                     AppCard(
-                        colors = AppCardDefaults.colors(containerColor = if (isSystemInDarkTheme()) Color(0xFFD32F2F).copy(alpha = 0.2f) else Color(0xFFFDECEA)),
+                        colors = AppCardDefaults.colors(containerColor = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.error.copy(alpha = 0.2f) else MaterialTheme.colorScheme.errorContainer),
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = AppShapes.Button,
                         border = null
                     ) {
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Error, contentDescription = null, tint = Color(0xFFD32F2F), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(text = connectionState.message, color = Color(0xFFD32F2F), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                            Text(text = connectionState.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -145,7 +145,7 @@ fun BluetoothDialog(
                     if (scannedDevices.isEmpty() && !isScanning) {
                         item {
                             Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
-                                Text("No se encontraron dispositivos", color = Color.Gray, fontSize = 12.sp)
+                                Text("No se encontraron dispositivos", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     } else {
@@ -173,9 +173,9 @@ fun BluetoothDialog(
                 Button(
                     onClick  = if (isScanning) onStopScan else onStartScan,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape    = RoundedCornerShape(16.dp),
+                    shape    = AppShapes.Input,
                     colors   = ButtonDefaults.buttonColors(
-                        containerColor = if (isScanning) Color.Gray else MaterialTheme.colorScheme.secondary
+                        containerColor = if (isScanning) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.secondary
                     )
                 ) {
                     if (isScanning) {
@@ -188,14 +188,6 @@ fun BluetoothDialog(
                 }
                 
                 Spacer(modifier = Modifier.height(12.dp))
-                // Technical Info Footer
-                Text(
-                    text = "Service UUID: 00001101-0000-1000-8000-00805F9B34FB",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.Gray.copy(alpha = 0.6f),
-                    fontSize = 8.sp,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
             }
         }
     }
@@ -206,7 +198,7 @@ private fun DeviceSectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
         text     = title.uppercase(),
         style    = MaterialTheme.typography.labelSmall,
-        color    = Color.Gray,
+        color    = MaterialTheme.colorScheme.onSurfaceVariant,
         fontWeight = FontWeight.Bold,
         modifier = modifier.padding(vertical = 8.dp)
     )
@@ -232,9 +224,9 @@ private fun DeviceItem(
         modifier = Modifier.fillMaxWidth(),
         onClick = if (!isConnecting && !isDeviceConnected) onClick else null,
         colors = AppCardDefaults.colors(
-            containerColor = if (isDeviceConnected) (if (isSystemInDarkTheme()) Color(0xFF1B5E20).copy(alpha = 0.2f) else Color(0xFFE8F5E9)) else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isDeviceConnected) (if (isSystemInDarkTheme()) MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.secondaryContainer) else MaterialTheme.colorScheme.surfaceVariant
         ),
-        border = if (isDeviceConnected) AppCardDefaults.border(color = Color(0xFF4CAF50).copy(alpha = 0.1f)) else AppCardDefaults.border()
+        border = if (isDeviceConnected) AppCardDefaults.border(color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)) else AppCardDefaults.border()
     ) {
         Row(
             modifier          = Modifier.padding(14.dp).fillMaxWidth(),
@@ -243,7 +235,7 @@ private fun DeviceItem(
             Icon(
                 imageVector        = if (isDeviceConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
                 contentDescription = null,
-                tint               = if (isDeviceConnected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                tint               = if (isDeviceConnected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                 modifier           = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(14.dp))
@@ -252,12 +244,12 @@ private fun DeviceItem(
                     text       = device.name ?: "Desconocido",
                     style      = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color      = if (isDeviceConnected) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
+                    color      = if (isDeviceConnected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text  = device.address,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isDeviceConnected) Color(0xFF2E7D32).copy(alpha = 0.7f) else Color.Gray
+                    color = if (isDeviceConnected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             
@@ -266,8 +258,8 @@ private fun DeviceItem(
                     TextButton(onClick = onDisconnect) {
                         Text(
                             "DESCONECTAR", 
-                            color      = Color(0xFFD32F2F), 
-                            fontSize   = 10.sp, 
+                            color      = MaterialTheme.colorScheme.error, 
+                            style      = MaterialTheme.typography.labelMedium, 
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
@@ -279,7 +271,7 @@ private fun DeviceItem(
                     Text(
                         "CONECTAR", 
                         color      = MaterialTheme.colorScheme.primary, 
-                        fontSize   = 11.sp, 
+                        style      = MaterialTheme.typography.labelMedium, 
                         fontWeight = FontWeight.Bold
                     )
                 }

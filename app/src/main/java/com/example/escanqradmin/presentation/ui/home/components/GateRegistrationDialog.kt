@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.escanqradmin.presentation.theme.shape.AppShapes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.delay
 import com.example.escanqradmin.domain.model.BluetoothDeviceDomain
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
@@ -50,11 +52,13 @@ fun GateRegistrationDialog(
     onDismissError: () -> Unit,
     onGoBackFromError: () -> Unit,
     onDismiss: () -> Unit,
-    onReset: () -> Unit
+    onReset: () -> Unit,
+    onSendReportIp: () -> Unit = {},
+    onCloseDone: () -> Unit = { onDismiss() }
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(28.dp),
+            shape = AppShapes.Pill,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 8.dp,
             modifier = Modifier
@@ -84,14 +88,14 @@ fun GateRegistrationDialog(
                                 is GateStep.Error -> "Error"
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     IconButton(
                         onClick = onDismiss,
                         modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.Gray, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                     }
                 }
 
@@ -125,7 +129,9 @@ fun GateRegistrationDialog(
                         is GateStep.RegisteringInOdoo -> RegisteringInOdooContent()
                         is GateStep.LocalDone -> LocalDoneContent(
                             uiState = uiState,
-                            onDismiss = onDismiss
+                            onDismiss = onDismiss,
+                            onSendReportIp = onSendReportIp,
+                            onCloseDone = onCloseDone
                         )
                         is GateStep.Error -> ErrorContent(
                             uiState = uiState,
@@ -153,15 +159,15 @@ private fun ColumnScope.SelectBluetoothContent(
 ) {
     if (connectionState is BluetoothConnectionState.Error) {
         AppCard(
-            colors = AppCardDefaults.colors(containerColor = Color(0xFFFDECEA)),
+            colors = AppCardDefaults.colors(containerColor = MaterialTheme.colorScheme.errorContainer),
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            shape = RoundedCornerShape(12.dp),
+            shape = AppShapes.Button,
             border = null
         ) {
             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Error, contentDescription = null, tint = Color(0xFFD32F2F), modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Error, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(text = connectionState.message, color = Color(0xFFD32F2F), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                Text(text = connectionState.message, color = MaterialTheme.colorScheme.error, fontSize = 11.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -203,7 +209,7 @@ private fun ColumnScope.SelectBluetoothContent(
         if (scannedDevices.isEmpty() && !isScanning) {
             item {
                 Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
-                    Text("No se encontraron dispositivos", color = Color.Gray, fontSize = 12.sp)
+                    Text("No se encontraron dispositivos", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 }
             }
         } else {
@@ -227,9 +233,9 @@ private fun ColumnScope.SelectBluetoothContent(
     Button(
         onClick = if (isScanning) onStopScan else onStartScan,
         modifier = Modifier.fillMaxWidth().height(52.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = AppShapes.Input,
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isScanning) Color.Gray else MaterialTheme.colorScheme.secondary
+            containerColor = if (isScanning) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.secondary
         )
     ) {
         if (isScanning) {
@@ -269,7 +275,7 @@ private fun WiFiConfigContent(
         Text(
             "Ingresa las credenciales WiFi y el nombre del portón para el ESP32",
             style = MaterialTheme.typography.bodySmall,
-            color = Color.Gray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Spacer(Modifier.height(16.dp))
 
@@ -287,7 +293,7 @@ private fun WiFiConfigContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = AppShapes.Button,
                     enabled = !uiState.isSubmitting,
                     trailingIcon = {
                         if (uiState.availableNetworks.isNotEmpty()) {
@@ -335,7 +341,7 @@ private fun WiFiConfigContent(
             label = { Text("Contraseña") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = AppShapes.Button,
             visualTransformation = PasswordVisualTransformation(),
             enabled = !uiState.isSubmitting
         )
@@ -347,14 +353,14 @@ private fun WiFiConfigContent(
             placeholder = { Text("Ej: Portón Principal") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = AppShapes.Button,
             enabled = !uiState.isSubmitting
         )
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = onSendWiFiConfig,
             modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = AppShapes.Input,
             enabled = uiState.ssid.isNotBlank() && uiState.gateName.isNotBlank() && !uiState.isSubmitting
         ) {
             if (uiState.isSubmitting) {
@@ -379,13 +385,13 @@ private fun VerifyingWifiContent() {
             Text(
                 "Verificando conexión WiFi...",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
             Text(
                 "El ESP32 se está conectando a la red WiFi. Esto puede tomar hasta 30 segundos.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
@@ -401,13 +407,13 @@ private fun RegisteringInOdooContent() {
             Text(
                 "Registrando en Odoo...",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
             Text(
                 "El portón se está registrando en el servidor.",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
@@ -417,8 +423,19 @@ private fun RegisteringInOdooContent() {
 @Composable
 private fun LocalDoneContent(
     uiState: GateRegistrationUiState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSendReportIp: () -> Unit = {},
+    onCloseDone: () -> Unit = onDismiss
 ) {
+    var sendingReport by remember { mutableStateOf(false) }
+
+    if (sendingReport) {
+        LaunchedEffect(Unit) {
+            delay(3000)
+            sendingReport = false
+        }
+    }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp)
@@ -439,16 +456,50 @@ private fun LocalDoneContent(
         Text(
             if (uiState.odooMessage.isNotBlank()) uiState.odooMessage else "Portón registrado exitosamente.",
             style = MaterialTheme.typography.bodySmall,
-            color = Color.Gray,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onDismiss,
-            modifier = Modifier.fillMaxWidth().height(52.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Text("CERRAR", fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Si el ESP32 no reportó su IP automáticamente, usa el botón \"Reenviar IP\" para notificar a Odoo.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        )
+        Spacer(Modifier.height(20.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = {
+                    sendingReport = true
+                    onSendReportIp()
+                },
+                modifier = Modifier.weight(1f).height(48.dp),
+                shape = AppShapes.Input,
+                enabled = !sendingReport
+            ) {
+                if (sendingReport) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                } else {
+                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    if (sendingReport) "ENVIANDO..." else "REENVIAR IP",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+            }
+            Button(
+                onClick = onCloseDone,
+                modifier = Modifier.weight(1f).height(48.dp),
+                shape = AppShapes.Input
+            ) {
+                Text("CERRAR", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -479,13 +530,13 @@ private fun ErrorContent(
         )
         Spacer(Modifier.height(8.dp))
         val errorMessage = (uiState.step as? GateStep.Error)?.message ?: "Error desconocido"
-        Text(errorMessage, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+        Text(errorMessage, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(24.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
                 onClick = onGoBack,
                 modifier = Modifier.weight(1f).height(52.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = AppShapes.Input
             ) {
                 Icon(Icons.Default.NavigateBefore, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(4.dp))
@@ -494,7 +545,7 @@ private fun ErrorContent(
             Button(
                 onClick = onRetry,
                 modifier = Modifier.weight(1f).height(52.dp),
-                shape = RoundedCornerShape(16.dp)
+                shape = AppShapes.Input
             ) {
                 Text("REINTENTAR", fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
@@ -515,7 +566,7 @@ private fun DeviceSectionHeader(title: String, modifier: Modifier = Modifier) {
     Text(
         text = title.uppercase(),
         style = MaterialTheme.typography.labelSmall,
-        color = Color.Gray,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         fontWeight = FontWeight.Bold,
         modifier = modifier.padding(vertical = 8.dp)
     )
@@ -536,9 +587,9 @@ private fun DeviceItem(
         modifier = Modifier.fillMaxWidth(),
         onClick = if (!isConnecting && !isDeviceConnected) onClick else null,
         colors = AppCardDefaults.colors(
-            containerColor = if (isDeviceConnected) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isDeviceConnected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
         ),
-        border = if (isDeviceConnected) AppCardDefaults.border(color = Color(0xFF4CAF50).copy(alpha = 0.1f)) else AppCardDefaults.border()
+        border = if (isDeviceConnected) AppCardDefaults.border(color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)) else AppCardDefaults.border()
     ) {
         Row(
             modifier = Modifier.padding(14.dp).fillMaxWidth(),
@@ -547,7 +598,7 @@ private fun DeviceItem(
             Icon(
                 imageVector = if (isDeviceConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
                 contentDescription = null,
-                tint = if (isDeviceConnected) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                tint = if (isDeviceConnected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(14.dp))
@@ -556,12 +607,12 @@ private fun DeviceItem(
                     text = device.name ?: "Desconocido",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDeviceConnected) Color(0xFF1B5E20) else MaterialTheme.colorScheme.onSurface
+                    color = if (isDeviceConnected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = device.address,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isDeviceConnected) Color(0xFF2E7D32).copy(alpha = 0.7f) else Color.Gray
+                    color = if (isDeviceConnected) MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -570,7 +621,7 @@ private fun DeviceItem(
                     TextButton(onClick = onDisconnect) {
                         Text(
                             "DESCONECTAR",
-                            color = Color(0xFFD32F2F),
+                            color = MaterialTheme.colorScheme.error,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold
                         )

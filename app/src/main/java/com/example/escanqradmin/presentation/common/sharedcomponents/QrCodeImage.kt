@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.escanqradmin.presentation.theme.shape.AppShapes
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,7 +75,7 @@ fun QrCodeBox(
     Box(
         modifier = Modifier
             .size(size + 16.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(AppShapes.Input)
             .background(Color.White)
             .padding(8.dp),
         contentAlignment = Alignment.Center

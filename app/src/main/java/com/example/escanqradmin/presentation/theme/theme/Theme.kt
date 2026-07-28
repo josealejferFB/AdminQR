@@ -62,47 +62,6 @@ private val DarkColorScheme = darkColorScheme(
     onErrorContainer = Color(0xFFFEE2E2)
 )
 
-object EspColorScheme {
-    val surfaceLight = Color(0xFFF8FAFC)
-    val surfaceDark = Color(0xFF0D1117)
-    val surfaceVariantLight = Color(0xFFE2E8F0)
-    val surfaceVariantDark = Color(0xFF161B22)
-    val outlineLight = Color(0xFFCBD5E1)
-    val outlineDark = Color(0xFF30363D)
-    val onSurfaceLight = Color(0xFF0F172A)
-    val onSurfaceDark = Color(0xFFE6EDF3)
-    val primary = Color(0xFF1F6FEB)
-    val secondary = Color(0xFF238636)
-    val tertiary = Color(0xFF8957E5)
-    val onSurfaceVariantLight = Color(0xFF64748B)
-    val onSurfaceVariantDark = Color(0xFF8B949E)
-}
-
-@Composable
-fun EspColorScheme(): EspColorSchemeColors {
-    val dark = isSystemInDarkTheme()
-    return EspColorSchemeColors(
-        surface = if (dark) EspColorScheme.surfaceDark else EspColorScheme.surfaceLight,
-        surfaceVariant = if (dark) EspColorScheme.surfaceVariantDark else EspColorScheme.surfaceVariantLight,
-        outline = if (dark) EspColorScheme.outlineDark else EspColorScheme.outlineLight,
-        onSurface = if (dark) EspColorScheme.onSurfaceDark else EspColorScheme.onSurfaceLight,
-        onSurfaceVariant = if (dark) EspColorScheme.onSurfaceVariantDark else EspColorScheme.onSurfaceVariantLight,
-        primary = EspColorScheme.primary,
-        secondary = EspColorScheme.secondary,
-        tertiary = EspColorScheme.tertiary
-    )
-}
-
-data class EspColorSchemeColors(
-    val surface: Color,
-    val surfaceVariant: Color,
-    val outline: Color,
-    val onSurface: Color,
-    val onSurfaceVariant: Color,
-    val primary: Color,
-    val secondary: Color,
-    val tertiary: Color
-)
 
 @Composable
 fun EscanQRAdminTheme(
