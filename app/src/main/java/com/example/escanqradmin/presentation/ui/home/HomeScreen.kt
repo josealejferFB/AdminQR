@@ -587,7 +587,7 @@ fun HomeScreen(
                                     hostname = event.hostname,
                                     odooId = event.odooId
                                 )
-                                showGateRegistrationDialog = false
+                                // Dialog stays open so user can see LocalDone step
                             }
                         }
                     }
@@ -625,6 +625,7 @@ fun HomeScreen(
                     connectionState = bluetoothConnectionState,
                     onConnect = { viewModel.connectToGate(selectedGateForDialog!!) },
                     onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
+                    onDisconnect = { viewModel.disconnect() },
                     onDismiss = {
                         showReconfigureDialog = false
                         selectedGateForDialog = null

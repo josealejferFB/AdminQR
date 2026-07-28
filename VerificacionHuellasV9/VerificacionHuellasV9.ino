@@ -1,18 +1,17 @@
 // ============================================================
-//  SISTEMA VEHICULAR - VERSIÓN 9
+//  SISTEMA VEHICULAR - VERSIÓN 10
 //  Apertura de portón: señal HTTP desde Odoo → relé
 //  Bluetooth: Solo protocolo JSON (config_network, set_bt_name, set_hostname)
-//  Novedades V9:
-//    - Eliminado protocolo texto V6 (config, wifi legacy)
-//    - Eliminado MODO_CONFIG_ODOO + construirUrlOdoo + guardarConfigOdoo
+//  Novedades V10:
+//    - Eliminado protocolo texto legacy (wifi SSID/PASS manual)
+//    - Auto-desconexión BT tras completar configuración
+//    - Helper volverAEspera() para transiciones limpias
+//    - NVS single-open para config_network
+//    - Eliminados MODO_WIFI_SSID y MODO_WIFI_PASS
+//  Legado V9:
 //    - Auto-discovery: ESP32 reporta IP a Odoo tras WiFi connect
 //    - IoT token configurable vía config_network
-//  Legado V8:
 //    - Comandos JSON: config_network, set_bt_name, set_hostname
-//    - Nombre Bluetooth configurable vía set_bt_name
-//    - Hostname DHCP configurable vía set_hostname
-//    - BT se reinicia automáticamente tras conexión WiFi
-//    - GET /status expone bt_name y hostname
 // ============================================================
 
 #include <BluetoothSerial.h>
@@ -73,12 +72,12 @@ struct {
   unsigned long timeout;
   unsigned long lastBlink;
   bool          ledState;
-  String        ssidTemp;         // SSID temporal durante config WiFi vía BT
 
   // [V7] Control asíncrono de WiFi
   unsigned long wifiStartTime;
   bool          wifiConnecting;
   uint8_t       wifiRetryCount;
+  bool          wifiStarted;        // [V10] Movido de static local a global para BUG-6
 
   // [V7] Almacenar última respuesta MAC para /status
   String        macAddress;
@@ -99,10 +98,8 @@ struct {
 } sistema;
 
 // ========== ESTADOS ==========
-#define ESPERA_CONEXION   0   // Idle: BT parpadeando, WebServer activo
-#define MODO_CONFIG_BT    1   // BT conectado: espera comando JSON
-#define MODO_WIFI_SSID    2   // Espera SSID por BT
-#define MODO_WIFI_PASS    4   // Espera contraseña WiFi por BT
+#define ESPERA_CONEXION      0   // Idle: BT parpadeando, WebServer activo
+#define MODO_CONFIG_BT       1   // BT conectado: espera comando JSON
 #define MODO_CONECTANDO_WIFI 5   // [V7] WiFi.begin no bloqueante
 
 // ========== PROTOTIPOS ==========
@@ -117,6 +114,7 @@ void agregarEndpointStatus();
 String obtenerMacAddress();
 
 void manejarAsincronos();
+void volverAEspera(const char* msg1, const char* msg2 = "");
 
 // ============================================================
 //  SETUP
@@ -163,6 +161,7 @@ void setup() {
   sistema.wifiConnecting = false;
   sistema.reportPending  = false;
   sistema.wifiRetryCount = 0;
+  sistema.wifiStarted    = false;
   sistema.macAddress     = obtenerMacAddress();
 
   // Hostname único por dispositivo (basado en MAC)
@@ -230,7 +229,7 @@ void loop() {
       break;
 
     // ----------------------------------------------------------
-    // MODO_CONFIG_BT — Solo acepta: "config" | "wifi"
+    // MODO_CONFIG_BT — Solo acepta comandos JSON
     // ----------------------------------------------------------
     case MODO_CONFIG_BT:
       if (!SerialBT.hasClient()) {
@@ -241,11 +240,8 @@ void loop() {
       }
 
       if (millis() - sistema.timeout > 30000) {
-        SerialBT.println("TIMEOUT");
-        pantalla("TIMEOUT BT");
-        sistema.msjDesde     = millis();
-        sistema.mostrandoMsj = true;
-        sistema.estado       = ESPERA_CONEXION;
+        SerialBT.println("{\"status\":\"error\",\"message\":\"Timeout BT\"}");
+        volverAEspera("TIMEOUT BT");
         break;
       }
 
@@ -253,212 +249,149 @@ void loop() {
         String cmd = SerialBT.readStringUntil('\n');
         cmd.trim();
 
-        // ── [V7] Auto-detección: JSON vs texto ─────────────────
-        if (cmd.length() > 0 && cmd.charAt(0) == '{') {
-          StaticJsonDocument<512> doc;
-          DeserializationError error = deserializeJson(doc, cmd);
+        // Solo JSON (debe empezar con '{')
+        if (cmd.length() == 0 || cmd.charAt(0) != '{') {
+          SerialBT.println("{\"status\":\"error\",\"message\":\"Solo JSON\"}");
+          sistema.timeout = millis();  // Reiniciar timeout
+          break;
+        }
 
-          if (error) {
-            SerialBT.println("{\"status\":\"error\",\"message\":\"JSON inválido\"}");
-            pantalla("ERROR JSON", "Formato inválido");
-            sistema.msjDesde = millis();
-            sistema.mostrandoMsj = true;
-            sistema.estado = ESPERA_CONEXION;
-          } else {
-            const char* action = doc["action"] | "";
+        JsonDocument doc;
+        DeserializationError error = deserializeJson(doc, cmd);
 
-            if (strcmp(action, "config_network") == 0) {
-              const char* ssid = doc["ssid"] | "";
-              const char* password = doc["password"] | "";
+        if (error) {
+          SerialBT.println("{\"status\":\"error\",\"message\":\"JSON inválido\"}");
+          volverAEspera("ERROR JSON", "Formato inválido");
+          break;
+        }
 
-              if (strlen(ssid) == 0) {
-                SerialBT.println("{\"status\":\"error\",\"message\":\"SSID requerido\"}");
-                pantalla("ERROR JSON", "SSID requerido");
-                sistema.msjDesde = millis();
-                sistema.mostrandoMsj = true;
-                sistema.estado = ESPERA_CONEXION;
-              } else {
-                prefs.begin("cfg", false);
-                prefs.putString("ssid", ssid);
-                prefs.putString("pass", password);
-                prefs.end();
-                config.ssid = String(ssid);
-                config.pass = String(password);
-                config.wifiConfigurado = true;
+        const char* action = doc["action"] | "";
 
-                const char* btName = doc["bt_name"] | "";
-                if (strlen(btName) > 0) {
-                  prefs.begin("cfg", false);
-                  prefs.putString("bt_name", btName);
-                  prefs.end();
-                  config.btName = String(btName);
-                }
+        // ── config_network ──────────────────────────────────
+        if (strcmp(action, "config_network") == 0) {
+          const char* ssid = doc["ssid"] | "";
+          const char* password = doc["password"] | "";
 
-                const char* hostname = doc["hostname"] | "";
-                if (strlen(hostname) > 0) {
-                  prefs.begin("cfg", false);
-                  prefs.putString("hostname", hostname);
-                  prefs.end();
-                  config.hostname = String(hostname);
-                }
-
-                const char* iotToken = doc["iot_token"] | "";
-                if (strlen(iotToken) > 0) {
-                  prefs.begin("cfg", false);
-                  prefs.putString("iot_token", iotToken);
-                  prefs.end();
-                  config.iotToken = String(iotToken);
-                }
-
-                String mac = obtenerMacAddress();
-
-                {
-                  StaticJsonDocument<128> resp;
-                  resp["status"] = "processing";
-                  resp["message"] = "Conectando a WiFi...";
-                  String jsonResp;
-                  serializeJson(resp, jsonResp);
-                  SerialBT.println(jsonResp);
-                }
-                SerialBT.flush();
-                delay(200);
-
-                pantalla("CONFIG JSON", "Conectando...");
-
-                sistema.wifiConnecting = true;
-                sistema.wifiRetryCount = 0;
-                sistema.wifiStartTime = millis();
-                sistema.estado = MODO_CONECTANDO_WIFI;
-
-                Serial.println("[V7] JSON config_network OK. MAC: " + mac);
-              }
-            } else if (strcmp(action, "set_bt_name") == 0) {
-              const char* name = doc["name"] | "";
-
-              if (strlen(name) == 0) {
-                SerialBT.println("{\"status\":\"error\",\"message\":\"Nombre requerido\"}");
-                pantalla("ERROR", "Nombre BT vacío");
-              } else {
-                prefs.begin("cfg", false);
-                prefs.putString("bt_name", name);
-                prefs.end();
-                config.btName = String(name);
-
-                SerialBT.println("{\"status\":\"success\",\"message\":\"Nombre BT actualizado\"}");
-                SerialBT.flush();
-                delay(200);
-                pantalla("BT NAME OK", name);
-
-                SerialBT.end();
-                SerialBT.begin(config.btName.c_str());
-                Serial.println("[V8] BT name cambiado a: " + config.btName);
-              }
-              sistema.msjDesde = millis();
-              sistema.mostrandoMsj = true;
-              sistema.estado = ESPERA_CONEXION;
-            } else if (strcmp(action, "report_ip") == 0) {
-              if (WiFi.status() != WL_CONNECTED) {
-                SerialBT.println("{\"status\":\"error\",\"message\":\"WiFi no conectado\"}");
-                pantalla("ERROR", "WiFi no conectado");
-              } else {
-                SerialBT.println("{\"status\":\"success\",\"message\":\"Reportando IP a Odoo...\"}");
-                SerialBT.flush();
-                delay(200);
-                pantalla("REPORTANDO IP", "A Odoo...");
-                // Marcar para envío asíncrono (no bloquea el loop)
-                sistema.reportPending = true;
-              }
-              sistema.msjDesde = millis();
-              sistema.mostrandoMsj = true;
-              sistema.estado = ESPERA_CONEXION;
-            } else if (strcmp(action, "set_hostname") == 0) {
-              const char* hostname = doc["hostname"] | "";
-
-              if (strlen(hostname) == 0) {
-                SerialBT.println("{\"status\":\"error\",\"message\":\"Hostname requerido\"}");
-                pantalla("ERROR", "Hostname vacío");
-              } else {
-                prefs.begin("cfg", false);
-                prefs.putString("hostname", hostname);
-                prefs.end();
-                config.hostname = String(hostname);
-
-                SerialBT.println("{\"status\":\"success\",\"message\":\"Hostname configurado\"}");
-                SerialBT.flush();
-                pantalla("HOSTNAME OK", hostname);
-                delay(1000);
-                ESP.restart();
-              }
-            } else {
-              SerialBT.println("{\"status\":\"error\",\"message\":\"Acción desconocida\"}");
-              pantalla("ERROR JSON", (String("Acción: ") + action).c_str());
-              sistema.msjDesde = millis();
-              sistema.mostrandoMsj = true;
-              sistema.estado = ESPERA_CONEXION;
-            }
+          if (strlen(ssid) == 0) {
+            SerialBT.println("{\"status\":\"error\",\"message\":\"SSID requerido\"}");
+            volverAEspera("ERROR JSON", "SSID requerido");
+            break;
           }
+
+          // [V10] Single NVS open/close (BUG-13 fix)
+          prefs.begin("cfg", false);
+          prefs.putString("ssid", ssid);
+          prefs.putString("pass", password);
+
+          const char* btName = doc["bt_name"] | "";
+          if (strlen(btName) > 0) {
+            prefs.putString("bt_name", btName);
+            config.btName = String(btName);
+          }
+          const char* hostname = doc["hostname"] | "";
+          if (strlen(hostname) > 0) {
+            prefs.putString("hostname", hostname);
+            config.hostname = String(hostname);
+          }
+          const char* iotToken = doc["iot_token"] | "";
+          if (strlen(iotToken) > 0) {
+            prefs.putString("iot_token", iotToken);
+            config.iotToken = String(iotToken);
+          }
+          const char* odooUrl = doc["odoo_url"] | "";
+          if (strlen(odooUrl) > 0) {
+            prefs.putString("odoo_url", odooUrl);
+            config.odooUrl = String(odooUrl);
+          }
+          prefs.end();
+
+          config.ssid = String(ssid);
+          config.pass = String(password);
+          config.wifiConfigurado = true;
+
+          // Respuesta "processing" — la app sabe que estamos trabajando
+          {
+            JsonDocument resp;
+            resp["status"] = "processing";
+            resp["message"] = "Conectando a WiFi...";
+            String jsonResp;
+            serializeJson(resp, jsonResp);
+            SerialBT.println(jsonResp);
+          }
+          SerialBT.flush();
+          delay(200);
+
+          pantalla("CONFIG JSON", "Conectando...");
+
+          sistema.wifiConnecting = true;
+          sistema.wifiRetryCount = 0;
+          sistema.wifiStarted    = false;  // Reset for clean start
+          sistema.wifiStartTime  = millis();
+          sistema.estado         = MODO_CONECTANDO_WIFI;
+
+          Serial.println("[V10] JSON config_network OK.");
+
+        // ── set_bt_name ─────────────────────────────────────
+        } else if (strcmp(action, "set_bt_name") == 0) {
+          const char* name = doc["name"] | "";
+          if (strlen(name) == 0) {
+            SerialBT.println("{\"status\":\"error\",\"message\":\"Nombre requerido\"}");
+            volverAEspera("ERROR", "Nombre BT vacío");
+          } else {
+            prefs.begin("cfg", false);
+            prefs.putString("bt_name", name);
+            prefs.end();
+            config.btName = String(name);
+
+            SerialBT.println("{\"status\":\"success\",\"message\":\"Nombre BT actualizado\"}");
+            pantalla("BT NAME OK", name);
+            Serial.println("[V10] BT name cambiado a: " + config.btName);
+
+            // Auto-desconexión tras config completada
+            volverAEspera("BT NAME OK", name);
+
+            // Reiniciar BT con nuevo nombre
+            SerialBT.end();
+            SerialBT.begin(config.btName.c_str());
+          }
+
+        // ── set_hostname ────────────────────────────────────
+        } else if (strcmp(action, "set_hostname") == 0) {
+          const char* hostname = doc["hostname"] | "";
+          if (strlen(hostname) == 0) {
+            SerialBT.println("{\"status\":\"error\",\"message\":\"Hostname requerido\"}");
+            volverAEspera("ERROR", "Hostname vacío");
+          } else {
+            prefs.begin("cfg", false);
+            prefs.putString("hostname", hostname);
+            prefs.end();
+            config.hostname = String(hostname);
+
+            SerialBT.println("{\"status\":\"success\",\"message\":\"Hostname configurado\"}");
+            SerialBT.flush();
+            delay(200);
+            pantalla("HOSTNAME OK", hostname);
+            delay(1000);
+            ESP.restart();
+          }
+
+        // ── report_ip ───────────────────────────────────────
+        } else if (strcmp(action, "report_ip") == 0) {
+          if (WiFi.status() != WL_CONNECTED) {
+            SerialBT.println("{\"status\":\"error\",\"message\":\"WiFi no conectado\"}");
+            volverAEspera("ERROR", "WiFi no conectado");
+          } else {
+            SerialBT.println("{\"status\":\"success\",\"message\":\"Reportando IP a Odoo...\"}");
+            sistema.reportPending = true;
+            // Auto-desconexión tras respuesta
+            volverAEspera("REPORTANDO IP", "A Odoo...");
+          }
+
+        // ── Acción desconocida ───────────────────────────────
+        } else {
+          SerialBT.println("{\"status\":\"error\",\"message\":\"Acción desconocida\"}");
+          volverAEspera("ERROR JSON", (String("Acción: ") + action).c_str());
         }
-        // ── Fallback texto: wifi (SSID manual) ──────────────
-        else if (cmd == "wifi") {
-          pantalla("CONFIG WIFI", "Envie SSID:");
-          SerialBT.println("SSID:");
-          sistema.estado  = MODO_WIFI_SSID;
-          sistema.timeout = millis();
-        }
-        else {
-          SerialBT.println("CMD_DESCONOCIDO");
-          sistema.timeout = millis();
-        }
-      }
-      break;
-
-    // ----------------------------------------------------------
-    // MODO_WIFI_SSID — Recibe SSID por BT
-    // ----------------------------------------------------------
-    case MODO_WIFI_SSID:
-      if (!SerialBT.hasClient()) { sistema.estado = ESPERA_CONEXION; break; }
-
-      if (millis() - sistema.timeout > 60000) {
-        SerialBT.println("TIMEOUT");
-        sistema.estado = ESPERA_CONEXION;
-        break;
-      }
-
-      if (SerialBT.available()) {
-        sistema.ssidTemp = SerialBT.readStringUntil('\n');
-        sistema.ssidTemp.trim();
-        pantalla("CONFIG WIFI", "Envie Password:");
-        SerialBT.println("PASS:");
-        sistema.estado  = MODO_WIFI_PASS;
-        sistema.timeout = millis();
-      }
-      break;
-
-    // ----------------------------------------------------------
-    // MODO_WIFI_PASS — Recibe contraseña, guarda y reinicia
-    // ----------------------------------------------------------
-    case MODO_WIFI_PASS:
-      if (!SerialBT.hasClient()) { sistema.estado = ESPERA_CONEXION; break; }
-
-      if (millis() - sistema.timeout > 60000) {
-        SerialBT.println("TIMEOUT");
-        sistema.estado = ESPERA_CONEXION;
-        break;
-      }
-
-      if (SerialBT.available()) {
-        String pass = SerialBT.readStringUntil('\n');
-        pass.trim();
-
-        prefs.begin("cfg", false);
-        prefs.putString("ssid", sistema.ssidTemp);
-        prefs.putString("pass", pass);
-        prefs.end();
-
-        pantalla("WIFI GUARDADO", "Reiniciando...");
-        SerialBT.println("REINICIANDO");
-        delay(1000);
-        ESP.restart();
       }
       break;
 
@@ -494,6 +427,46 @@ void manejarAsincronos() {
     digitalWrite(PIN_LED_ERROR, LOW);
     if (sistema.estado == ESPERA_CONEXION) mostrarIdle();
   }
+}
+
+// ============================================================
+//  HELPER: Transición limpia a ESPERA_CONEXION con disconnect BT
+// ============================================================
+void volverAEspera(const char* msg1, const char* msg2) {
+  SerialBT.flush();
+  delay(200);
+  SerialBT.disconnect();
+  pantalla(msg1, msg2);
+  sistema.msjDesde     = millis();
+  sistema.mostrandoMsj = true;
+  sistema.estado       = ESPERA_CONEXION;
+}
+
+// ============================================================
+//  HELPER: Registra endpoints HTTP una sola vez
+// ============================================================
+void registrarEndpoints() {
+  if (sistema.handlersRegistered) return;
+
+  server.on("/abrir", HTTP_GET, []() {
+    if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
+      server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
+      Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
+      return;
+    }
+    server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
+    pantalla("SENAL ODOO", "Abriendo porton...");
+    digitalWrite(PIN_LED_OK, HIGH);
+    digitalWrite(PIN_RELAY_OK, HIGH);
+    sistema.releActivo = true;
+    sistema.releActivoDesde = millis();
+    sistema.msjDesde = millis();
+    sistema.mostrandoMsj = true;
+    Serial.println("[RELE] Activado por Odoo");
+  });
+
+  agregarEndpointStatus();
+  sistema.handlersRegistered = true;
 }
 
 // ============================================================
@@ -586,30 +559,7 @@ void conectarWiFi() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\n[WiFi] Conectado: " + WiFi.localIP().toString());
 
-    if (!sistema.handlersRegistered) {
-      // ── Endpoint /abrir ──
-      server.on("/abrir", HTTP_GET, []() {
-        if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
-          server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
-          Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
-          return;
-        }
-        server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
-        pantalla("SENAL ODOO", "Abriendo porton...");
-        digitalWrite(PIN_LED_OK, HIGH);
-        digitalWrite(PIN_RELAY_OK, HIGH);
-        sistema.releActivo = true;
-        sistema.releActivoDesde = millis();
-        sistema.msjDesde = millis();
-        sistema.mostrandoMsj = true;
-        Serial.println("[RELE] Activado por Odoo");
-      });
-
-      // ── [V7] Endpoint /status ──
-      agregarEndpointStatus();
-
-      sistema.handlersRegistered = true;
-    }
+    registrarEndpoints();
 
     server.begin();
     Serial.println("[HTTP] Servidor iniciado en puerto 80");
@@ -631,9 +581,9 @@ void conectarWiFi() {
 void reportarIPyMAC() {
   if (WiFi.status() != WL_CONNECTED || config.odooUrl.length() == 0) return;
 
-  StaticJsonDocument<256> doc;
+  JsonDocument doc;
   doc["jsonrpc"] = "2.0";
-  JsonObject params = doc.createNestedObject("params");
+  JsonObject params = doc["params"].to<JsonObject>();
   params["iot_token"]    = config.iotToken;
   params["mac_address"]  = obtenerMacAddress();
   params["ip"]           = WiFi.localIP().toString();
@@ -689,13 +639,12 @@ String obtenerMacAddress() {
 //  [V7] CONEXIÓN WIFI ASÍNCRONA (no bloqueante)
 // ============================================================
 void manejarConexionWiFiAsync() {
-  static bool wifiStarted = false;
-  if (!wifiStarted) {
+  if (!sistema.wifiStarted) {
     WiFi.setHostname(config.hostname.c_str());
     WiFi.begin(config.ssid.c_str(), config.pass.c_str());
-    wifiStarted = true;
+    sistema.wifiStarted = true;
     pantalla("CONECTANDO WIFI", config.ssid.c_str());
-    Serial.println("[V7] Conectando WiFi async: " + config.ssid);
+    Serial.println("[V10] Conectando WiFi async: " + config.ssid);
   }
 
   if (millis() - sistema.lastBlink > 250) {
@@ -705,52 +654,36 @@ void manejarConexionWiFiAsync() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    wifiStarted = false;
+    sistema.wifiStarted    = false;
     sistema.wifiConnecting = false;
     sistema.wifiRetryCount = 0;
     digitalWrite(PIN_LED_WAIT, LOW);
 
     String mac = obtenerMacAddress();
-    StaticJsonDocument<128> resp;
+    JsonDocument resp;
     resp["status"] = "success";
     resp["mac_address"] = mac;
     resp["message"] = "WiFi conectado";
     String jsonResp;
     serializeJson(resp, jsonResp);
-    SerialBT.println(jsonResp);
-    SerialBT.flush();
-    delay(1000);
 
+    if (SerialBT.hasClient()) {
+      SerialBT.println(jsonResp);
+      SerialBT.flush();
+      delay(200);
+      SerialBT.disconnect();  // [V10] Auto-desconexión limpia
+    }
+
+    // Reiniciar BT solo para aplicar posible cambio de nombre y asegurar estado
     SerialBT.end();
-    delay(500);
+    delay(200);
     SerialBT.begin(config.btName.c_str());
-    Serial.println("[V8] BT reiniciado como: " + config.btName);
+    Serial.println("[V10] BT reiniciado como: " + config.btName);
 
     pantalla("WIFI CONECTADO", WiFi.localIP().toString().c_str());
-    Serial.println("[V7] WiFi conectado: " + WiFi.localIP().toString());
+    Serial.println("[V10] WiFi conectado: " + WiFi.localIP().toString());
 
-    if (!sistema.handlersRegistered) {
-      server.on("/abrir", HTTP_GET, []() {
-        if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
-          server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
-          Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
-          return;
-        }
-        server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Acceso concedido\"}");
-        pantalla("SENAL ODOO", "Abriendo porton...");
-        digitalWrite(PIN_LED_OK, HIGH);
-        digitalWrite(PIN_RELAY_OK, HIGH);
-        sistema.releActivo = true;
-        sistema.releActivoDesde = millis();
-        sistema.msjDesde = millis();
-        sistema.mostrandoMsj = true;
-        Serial.println("[RELE] Activado por Odoo");
-      });
-
-      agregarEndpointStatus();
-
-      sistema.handlersRegistered = true;
-    }
+    registrarEndpoints();
 
     server.begin();
     Serial.println("[HTTP] Servidor iniciado en puerto 80");
@@ -762,26 +695,29 @@ void manejarConexionWiFiAsync() {
     sistema.mostrandoMsj = true;
   }
   else if (millis() - sistema.wifiStartTime > TIEMPO_WIFI_MAX) {
-    wifiStarted = false;
+    sistema.wifiStarted    = false;
     sistema.wifiConnecting = false;
     digitalWrite(PIN_LED_WAIT, LOW);
     digitalWrite(PIN_LED_ERROR, HIGH);
 
-    WiFi.disconnect(); // Detener reintentos internos del ESP32
+    WiFi.disconnect();
 
-    StaticJsonDocument<128> resp;
+    JsonDocument resp;
     resp["status"] = "error";
     resp["message"] = "Fallo de conexión WiFi";
     String jsonResp;
     serializeJson(resp, jsonResp);
-    SerialBT.println(jsonResp);
-    SerialBT.flush();
-    delay(500);
 
-    Serial.println("[V9] Fallo WiFi. BT se mantiene activo.");
+    if (SerialBT.hasClient()) {
+      SerialBT.println(jsonResp);
+      SerialBT.flush();
+      delay(200);
+      SerialBT.disconnect();  // [V10] Auto-desconexión en error
+    }
+
+    Serial.println("[V10] Fallo WiFi. BT desconectado.");
 
     pantalla("ERROR WIFI", "Timeout 30s");
-    Serial.println("[V7] WiFi timeout");
     sistema.msjDesde = millis();
     sistema.mostrandoMsj = true;
     sistema.estado = ESPERA_CONEXION;
@@ -793,7 +729,7 @@ void manejarConexionWiFiAsync() {
 // ============================================================
 void agregarEndpointStatus() {
   server.on("/status", HTTP_GET, []() {
-    StaticJsonDocument<256> doc;
+    JsonDocument doc;
     doc["mac"] = obtenerMacAddress();
 
     if (WiFi.status() == WL_CONNECTED) {

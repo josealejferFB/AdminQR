@@ -22,6 +22,9 @@ import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 import android.util.Log
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 @Singleton
 class BluetoothRepositoryImpl @Inject constructor(
@@ -44,9 +47,14 @@ class BluetoothRepositoryImpl @Inject constructor(
     private val _connectionState = MutableStateFlow<BluetoothConnectionState>(BluetoothConnectionState.Idle)
     override val connectionState: StateFlow<BluetoothConnectionState> = _connectionState.asStateFlow()
 
-    private val _messages = MutableSharedFlow<String>()
+    private val _messages = MutableSharedFlow<String>(
+        replay = 1,
+        extraBufferCapacity = 5,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
     override val messages: Flow<String> = _messages.asSharedFlow()
 
+    private val socketMutex = Mutex()
     private var socket: BluetoothSocket? = null
     private var connectionJob: Job? = null
     private val readBuffer = StringBuilder()
@@ -140,13 +148,15 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun connectToDevice(address: String) {
-        // Cancelamos job anterior sin cambiar el estado (evita snackbar falso)
         connectionJob?.cancel()
-        socket?.close()
-        socket = null
-        readBuffer.clear()
-
         connectionJob = scope.launch {
+            socketMutex.withLock {
+                socket?.close()
+                socket = null
+                readBuffer.clear()
+                _messages.resetReplayCache()
+            }
+
             if (bluetoothAdapter == null) {
                 _connectionState.value = BluetoothConnectionState.Error(
                     "Bluetooth no disponible en este dispositivo")
@@ -163,24 +173,28 @@ class BluetoothRepositoryImpl @Inject constructor(
                 bluetoothAdapter.cancelDiscovery()
 
                 try {
-                    withTimeout(12000) {
+                    withTimeout(20000) {
                         try {
                             // Método estándar con UUID SPP
-                            socket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-                            var connectJob = launch(Dispatchers.IO) { socket?.connect() }
+                            val newSocket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                            socketMutex.withLock { socket = newSocket }
+                            var connectJob = launch(Dispatchers.IO) { newSocket.connect() }
                             connectJob.join()
                         } catch (e: Exception) {
                             if (e is CancellationException) throw e // Don't catch the timeout's cancellation
                             // FALLBACK: Conexión por reflexión (canal 1)
-                            socket?.close()
-                            socket = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
-                                .invoke(device, 1) as BluetoothSocket
-                            var connectJob = launch(Dispatchers.IO) { socket?.connect() }
-                            connectJob.join()
+                            socketMutex.withLock {
+                                socket?.close()
+                                val fallbackSocket = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                                    .invoke(device, 1) as BluetoothSocket
+                                socket = fallbackSocket
+                                var connectJob = launch(Dispatchers.IO) { fallbackSocket.connect() }
+                                connectJob.join()
+                            }
                         }
                     }
                 } catch (e: TimeoutCancellationException) {
-                    socket?.close() // This forcefully interrupts the native connect()!
+                    socketMutex.withLock { socket?.close() } // This forcefully interrupts the native connect()!
                     throw e
                 }
                 
@@ -190,27 +204,37 @@ class BluetoothRepositoryImpl @Inject constructor(
             } catch (e: SecurityException) {
                 Log.e("BluetoothRepository", "SecurityException al conectar", e)
                 _connectionState.value = BluetoothConnectionState.Error("Faltan permisos de Bluetooth")
-                socket?.close()
-                socket = null
+                socketMutex.withLock { 
+                    socket?.close()
+                    socket = null
+                }
             } catch (e: TimeoutCancellationException) {
                 Log.e("BluetoothRepository", "TimeoutCancellationException al conectar", e)
                 _connectionState.value = BluetoothConnectionState.Error("Tiempo de espera agotado al conectar")
-                socket?.close()
-                socket = null
+                socketMutex.withLock { 
+                    socket?.close()
+                    socket = null
+                }
             } catch (e: Exception) {
                 Log.e("BluetoothRepository", "Exception al conectar", e)
                 _connectionState.value = BluetoothConnectionState.Error("Fallo de conexión: ${e.message}")
-                socket?.close()
-                socket = null
+                socketMutex.withLock { 
+                    socket?.close()
+                    socket = null
+                }
             }
         }
     }
 
     override fun disconnect() {
         connectionJob?.cancel()
-        socket?.close()
-        socket = null
-        readBuffer.clear()
+        scope.launch {
+            socketMutex.withLock {
+                socket?.close()
+                socket = null
+                readBuffer.clear()
+            }
+        }
         _connectionState.value = BluetoothConnectionState.Idle
     }
 
@@ -252,7 +276,7 @@ class BluetoothRepositoryImpl @Inject constructor(
 
     private suspend fun listenForMessages() {
         withContext(Dispatchers.IO) {
-            val inputStream: InputStream = socket?.inputStream ?: return@withContext
+            val inputStream: InputStream = socketMutex.withLock { socket?.inputStream } ?: return@withContext
             val buffer = ByteArray(1024)
             while (isActive) {
                 try {
@@ -271,17 +295,18 @@ class BluetoothRepositoryImpl @Inject constructor(
                             newlineIdx = readBuffer.indexOf('\n')
                         }
                     } else if (bytes == -1) {
-                        // El extremo remoto cerró la conexión limpiamente
+                        // El extremo remoto cerró la conexión limpiamente (Ej. Autodisconnect tras configurar)
                         break
                     }
                 } catch (e: IOException) {
-                    // El ESP32 cerró la conexión (timeout u otro motivo)
+                    // El ESP32 cerró la conexión
                     break
                 }
             }
-            // Si el job sigue activo, significa que el cierre fue remoto (ESP32 timeout)
+            // Si el job sigue activo, significa que el cierre fue remoto (ESP32 auto-disconnect)
+            // Tratamos la desconexión remota como transición a Idle en lugar de Error
             if (isActive) {
-                _connectionState.value = BluetoothConnectionState.Error("Desconectado")
+                _connectionState.value = BluetoothConnectionState.Idle
             }
         }
     }

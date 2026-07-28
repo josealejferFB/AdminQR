@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.escanqradmin.data.network.ApiConstants
 import com.example.escanqradmin.domain.model.GateInfo
 import com.example.escanqradmin.domain.model.SecurityConstants
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
@@ -46,6 +47,7 @@ fun ReconfigureNetworkDialog(
     connectionState: BluetoothConnectionState,
     onConnect: () -> Unit,
     onSendMessageAndWaitForReply: suspend (String, Long) -> String?,
+    onDisconnect: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     var step by remember { mutableStateOf(ReconfigureStep.Input) }
@@ -58,7 +60,12 @@ fun ReconfigureNetworkDialog(
     val isConnecting = connectionState is BluetoothConnectionState.Connecting && connectionState.deviceAddress.equals(gate.macAddress, ignoreCase = true)
     val connectionError = if (connectionState is BluetoothConnectionState.Error) connectionState.message else null
 
-    Dialog(onDismissRequest = { if (step != ReconfigureStep.Submitting) onDismiss() }) {
+    Dialog(onDismissRequest = { 
+        if (step != ReconfigureStep.Submitting) {
+            onDisconnect()
+            onDismiss() 
+        }
+    }) {
         Surface(
             shape = AppShapes.Pill,
             color = MaterialTheme.colorScheme.surface,
@@ -87,7 +94,10 @@ fun ReconfigureNetworkDialog(
                     }
                     if (step != ReconfigureStep.Submitting) {
                         IconButton(
-                            onClick = onDismiss,
+                            onClick = {
+                                onDisconnect()
+                                onDismiss()
+                            },
                             modifier = Modifier.background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
                         ) {
                             Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
@@ -179,6 +189,7 @@ fun ReconfigureNetworkDialog(
                                                 put("bt_name", gate.name)
                                                 put("hostname", safeHostname)
                                                 put("iot_token", SecurityConstants.IOT_TOKEN)
+                                                put("odoo_url", "${ApiConstants.BASE_URL}/api/update_esp_ip")
                                             }.toString()
 
                                             val response = onSendMessageAndWaitForReply(payload, 40000L)
@@ -259,7 +270,10 @@ fun ReconfigureNetworkDialog(
                                 )
                                 Spacer(Modifier.height(24.dp))
                                 Button(
-                                    onClick = onDismiss,
+                                    onClick = {
+                                        onDisconnect()
+                                        onDismiss()
+                                    },
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     shape = AppShapes.Input
                                 ) {

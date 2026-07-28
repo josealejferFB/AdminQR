@@ -75,12 +75,10 @@ ESPERA_CONEXION (0)  →  MODO_CONFIG_BT (1)
 | Estado | Valor | Descripción |
 |---|---|---|
 | `ESPERA_CONEXION` | 0 | Idle. Parpadea LED. WebServer HTTP activo. Reconexión WiFi automática (max 3 intentos). |
-| `MODO_CONFIG_BT` | 1 | Cliente BT conectado. Acepta comandos JSON: `config_network`, `set_bt_name`, `set_hostname`. |
-| `MODO_WIFI_SSID` | 3 | (Legacy) Espera SSID de red WiFi por texto. |
-| `MODO_WIFI_PASS` | 4 | (Legacy) Espera contraseña WiFi por texto. Guarda y reinicia. |
-| `MODO_CONECTANDO_WIFI` | 5 | (V7+) Conexión WiFi asíncrona no bloqueante. Procesa BT solo para limpiar buffer. |
+| `MODO_CONFIG_BT` | 1 | Cliente BT conectado. Solo acepta comandos JSON: `config_network`, `set_bt_name`, `set_hostname`, `report_ip`. Auto-desconecta BT al completar cada comando. |
+| `MODO_CONECTANDO_WIFI` | 5 | (V7+) Conexión WiFi asíncrona no bloqueante. Al finalizar (éxito o error), envía respuesta JSON y auto-desconecta BT. |
 
-### Diagrama de flujo (V9)
+### Diagrama de flujo (V10)
 
 ```
             ┌──────────────────────┐
@@ -93,30 +91,33 @@ ESPERA_CONEXION (0)  →  MODO_CONFIG_BT (1)
             ┌──────────────────────┐
             │    MODO_CONFIG_BT     │
             │ Timeout: 30s          │
-            └───┬──────────┬───────┘
-       JSON    │          │  "wifi" (legacy)
-               ▼          ▼
-   ┌────────────────────┐  ┌──────────────────┐
-   │ Procesa JSON       │  │ MODO_WIFI_SSID   │
-   │  • config_network  │  │ (legacy V6)       │
-   │  • set_bt_name     │  └────────┬─────────┘
-   │  • set_hostname    │           ▼
-   └────────┬───────────┘  ┌──────────────────┐
-            │              │ MODO_WIFI_PASS   │
-            │              │ (legacy V6)       │
-            │              └────────┬─────────┘
-            │                       │ Guarda y reinicia
-            ▼                       ▼
-   ┌────────────────────┐      REINICIANDO
-   │ MODO_CONECTANDO_WIFI│
-   │ WiFi asíncrono      │
-   │ Timeout: 30s        │
-   │ Max 3 reintentos    │
-   └────────┬───────────┘
-            │ WiFi OK
-            ▼
+            │ Solo JSON             │
+            └───┬──────────────────┘
+                │ JSON command
+                ▼
+   ┌────────────────────────┐
+   │ Procesa JSON            │
+   │  • config_network       │──→ MODO_CONECTANDO_WIFI
+   │  • set_bt_name          │──→ Responde + auto-disconnect
+   │  • set_hostname         │──→ Responde + ESP.restart()
+   │  • report_ip            │──→ Responde + auto-disconnect
+   └────────────────────────┘
+                │ config_network
+                ▼
+   ┌────────────────────────┐
+   │ MODO_CONECTANDO_WIFI    │
+   │ WiFi asíncrono          │
+   │ Timeout: 30s            │
+   └────────┬──────┬────────┘
+            │      │
+     WiFi OK│      │WiFi Error
+            ▼      ▼
+   Envía success  Envía error
+   + mac_address  + auto-disconnect
+   + auto-disconnect
+            │      │
+            ▼      ▼
    ESPERA_CONEXION
-   (BT reiniciado con nuevo nombre si cambió)
 ```
 
 ### Timeouts
@@ -124,11 +125,26 @@ ESPERA_CONEXION (0)  →  MODO_CONFIG_BT (1)
 | Estado | Timeout |
 |---|---|
 | `MODO_CONFIG_BT` | 30 segundos |
-| `MODO_WIFI_SSID` | 60 segundos (legacy) |
-| `MODO_WIFI_PASS` | 60 segundos (legacy) |
 | `MODO_CONECTANDO_WIFI` | 30 segundos (max 3 intentos totales) |
 
 Al expirar el timeout o superar los reintentos, el ESP32 vuelve a `ESPERA_CONEXION` y muestra error en pantalla. Si se superan los 3 intentos de WiFi, se enciende LED_ERROR fijo.
+
+### Auto-Desconexión Bluetooth (V10)
+
+A partir de V10, el ESP32 **auto-desconecta** la conexión Bluetooth tras completar cada comando. Esto aplica a:
+
+| Evento | Comportamiento |
+|---|---|
+| `config_network` → WiFi OK | Envía `{"status":"success",...}` → `SerialBT.disconnect()` |
+| `config_network` → WiFi Error | Envía `{"status":"error",...}` → `SerialBT.disconnect()` |
+| `set_bt_name` | Envía `{"status":"success",...}` → `SerialBT.disconnect()` → reinicia BT |
+| `set_hostname` | Envía `{"status":"success",...}` → `ESP.restart()` |
+| `report_ip` | Envía `{"status":"success",...}` → `SerialBT.disconnect()` |
+| Timeout 30s | Envía `{"status":"error","message":"Timeout BT"}` → `SerialBT.disconnect()` |
+| JSON inválido | Envía `{"status":"error",...}` → `SerialBT.disconnect()` |
+| Acción desconocida | Envía `{"status":"error",...}` → `SerialBT.disconnect()` |
+
+La app Android debe tratar la desconexión como evento esperado (transicionar a `Idle`, no `Error`).
 
 ## Comandos y Respuestas (V9)
 
@@ -142,11 +158,7 @@ Al expirar el timeout o superar los reintentos, el ESP32 vuelve a `ESPERA_CONEXI
 
 Cualquier comando no reconocido recibe `{"status":"error","message":"Acción desconocida"}`.
 
-### Comando legacy texto
 
-| Comando | Descripción |
-|---|---|
-| `wifi` | (Legacy V6) Configuración secuencial de WiFi: SSID → PASS → reinicia |
 
 ### Formato de respuesta del ESP32
 
@@ -174,7 +186,8 @@ Este es el flujo principal en V9. La app Admin envía un solo JSON con todos los
        "password": "password123",
        "bt_name": "ESP32_Puerta1",
        "hostname": "porton-principal",
-       "iot_token": "iot_secret_2024"
+       "iot_token": "iot_secret_2024",
+       "odoo_url": "http://172.17.12.119:8059/api/update_esp_ip"
    }
    ```
 3. ESP32 guarda todo en NVS y responde: `{"status":"success","mac_address":"...","message":"Red configurada"}`
@@ -183,7 +196,7 @@ Este es el flujo principal en V9. La app Admin envía un solo JSON con todos los
 6. Al conectar WiFi: BT se reinicia con el nuevo nombre, se reporta IP a Odoo, se inicia WebServer
 7. Si WiFi falla tras 3 intentos: LED_ERROR fijo, muestra "WIFI ERROR / Sin conexion / Reintente via BT"
 
-**Campos opcionales:** `bt_name`, `hostname`, `iot_token` — si no se envían, se mantienen los valores actuales.
+**Campos opcionales:** `bt_name`, `hostname`, `iot_token`, `odoo_url` — si no se envían, se mantienen los valores actuales.
 
 ## Comando `set_bt_name`
 
@@ -206,13 +219,7 @@ Este es el flujo principal en V9. La app Admin envía un solo JSON con todos los
 - Persiste en NVS (clave `hostname`)
 - **Reinicia el ESP32** para aplicar el cambio
 
-## Configuración de WiFi vía Bluetooth (Comando legacy `wifi`)
 
-1. Admin envía `"wifi"` → ESP32 responde `"SSID:"`
-2. Admin envía el SSID de la red → ESP32 responde `"PASS:"`
-3. Admin envía la contraseña
-4. ESP32 guarda SSID y PASS en NVS (Preferences, claves `ssid` y `pass`)
-5. Responde `"REINICIANDO"` y ejecuta `ESP.restart()`
 
 ## WebServer Interno (HTTP)
 
@@ -282,15 +289,7 @@ La pantalla `ESPConfigScreen` implementa una consola tipo terminal para interact
 - **Botones rápidos:** "Config" y "WiFi" para enviar los comandos raíz
 - **Consola:** historial de mensajes TX/RX con marcas de tiempo
 
-### Máquina de estados del ViewModel
 
-```kotlin
-enum class EspFlowState {
-    IDLE,
-    WAIT_WIFI_SSID,     // Espera SSID
-    WAIT_WIFI_PASS,     // Espera Password
-}
-```
 
 ### Terminales que finalizan el flujo
 
@@ -299,17 +298,16 @@ enum class EspFlowState {
 - `REINICIANDO`
 - Cualquier respuesta JSON completa
 
-## V8/V9 — Comandos JSON y Configuraciones Avanzadas
+## V10 — Auto-Desconexión y Simplificación
 
-### Resumen de cambios V9 respecto a V8
+### Resumen de cambios V10 respecto a V9
 
-| Cambio | V8 | V9 |
+| Cambio | V9 | V10 |
 |---|---|---|
-| Protocolo texto V6 (`config`, `wifi` legacy) | Soporte completo | Solo `wifi` legacy, `config` eliminado |
-| `MODO_CONFIG_ODOO` | Existente | Eliminado |
-| BT restart en `config_network` | Inmediato, cortaba conexión | Diferido hasta después de WiFi OK |
-| Reconexión WiFi automática | Infinita | Máximo 3 intentos, luego error fijo |
-| Limpieza buffer BT durante WiFi | No | Sí (evita saturación) |
+| Protocolo texto | Solo `wifi` legacy | Eliminado por completo |
+| `MODO_WIFI_SSID` / `PASS` | Existente | Eliminados |
+| Ciclo de vida de conexión | Indefinido | Auto-disconnect tras cada comando (éxito/error) |
+| Interfaz UI | `ESPConfigScreen` (consola) | Integrado a flujos nativos (ej. `GateRegistrationDialog`) |
 
 ### Comandos JSON disponibles (V8+)
 

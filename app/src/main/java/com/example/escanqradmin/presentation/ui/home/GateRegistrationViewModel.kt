@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.wifi.WifiManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.escanqradmin.data.network.ApiConstants
 import com.example.escanqradmin.domain.model.SecurityConstants
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.domain.repository.BluetoothRepository
@@ -154,6 +155,15 @@ class GateRegistrationViewModel @Inject constructor(
         viewModelScope.launch {
             lastDeviceAddress = address
             _uiState.update { it.copy(isSubmitting = true) }
+
+            // Forzar estado limpio antes de conectar (BUG-11 fix)
+            val currentState = bluetoothRepository.connectionState.value
+            if (currentState is BluetoothConnectionState.Connected ||
+                currentState is BluetoothConnectionState.Connecting) {
+                bluetoothRepository.disconnect()
+                delay(500)
+            }
+
             bluetoothRepository.connectToDevice(address)
             bluetoothRepository.connectionState.first { state ->
                 when (state) {
@@ -189,12 +199,27 @@ class GateRegistrationViewModel @Inject constructor(
                 put("bt_name", state.gateName)
                 put("hostname", safeHostname)
                 put("iot_token", SecurityConstants.IOT_TOKEN)
+                put("odoo_url", "${ApiConstants.BASE_URL}/api/update_esp_ip")
             }.toString()
+
+            // Mostrar paso VerifyingWifi inmediatamente
+            _uiState.update { it.copy(step = GateStep.VerifyingWifi, isSubmitting = true) }
 
             val response = bluetoothRepository.sendMessageAndWaitForReply(payload, 40000L)
 
             if (response == null) {
-                _uiState.update { it.copy(step = GateStep.Error("No se recibió respuesta del ESP32"), isSubmitting = false) }
+                // Verificar si BT se desconectó (auto-disconnect del ESP32 post-WiFi)
+                val btState = bluetoothRepository.connectionState.value
+                if (btState is BluetoothConnectionState.Idle) {
+                    _uiState.update {
+                        it.copy(
+                            step = GateStep.Error("El ESP32 se desconectó. La configuración WiFi fue enviada pero no se recibió confirmación. Verifica si el ESP32 se conectó al WiFi."),
+                            isSubmitting = false
+                        )
+                    }
+                } else {
+                    _uiState.update { it.copy(step = GateStep.Error("No se recibió respuesta del ESP32"), isSubmitting = false) }
+                }
                 return@launch
             }
 
@@ -296,10 +321,12 @@ class GateRegistrationViewModel @Inject constructor(
         }
     }
 
-    /** Cierra el diálogo tras registración exitosa (desconecta BT) */
+    /** Cierra el diálogo tras registración exitosa */
     fun closeDone() {
         viewModelScope.launch {
-            bluetoothRepository.disconnect()
+            if (bluetoothRepository.connectionState.value is BluetoothConnectionState.Connected) {
+                bluetoothRepository.disconnect()
+            }
             _events.emit(GateRegistrationEvent.CloseDialog)
             resetState()
         }
