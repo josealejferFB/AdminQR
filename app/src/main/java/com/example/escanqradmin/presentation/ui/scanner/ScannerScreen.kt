@@ -16,8 +16,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.example.escanqradmin.presentation.theme.shape.AppShapes
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -79,7 +79,6 @@ fun ScannerScreen(
     var isNavigating by remember { mutableStateOf(false) }
 
     var torchEnabled by remember { mutableStateOf(false) }
-    var showManualDialog by remember { mutableStateOf(false) }
 
     val snackbarHostState = LocalSnackbarHostState.current
 
@@ -106,8 +105,7 @@ fun ScannerScreen(
             )
             ScannerOverlay(
                 torchEnabled = torchEnabled,
-                onToggleTorch = { torchEnabled = !torchEnabled },
-                onManualEntry = { showManualDialog = true }
+                onToggleTorch = { torchEnabled = !torchEnabled }
             )
         } else {
             Box(
@@ -127,21 +125,8 @@ fun ScannerScreen(
                 .padding(top = 48.dp, start = 16.dp)
                 .background(Color.Black.copy(alpha = 0.3f), CircleShape)
         ) {
-            Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = Color.White)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Color.White)
         }
-    }
-
-    if (showManualDialog) {
-        ManualEntryDialog(
-            onDismiss = { showManualDialog = false },
-            onConfirm = { androidId, userName, cedula, plate ->
-                showManualDialog = false
-                if (!isNavigating) {
-                    isNavigating = true
-                    onQrScanned(QrContent(androidId, userName, cedula, plate))
-                }
-            }
-        )
     }
 }
 
@@ -215,8 +200,7 @@ fun CameraPreview(
 @Composable
 fun ScannerOverlay(
     torchEnabled: Boolean = false,
-    onToggleTorch: () -> Unit = {},
-    onManualEntry: () -> Unit = {}
+    onToggleTorch: () -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "scanLine")
     val lineOffset by infiniteTransition.animateFloat(
@@ -342,135 +326,28 @@ fun ScannerOverlay(
                 fontSize = 12.sp
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .background(
+                        if (torchEnabled) ScannerAccent.copy(alpha = 0.5f)
+                        else Color.White.copy(alpha = 0.2f),
+                        CircleShape
+                    )
+                    .clickable { onToggleTorch() },
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(56.dp)
-                        .background(
-                            if (torchEnabled) ScannerAccent.copy(alpha = 0.5f)
-                            else Color.White.copy(alpha = 0.2f),
-                            CircleShape
-                        )
-                        .clickable { onToggleTorch() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (torchEnabled) Icons.Default.FlashlightOff else Icons.Default.FlashlightOn,
-                        contentDescription = if (torchEnabled) "Apagar linterna" else "Encender linterna",
-                        tint = if (torchEnabled) ScannerAccent else Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .height(56.dp)
-                        .clickable { onManualEntry() }
-                        .background(Color.White.copy(alpha = 0.2f), AppShapes.Pill)
-                        .padding(horizontal = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Keyboard,
-                        contentDescription = "Keyboard",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "INGRESAR DATOS\nMANUALMENTE",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 12.sp
-                    )
-                }
+                Icon(
+                    imageVector = if (torchEnabled) Icons.Default.FlashlightOff else Icons.Default.FlashlightOn,
+                    contentDescription = if (torchEnabled) "Apagar linterna" else "Encender linterna",
+                    tint = if (torchEnabled) ScannerAccent else Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
             }
         }
     }
 }
 
-@Composable
-private fun ManualEntryDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (androidId: String, userName: String, cedula: String, plate: String) -> Unit
-) {
-    var androidId by remember { mutableStateOf("") }
-    var userName by remember { mutableStateOf("") }
-    var cedula by remember { mutableStateOf("") }
-    var plate by remember { mutableStateOf("") }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Ingreso Manual", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = androidId,
-                    onValueChange = { androidId = it },
-                    label = { Text("Android ID") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = AppShapes.Button,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.secondary
-                    )
-                )
-                OutlinedTextField(
-                    value = userName,
-                    onValueChange = { userName = it },
-                    label = { Text("Nombre") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = AppShapes.Button,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.secondary
-                    )
-                )
-                OutlinedTextField(
-                    value = cedula,
-                    onValueChange = { cedula = it },
-                    label = { Text("Cédula") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = AppShapes.Button,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.secondary
-                    )
-                )
-                OutlinedTextField(
-                    value = plate,
-                    onValueChange = { plate = it },
-                    label = { Text("Placa") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = AppShapes.Button,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.secondary
-                    )
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(androidId, userName, cedula, plate) },
-                enabled = userName.isNotBlank() && cedula.isNotBlank() && androidId.isNotBlank()
-            ) {
-                Text("CONTINUAR", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("CANCELAR", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.surface,
-        shape = AppShapes.Card
-    )
-}

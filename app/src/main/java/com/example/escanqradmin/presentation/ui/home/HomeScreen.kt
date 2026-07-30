@@ -182,7 +182,10 @@ fun HomeScreen(
             )
         },
         snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState) { data ->
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(bottom = 100.dp)
+            ) { data ->
                 val isBluetooth = data.visuals.message.contains("Bluetooth", ignoreCase = true)
                 CustomSnackbar(
                     message = data.visuals.message,
@@ -203,7 +206,7 @@ fun HomeScreen(
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 24.dp, top = 0.dp, end = 24.dp, bottom = 32.dp),
+                    contentPadding = PaddingValues(start = 24.dp, top = 0.dp, end = 24.dp, bottom = 100.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
