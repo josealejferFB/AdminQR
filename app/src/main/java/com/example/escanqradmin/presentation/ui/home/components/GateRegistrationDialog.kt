@@ -1,6 +1,7 @@
 package com.example.escanqradmin.presentation.ui.home.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -20,21 +21,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
 import com.example.escanqradmin.domain.model.BluetoothDeviceDomain
+import com.example.escanqradmin.domain.model.GateInfo
 import com.example.escanqradmin.domain.repository.BluetoothConnectionState
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.AppCardDefaults
 import com.example.escanqradmin.presentation.ui.home.GateRegistrationUiState
 import com.example.escanqradmin.presentation.ui.home.GateStep
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GateRegistrationDialog(
     uiState: GateRegistrationUiState,
+    registeredGates: List<GateInfo>,
     scannedDevices: List<BluetoothDeviceDomain>,
     pairedDevices: List<BluetoothDeviceDomain>,
     isScanning: Boolean,
@@ -56,16 +65,22 @@ fun GateRegistrationDialog(
     onSendReportIp: () -> Unit = {},
     onCloseDone: () -> Unit = { onDismiss() }
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = AppShapes.Pill,
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp,
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 16.dp)
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .navigationBarsPadding()
+                .animateContentSize()
         ) {
-            Column(modifier = Modifier.padding(24.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -81,6 +96,7 @@ fun GateRegistrationDialog(
                         Text(
                             text = when (uiState.step) {
                                 is GateStep.SelectBluetooth -> "Conectar al ESP32"
+                                is GateStep.GettingDeviceInfo -> "Obteniendo información"
                                 is GateStep.WiFiConfig -> "Configurar WiFi del ESP32"
                                 is GateStep.VerifyingWifi -> "Verificando conexión WiFi"
                                 is GateStep.RegisteringInOdoo -> "Registrando en Odoo"
@@ -107,6 +123,7 @@ fun GateRegistrationDialog(
                 ) { currentStep ->
                     when (currentStep) {
                         is GateStep.SelectBluetooth -> SelectBluetoothContent(
+                            registeredGates = registeredGates,
                             scannedDevices = scannedDevices,
                             pairedDevices = pairedDevices,
                             isScanning = isScanning,
@@ -116,6 +133,7 @@ fun GateRegistrationDialog(
                             onConnectToDevice = onConnectToDevice,
                             onCancelConnection = onCancelConnection
                         )
+                        is GateStep.GettingDeviceInfo -> GettingDeviceInfoContent()
                         is GateStep.WiFiConfig -> WiFiConfigContent(
                             uiState = uiState,
                             onSsidChange = onSsidChange,
@@ -144,10 +162,10 @@ fun GateRegistrationDialog(
             }
         }
     }
-}
 
 @Composable
-private fun ColumnScope.SelectBluetoothContent(
+private fun SelectBluetoothContent(
+    registeredGates: List<GateInfo>,
     scannedDevices: List<BluetoothDeviceDomain>,
     pairedDevices: List<BluetoothDeviceDomain>,
     isScanning: Boolean,
@@ -157,7 +175,8 @@ private fun ColumnScope.SelectBluetoothContent(
     onConnectToDevice: (String, String?) -> Unit,
     onCancelConnection: () -> Unit
 ) {
-    if (connectionState is BluetoothConnectionState.Error) {
+    Column {
+        if (connectionState is BluetoothConnectionState.Error) {
         AppCard(
             colors = AppCardDefaults.colors(containerColor = MaterialTheme.colorScheme.errorContainer),
             modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
@@ -172,19 +191,21 @@ private fun ColumnScope.SelectBluetoothContent(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier.weight(1f).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
+        LazyColumn(
+            modifier = Modifier.heightIn(max = 350.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
         if (pairedDevices.isNotEmpty()) {
             item { DeviceSectionHeader(title = "Dispositivos Vinculados") }
             items(pairedDevices) { device ->
                 val isThisDeviceConnected = (connectionState as? BluetoothConnectionState.Connected)?.deviceAddress == device.address
                 val isThisDeviceConnecting = (connectionState as? BluetoothConnectionState.Connecting)?.deviceAddress == device.address
+                val isAlreadyRegistered = registeredGates.any { it.macAddress == device.address }
                 DeviceItem(
                     device = device,
                     isDeviceConnected = isThisDeviceConnected,
                     isDeviceConnecting = isThisDeviceConnecting,
+                    isAlreadyRegistered = isAlreadyRegistered,
                     onClick = { onConnectToDevice(device.address, device.name) },
                     onDisconnect = onCancelConnection,
                     connectionState = connectionState
@@ -216,10 +237,12 @@ private fun ColumnScope.SelectBluetoothContent(
             items(scannedDevices) { device ->
                 val isThisDeviceConnected = (connectionState as? BluetoothConnectionState.Connected)?.deviceAddress == device.address
                 val isThisDeviceConnecting = (connectionState as? BluetoothConnectionState.Connecting)?.deviceAddress == device.address
+                val isAlreadyRegistered = registeredGates.any { it.macAddress == device.address }
                 DeviceItem(
                     device = device,
                     isDeviceConnected = isThisDeviceConnected,
                     isDeviceConnecting = isThisDeviceConnecting,
+                    isAlreadyRegistered = isAlreadyRegistered,
                     onClick = { onConnectToDevice(device.address, device.name) },
                     onDisconnect = onCancelConnection,
                     connectionState = connectionState
@@ -246,6 +269,7 @@ private fun ColumnScope.SelectBluetoothContent(
             Text("BUSCAR DISPOSITIVOS", fontWeight = FontWeight.Bold)
         }
     }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -260,6 +284,7 @@ private fun WiFiConfigContent(
     onGateNameChange: (String) -> Unit,
 ) {
     var ssidExpanded by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         onRefreshNetworks()
@@ -295,6 +320,7 @@ private fun WiFiConfigContent(
                         .menuAnchor(),
                     shape = AppShapes.Button,
                     enabled = !uiState.isSubmitting,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     trailingIcon = {
                         if (uiState.availableNetworks.isNotEmpty()) {
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = ssidExpanded)
@@ -342,7 +368,14 @@ private fun WiFiConfigContent(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             shape = AppShapes.Button,
-            visualTransformation = PasswordVisualTransformation(),
+            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+            trailingIcon = {
+                val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    Icon(imageVector = image, contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
             enabled = !uiState.isSubmitting
         )
         Spacer(Modifier.height(12.dp))
@@ -354,6 +387,7 @@ private fun WiFiConfigContent(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             shape = AppShapes.Button,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
             enabled = !uiState.isSubmitting
         )
         Spacer(Modifier.height(24.dp))
@@ -390,6 +424,28 @@ private fun VerifyingWifiContent() {
             Spacer(Modifier.height(8.dp))
             Text(
                 "El ESP32 se está conectando a la red WiFi. Esto puede tomar hasta 30 segundos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun GettingDeviceInfoContent() {
+    Box(Modifier.fillMaxWidth().padding(vertical = 48.dp), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CircularProgressIndicator()
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Obteniendo información...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Leyendo la dirección MAC y versión del ESP32.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp)
@@ -577,17 +633,19 @@ private fun DeviceItem(
     device: BluetoothDeviceDomain,
     isDeviceConnected: Boolean,
     isDeviceConnecting: Boolean,
+    isAlreadyRegistered: Boolean,
     onClick: () -> Unit,
     onDisconnect: () -> Unit,
     connectionState: BluetoothConnectionState
 ) {
     val isConnecting = isDeviceConnecting
+    val isRegistered = isAlreadyRegistered
 
     AppCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = if (!isConnecting && !isDeviceConnected) onClick else null,
+        onClick = if (!isConnecting && !isDeviceConnected && !isRegistered) onClick else null,
         colors = AppCardDefaults.colors(
-            containerColor = if (isDeviceConnected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isDeviceConnected) (if (androidx.compose.foundation.isSystemInDarkTheme()) MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.secondaryContainer) else MaterialTheme.colorScheme.surfaceVariant
         ),
         border = if (isDeviceConnected) AppCardDefaults.border(color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)) else AppCardDefaults.border()
     ) {
@@ -617,12 +675,24 @@ private fun DeviceItem(
             }
 
             when {
+                isRegistered -> {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "REGISTRADO",
+                            color = MaterialTheme.colorScheme.secondary,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
                 isDeviceConnected -> {
                     TextButton(onClick = onDisconnect) {
                         Text(
                             "DESCONECTAR",
                             color = MaterialTheme.colorScheme.error,
-                            fontSize = 10.sp,
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
@@ -634,7 +704,7 @@ private fun DeviceItem(
                     Text(
                         "CONECTAR",
                         color = MaterialTheme.colorScheme.primary,
-                        fontSize = 11.sp,
+                        style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold
                     )
                 }

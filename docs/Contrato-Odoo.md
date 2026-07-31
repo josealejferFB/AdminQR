@@ -242,146 +242,158 @@ data class GateDto(
 
 ---
 
+> [!IMPORTANT]
+> **Formato de Petición Obligatorio (JSON-RPC)**
+> Todas las peticiones a Odoo deben usar el estándar JSON-RPC 2.0. El payload de negocio NO puede ir en la raíz del JSON, debe ir siempre envuelto dentro del objeto "params".
+
 ### 3. `POST /api/v1/gates/register`
 
-Registra un nuevo portón ESP32 en Odoo. Se llama inmediatamente después de que la App Admin se conecta vía Bluetooth al ESP32, le configura el WiFi y extrae su MAC.
+Registrar Nuevo Portón (ESP32)
+Este endpoint debe ser llamado inmediatamente después de que la App Admin se conecta por Bluetooth a un ESP32 nuevo, le configura el WiFi y extrae su MAC Address. Sirve para crear el registro físico en la base de datos de Odoo.
 
-**Request:**
+> [!TIP]
+> **Idempotencia:** Este endpoint es 100% idempotente. Si la App envía la misma MAC Address varias veces (ej. por reintentos de red), la API no arrojará error; reactivará el portón si estaba archivado y devolverá su `api_token` sin duplicar el registro.
+
+- **Content-Type:** `application/json`
+- **Autenticación:** Ninguna requerida por ahora (el endpoint está desprotegido en beta, se integrará JWT próximamente).
+
+**📤 Body (Request)**
+| Parámetro | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `name` | String | Sí | Nombre descriptivo asignado por el instalador en la App (Ej. "Portón Principal"). |
+| `mac_address` | String | Sí | Dirección MAC física obtenida por Bluetooth desde el ESP32. Debe mantener el formato estándar (Ej. A1:B2:C3:D4:E5:F6). |
+
+**Ejemplo de Petición:**
 ```json
 {
-    "jsonrpc": "2.0",
-    "params": {
-        "name": "Portón Visitantes Norte",
-        "mac_address": "A1:B2:C3:D4:E5:F6"
-    }
+  "jsonrpc": "2.0",
+  "params": {
+    "name": "Portón Visitantes Norte",
+    "mac_address": "A1:B2:C3:D4:E5:F6"
+  }
 }
 ```
 
-**Response — Registro exitoso:**
+**📥 Respuestas (Response)**
+Odoo siempre devolverá HTTP 200 OK porque usa JSON-RPC. El éxito o fracaso de la operación se define dentro del nodo `result`.
+
+**✅ Escenario 1: Registro Exitoso (o Reintento Idempotente)**
+Se creó el portón en Odoo o se procesó un reintento. La App debe extraer el `api_token` y enviarlo al ESP32 por Bluetooth.
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "success": true,
-        "gate_id": 15,
-        "message": "Portón registrado exitosamente."
-    }
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "success": "success",
+    "gate_id": 15,
+    "api_token": "ff56e3bbafb14b2fb53808617de22b60",
+    "message": "Portón registrado exitosamente."
+  }
 }
 ```
 
-**Response — Reactivación (soft delete previo):**
+**❌ Escenario 2: Bad Request (Faltan Parámetros)**
+Faltó enviar el `name` o la `mac_address`.
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "success": true,
-        "gate_id": 15,
-        "message": "Portón reactivado exitosamente."
-    }
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "success": "error",
+    "message": "Nombre y MAC Address son obligatorios."
+  }
 }
 ```
-
-**Response — MAC duplicada activa:**
-```json
-{
-    "jsonrpc": "2.0",
-    "result": {
-        "success": false,
-        "message": "Ya existe un portón activo con esta MAC."
-    }
-}
-```
-
-**Response — Parámetros faltantes:**
-```json
-{
-    "jsonrpc": "2.0",
-    "result": {
-        "success": false,
-        "message": "Nombre y MAC Address son obligatorios."
-    }
-}
-```
-
-**Notas:**
-- El campo `result.success` es booleano (`true`/`false`), no string
-- La app debe leer `success` estrictamente: si es `true` → éxito; si es `false` → error con `message`
-- Para el escenario de reactivación, la app debe procesarlo como éxito y actualizar la lista local de portones
 
 ---
 
 ### 4. `POST /api/v1/gates/delete`
 
-Archiva (soft delete) un portón en Odoo. Lo oculta de la app y detiene sus operaciones, pero preserva el historial.
+Eliminar (Archivar) un Portón
+Este endpoint realiza un archivado lógico del portón (Soft Delete), ocultándolo de la app y apagando sus operaciones en Odoo, pero preservando el historial en base de datos.
 
-**Request:**
+- **Content-Type:** `application/json`
+
+**📤 Body (Request)**
 ```json
 {
-    "jsonrpc": "2.0",
-    "params": {
-        "gate_id": 1
-    }
+  "jsonrpc": "2.0",
+  "params": {
+    "gate_id": 1
+  }
 }
 ```
 
-**Response — Eliminación exitosa:**
+**📥 Respuestas (Response)**
+
+**✅ Escenario 1: Eliminación Exitosa**
+El portón ha sido archivado. La app debe leer estrictamente `success: true` y mostrar un popup de éxito verde con el mensaje.
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "success": true,
-        "message": "Portón archivado/eliminado correctamente."
-    }
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "success": true,
+    "message": "Portón archivado/eliminado correctamente."
+  }
 }
 ```
 
-**Response — Portón no encontrado:**
+**❌ Escenario 2: Error al Eliminar (No Encontrado)**
+Si se envía un ID inválido, la API devolverá `success: false`. La app debe capturar este `false` para mostrar una alerta roja/amarilla usando el `message` provisto.
+
+> [!WARNING]
+> Es crucial que la app valide correctamente el boolean `success`. Si la validación falla por un error de tipado en Kotlin, la app caerá en su bloque catch/else y podría terminar mostrando en pantalla "Error: Portón archivado correctamente" (concatenando un mensaje de éxito como si fuera error).
+
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "success": false,
-        "message": "Portón no encontrado."
-    }
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "success": false,
+    "message": "Portón no encontrado."
+  }
 }
 ```
-
-**Notas:**
-- El campo `result.success` es booleano (`true`/`false`)
-- La app debe validar `success` como booleano, nunca como string
-- Tras eliminar exitosamente, la app debe filtrar el portón de la lista local
 
 ---
 
-### 5. `POST /api/v1/gates/list`
+### 5. `POST /api/v1/gates/list` (O GET)
 
-Obtiene la lista completa de portones registrados en Odoo.
+Listar Todos los Portones
+Este endpoint permite a la App Admin obtener la lista completa de hardware registrado, útil para refrescar la interfaz después de un registro.
 
-**Request:**
+- **Content-Type:** `application/json`
+
+**📤 Body (Request)**
+Como es una simple consulta, pueden enviar un payload JSON-RPC vacío o sin parámetros.
 ```json
 {
-    "jsonrpc": "2.0",
-    "params": {}
+  "jsonrpc": "2.0",
+  "params": {}
 }
 ```
 
-**Response exitosa:**
+**📥 Respuesta (Response)**
+Devuelve un arreglo `data` con todos los portones del sistema.
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": {
-        "success": true,
-        "data": [
-            {
-                "id": 1,
-                "name": "Portón Principal",
-                "mac_address": "A1:B2:C3:D4:E5:F6",
-                "ip_address": "192.168.1.100",
-                "is_online": true,
-                "hostname": "esp32-a1b2c3"
-            }
-        ]
-    }
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "success": true,
+    "data": [
+      {
+        "id": 1,
+        "name": "Portón Principal",
+        "mac_address": "A1:B2:C3:D4:E5:F6",
+        "ip_address": "192.168.1.55",
+        "hostname": "esp-principal",
+        "is_online": true,
+        "is_active": true
+      }
+    ]
+  }
 }
 ```
 
@@ -449,6 +461,21 @@ Obtiene los usuarios que tienen acceso a un portón específico.
 
 ---
 
+### 8. Aclaratoria sobre el Flujo ESP32 (Ping)
+
+> [!WARNING]
+> El endpoint `/api/v1/gates/ping` NO DEBE SER LLAMADO POR LA APP MÓVIL.
+
+Es responsabilidad exclusiva del hardware (ESP32) llamar a `/api/v1/gates/ping` una vez que se conecte exitosamente a la red WiFi.
+
+**Nuevo Flujo de Integración (Opción 2):**
+1. La App llama a `/api/v1/gates/register` para Odoo y recibe un `api_token`.
+2. La App le inyecta este `api_token` (junto a los datos WiFi) al ESP32 a través de Bluetooth.
+3. El ESP32 se conecta al WiFi, realiza su ping al backend usando su token propio, y Odoo lo marca como Online.
+4. La App Administrativa simplemente refresca su vista llamando a `/api/v1/gates/list` para verificar que el portón ahora aparece `is_online: true`.
+
+---
+
 ## Implementación del Cliente HTTP
 
 Todas las llamadas se realizan desde `SyncRepositoryImpl` con OkHttp directamente:
@@ -503,13 +530,13 @@ El ESP32 implementa un WebServer interno que Odoo contacta directamente:
 - Responde `200 {"ok":true,"msg":"Acceso concedido"}` y activa el relé por 1 segundo
 - Token inválido responde `401 {"error":"No autorizado"}`
 
-### `POST /api/update_esp_ip`
+### `POST /api/v1/gates/ping`
 
-- El ESP32 reporta su IP al Odoo al iniciar o al reconfigurar la red
-- Se envía a la URL `{odooUrl}/api/update_esp_ip`
-- Body: `{"jsonrpc":"2.0","method":"call","params":{"iot_token":"...","mac_address":"A1:B2:C3:D4:E5:F6","ip":"192.168.x.x","hostname":"esp32-a1b2c3"}}`
-- La URL de Odoo se configura vía Bluetooth (comando `config_network` incluyendo `iot_token`) y se guarda en NVS del ESP32
-- El ESP32 hace hasta 3 intentos con backoff (5s/15s/30s) para asegurar el reporte
+- El ESP32 reporta su IP a Odoo al conectar al WiFi.
+- Se envía a la URL configurada (usualmente `{odooUrl}/api/v1/gates/ping`).
+- Body: `{"jsonrpc":"2.0","params":{"api_token":"...","ip_address":"192.168.x.x"}}`
+- La URL de Odoo se configura vía Bluetooth (comando `config_network`) y se guarda en NVS del ESP32. El Token lo obtiene la App de Odoo al registrar el portón, y se lo pasa al ESP32.
+- El ESP32 hace hasta 3 intentos con backoff (5s/15s/30s) para asegurar el reporte.
 
 ## Estado Actual
 

@@ -36,12 +36,12 @@
 // Token de seguridad compartido con Odoo.
 // Odoo debe incluirlo en cada petición: GET /abrir?token=secreto123
 // Sin token válido, el ESP32 responde 401 No autorizado.
-#define API_TOKEN "secreto123"
 
-// Token compartido con Odoo para auto-discovery IoT.
-// El ESP32 lo envía en cada reporte de IP para que Odoo
+
+// Token API recibido desde Odoo (vía App Admin)
+// El ESP32 lo envía en el ping para que Odoo
 // valide que la petición viene de un dispositivo autorizado.
-#define IOT_TOKEN "iot_secret_2024"
+#define DEFAULT_API_TOKEN "iot_secret_2024"
 
 // ========== PANTALLA OLED ==========
 #define SCREEN_WIDTH 128
@@ -58,7 +58,7 @@ WebServer       server(80);
 struct {
   String ssid, pass;
   String odooUrl;
-  String iotToken;
+  String apiToken;
   bool   wifiConfigurado;
   // [V8] Nombre Bluetooth configurable
   String btName;
@@ -293,10 +293,10 @@ void loop() {
             prefs.putString("hostname", hostname);
             config.hostname = String(hostname);
           }
-          const char* iotToken = doc["iot_token"] | "";
-          if (strlen(iotToken) > 0) {
-            prefs.putString("iot_token", iotToken);
-            config.iotToken = String(iotToken);
+          const char* apiToken = doc["api_token"] | "";
+          if (strlen(apiToken) > 0) {
+            prefs.putString("api_token", apiToken);
+            config.apiToken = String(apiToken);
           }
           const char* odooUrl = doc["odoo_url"] | "";
           if (strlen(odooUrl) > 0) {
@@ -330,6 +330,64 @@ void loop() {
           sistema.estado         = MODO_CONECTANDO_WIFI;
 
           Serial.println("[V10] JSON config_network OK.");
+
+        // ── get_info ────────────────────────────────────────
+        } else if (strcmp(action, "get_info") == 0) {
+          String mac = obtenerMacAddress();
+          JsonDocument resp;
+          resp["status"] = "success";
+          resp["mac_address"] = mac;
+          resp["version"] = "V10";
+          String jsonResp;
+          serializeJson(resp, jsonResp);
+          SerialBT.println(jsonResp);
+          SerialBT.flush();
+          // No desconecta BT ni vuelve a idle porque esperamos el config_network
+          Serial.println("[V10] JSON get_info OK. MAC enviada.");
+
+        // ── scan_wifi ───────────────────────────────────────
+        } else if (strcmp(action, "scan_wifi") == 0) {
+          pantalla("BUSCANDO REDES", "Escaneando...");
+          
+          // [CRITICAL FIX 1] Asegurar inicialización de antena WiFi en modo cliente
+          WiFi.mode(WIFI_STA);
+          WiFi.disconnect();
+          delay(100);
+          
+          int n = WiFi.scanNetworks();
+          
+          JsonDocument responseDoc;
+          responseDoc["status"] = "success";
+          JsonArray networks = responseDoc["networks"].to<JsonArray>();
+          
+          for (int i = 0; i < n; ++i) {
+            String ssid = WiFi.SSID(i);
+            if (ssid.length() > 0) {
+              // Evitar duplicados
+              bool exists = false;
+              for (JsonVariant v : networks) {
+                if (v.as<String>() == ssid) {
+                  exists = true;
+                  break;
+                }
+              }
+              if (!exists) {
+                networks.add(ssid);
+              }
+            }
+          }
+          
+          String responseStr;
+          serializeJson(responseDoc, responseStr);
+          
+          // [CRITICAL FIX 2] Enviar directamente la respuesta completa al final
+          SerialBT.println(responseStr);
+          SerialBT.flush();
+          
+          // Restaurar timeout y pantalla
+          sistema.timeout = millis();
+          pantalla("BT CONECTADO", "Comandos:", "  config / wifi", "  o JSON");
+          Serial.println("[V10] JSON scan_wifi OK. Redes: " + String(networks.size()));
 
         // ── set_bt_name ─────────────────────────────────────
         } else if (strcmp(action, "set_bt_name") == 0) {
@@ -449,7 +507,7 @@ void registrarEndpoints() {
   if (sistema.handlersRegistered) return;
 
   server.on("/abrir", HTTP_GET, []() {
-    if (!server.hasArg("token") || server.arg("token") != API_TOKEN) {
+    if (!server.hasArg("token") || server.arg("token") != config.apiToken) {
       server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
       Serial.println("[SEGURIDAD] Intento de acceso sin token valido");
       return;
@@ -463,6 +521,27 @@ void registrarEndpoints() {
     sistema.msjDesde = millis();
     sistema.mostrandoMsj = true;
     Serial.println("[RELE] Activado por Odoo");
+  });
+
+  server.on("/reset", HTTP_GET, []() {
+    if (!server.hasArg("token") || server.arg("token") != config.apiToken) {
+      server.send(401, "application/json", "{\"error\":\"No autorizado\"}");
+      Serial.println("[SEGURIDAD] Intento de borrado sin token valido");
+      return;
+    }
+    server.send(200, "application/json", "{\"ok\":true,\"msg\":\"Reseteando configuracion\"}");
+    Serial.println("[RESET] Borrando config por HTTP...");
+    
+    // Dar tiempo a enviar el HTTP 200 OK antes del reinicio
+    delay(500);
+    
+    prefs.begin("cfg", false);
+    prefs.clear();
+    prefs.end();
+    
+    pantalla("RESET OK", "Borrando config", "Reiniciando...");
+    delay(1000);
+    ESP.restart();
   });
 
   agregarEndpointStatus();
@@ -524,7 +603,7 @@ void cargarConfig() {
   config.ssid            = prefs.getString("ssid", "");
   config.pass            = prefs.getString("pass", "");
   config.odooUrl         = prefs.getString("odoo_url", "");
-  config.iotToken        = prefs.getString("iot_token", IOT_TOKEN);
+  config.apiToken        = prefs.getString("api_token", DEFAULT_API_TOKEN);
   config.wifiConfigurado = (config.ssid.length() > 0);
   config.btName        = prefs.getString("bt_name", "ESP32_Seguro");
   config.hostname      = prefs.getString("hostname", "");
@@ -532,7 +611,7 @@ void cargarConfig() {
 
   // URL por defecto si no hay configuración guardada
   if (config.odooUrl.length() == 0) {
-    config.odooUrl = "http://192.168.1.100:8059/api/update_esp_ip";
+    config.odooUrl = "http://192.168.1.100:8059/api/v1/gates/ping";
   }
 }
 
@@ -546,6 +625,11 @@ void conectarWiFi() {
   }
 
   pantalla("Conectando WiFi...", config.ssid.c_str());
+
+  // Limpiar credenciales oxidadas del NVS interno de Espressif
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true);
+  delay(100);
 
   WiFi.setHostname(config.hostname.c_str());
   WiFi.begin(config.ssid.c_str(), config.pass.c_str());
@@ -584,9 +668,9 @@ void reportarIPyMAC() {
   JsonDocument doc;
   doc["jsonrpc"] = "2.0";
   JsonObject params = doc["params"].to<JsonObject>();
-  params["iot_token"]    = config.iotToken;
+  params["api_token"]    = config.apiToken;
   params["mac_address"]  = obtenerMacAddress();
-  params["ip"]           = WiFi.localIP().toString();
+  params["ip_address"]   = WiFi.localIP().toString();
   params["hostname"]     = config.hostname;
 
   String payload;
@@ -640,6 +724,11 @@ String obtenerMacAddress() {
 // ============================================================
 void manejarConexionWiFiAsync() {
   if (!sistema.wifiStarted) {
+    // Limpiar credenciales oxidadas del NVS interno de Espressif
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(true);
+    delay(100);
+
     WiFi.setHostname(config.hostname.c_str());
     WiFi.begin(config.ssid.c_str(), config.pass.c_str());
     sistema.wifiStarted = true;

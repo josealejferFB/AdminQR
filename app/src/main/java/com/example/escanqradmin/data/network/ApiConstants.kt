@@ -56,10 +56,9 @@ object ApiConstants {
     ) {
         val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         
-        // Sanitize host: remove protocol if exists, and trailing slashes
+        // Sanitize host: remove any scheme-like prefix (e.g. http://, https://, or typos like qa-https//) and trailing slashes
         val cleanHost = host.trim()
-            .removePrefix("http://")
-            .removePrefix("https://")
+            .replace(Regex("^.*//"), "")
             .removeSuffix("/")
 
         // Ensure paths start with /

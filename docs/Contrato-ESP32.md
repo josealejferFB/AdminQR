@@ -152,7 +152,8 @@ La app Android debe tratar la desconexión como evento esperado (transicionar a 
 
 | Comando | Descripción |
 |---|---|
-| `config_network` | Configura WiFi, nombre BT, hostname e IoT token en un solo JSON |
+| `get_info` | Obtiene la MAC address y versión sin intentar conectar a WiFi ni desconectar BT |
+| `config_network` | Configura WiFi, nombre BT, hostname y api_token en un solo JSON |
 | `set_bt_name` | Cambia el nombre Bluetooth en caliente |
 | `set_hostname` | Cambia el hostname DHCP y reinicia |
 
@@ -177,8 +178,8 @@ Respuestas de error:
 
 Este es el flujo principal en V9. La app Admin envía un solo JSON con todos los parámetros:
 
-1. Admin se conecta al ESP32 por Bluetooth
-2. Admin envía JSON:
+1. Admin se conecta al ESP32 por Bluetooth y solicita `get_info` para registrar en Odoo
+2. Admin envía JSON con el token recibido de Odoo:
    ```json
    {
        "action": "config_network",
@@ -186,17 +187,17 @@ Este es el flujo principal en V9. La app Admin envía un solo JSON con todos los
        "password": "password123",
        "bt_name": "ESP32_Puerta1",
        "hostname": "porton-principal",
-       "iot_token": "iot_secret_2024",
-       "odoo_url": "http://172.17.12.119:8059/api/update_esp_ip"
+       "api_token": "TOKEN_GENERADO",
+       "odoo_url": "http://172.17.12.119:8059/api/v1/gates/ping"
    }
    ```
 3. ESP32 guarda todo en NVS y responde: `{"status":"success","mac_address":"...","message":"Red configurada"}`
 4. ESP32 inmediatamente entra en `MODO_CONECTANDO_WIFI` (no reinicia, no corta BT)
 5. Mientras WiFi conecta, el teléfono permanece conectado por BT (el BT restart se hace DESPUÉS de WiFi exitoso)
-6. Al conectar WiFi: BT se reinicia con el nuevo nombre, se reporta IP a Odoo, se inicia WebServer
+6. Al conectar WiFi: BT se reinicia con el nuevo nombre, se envía ping a Odoo, se inicia WebServer
 7. Si WiFi falla tras 3 intentos: LED_ERROR fijo, muestra "WIFI ERROR / Sin conexion / Reintente via BT"
 
-**Campos opcionales:** `bt_name`, `hostname`, `iot_token`, `odoo_url` — si no se envían, se mantienen los valores actuales.
+**Campos opcionales:** `bt_name`, `hostname`, `api_token`, `odoo_url` — si no se envían, se mantienen los valores actuales.
 
 ## Comando `set_bt_name`
 
@@ -238,13 +239,13 @@ El ESP32 corre un servidor HTTP en el puerto 80 cuando tiene WiFi configurado.
   - Muestra "Abriendo porton..." en OLED
 - **Token inválido (401):** `{"error":"No autorizado"}`
 
-#### `POST /api/update_esp_ip` (llamada saliente)
+#### `POST /api/v1/gates/ping` (llamada saliente)
 
-**Propósito:** El ESP32 reporta su IP al Odoo.
+**Propósito:** El ESP32 reporta su IP a Odoo e indica que está online.
 
 - Se llama al iniciar (si WiFi configurado) y al conectar WiFi post-configuración
-- Body: `{"jsonrpc":"2.0","params":{"iot_token":"...","mac_address":"...","ip":"192.168.x.x","hostname":"..."}}`
-- La URL de destino es la configurada vía Bluetooth (valor por defecto: `http://192.168.1.100:8059/api/update_esp_ip`)
+- Body: `{"jsonrpc":"2.0","params":{"api_token":"...","ip_address":"192.168.x.x"}}`
+- La URL de destino es la configurada vía Bluetooth (valor por defecto: `http://192.168.1.100:8059/api/v1/gates/ping`)
 - Hasta 3 intentos con backoff (5s / 15s / 30s)
 
 ### `GET /status`
@@ -272,8 +273,8 @@ El ESP32 usa la librería `Preferences` (NVS) para almacenar:
 | `pass` | Contraseña WiFi | — |
 | `bt_name` | Nombre Bluetooth | `"ESP32_Seguro"` |
 | `hostname` | Nombre host DHCP | `"esp32-" + últimos 6 dígitos MAC |
-| `iot_token` | Token IoT para auto-reporte | `"iot_secret_2024"` |
-| `odoo_url` | URL endpoint Odoo | `http://192.168.1.100:8059/api/update_esp_ip` |
+| `api_token` | Token API para peticiones a Odoo | `"iot_secret_2024"` (por defecto) |
+| `odoo_url` | URL endpoint Odoo | `http://192.168.1.100:8059/api/v1/gates/ping` |
 | `static_ip` | IP estática (V8) | — |
 | `static_gateway` | Gateway estático (V8) | — |
 | `static_netmask` | Máscara estática (V8) | — |
@@ -316,7 +317,7 @@ La pantalla `ESPConfigScreen` implementa una consola tipo terminal para interact
 | `config_ip` | Configura IP estática, gateway, netmask. Guarda y reinicia. [Eliminado en V9] |
 | `set_bt_name` | Cambia nombre Bluetooth en caliente. |
 | `set_hostname` | Cambia hostname DHCP. Reinicia. |
-| `config_network` | Configura WiFi + bt_name + hostname + iot_token en un solo JSON. |
+| `config_network` | Configura WiFi + bt_name + hostname + api_token en un solo JSON. |
 
 #### `config_ip`
 

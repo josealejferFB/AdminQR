@@ -386,14 +386,22 @@ init {
         }
     }
 
-    fun deleteGate(gateId: Int) {
+    fun deleteGate(gate: GateInfo) {
         viewModelScope.launch {
-            gateRepository.deleteGate(gateId).onSuccess {
-                val updatedGates = _uiState.value.gates.filter { it.id != gateId }
-                _uiState.update { it.copy(gates = updatedGates) }
-                _snackbarMessages.emit("Portón eliminado correctamente")
-            }.onFailure { e ->
-                _snackbarMessages.emit("Error al eliminar portón: ${e.message}")
+            _snackbarMessages.emit("Borrando portón de Odoo...")
+            
+            gate.id?.let { gateId ->
+                gateRepository.deleteGate(gateId).onSuccess {
+                    val updatedGates = _uiState.value.gates.filter { it.id != gateId }
+                    _uiState.update { it.copy(gates = updatedGates) }
+                    _snackbarMessages.emit("Portón eliminado correctamente")
+                }.onFailure { e ->
+                    _snackbarMessages.emit("Error al eliminar portón: ${e.message}")
+                }
+            } ?: run {
+                // Si es un portón puramente local (sin ID)
+                deleteLocalGate(gate.macAddress)
+                _snackbarMessages.emit("Portón local eliminado")
             }
         }
     }

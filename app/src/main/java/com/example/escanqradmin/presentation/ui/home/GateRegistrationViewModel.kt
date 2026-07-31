@@ -25,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -32,9 +33,10 @@ import javax.inject.Inject
 
 sealed class GateStep {
     data object SelectBluetooth : GateStep()
+    data object GettingDeviceInfo : GateStep()
     data class WiFiConfig(val macAddress: String? = null) : GateStep()
-    data object VerifyingWifi : GateStep()
     data object RegisteringInOdoo : GateStep()
+    data object VerifyingWifi : GateStep()
     data class LocalDone(val odooId: Int? = null, val message: String = "") : GateStep()
     data class Error(val message: String) : GateStep()
 }
@@ -45,6 +47,7 @@ data class GateRegistrationUiState(
     val ssid: String = "",
     val password: String = "",
     val macAddress: String = "",
+    val apiToken: String = "",
     val odooRegistered: Boolean = false,
     val odooMessage: String = "",
     val isSubmitting: Boolean = false,
@@ -106,39 +109,28 @@ class GateRegistrationViewModel @Inject constructor(
     }
 
     fun refreshAvailableNetworks() {
-        _uiState.update { it.copy(isLoadingNetworks = true) }
-        try {
-            val wifiManager = context.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            if (wifiManager != null) {
-                val networkList = mutableSetOf<String>()
-
-                val connInfo = wifiManager.connectionInfo
-                val connectedSsid = connInfo.ssid?.trim('"', ' ') ?: ""
-                if (connectedSsid.isNotBlank() && connectedSsid != "<unknown ssid>") {
-                    networkList.add(connectedSsid)
-                }
-
-                @Suppress("DEPRECATION")
-                val configured = wifiManager.configuredNetworks
-                if (configured != null) {
-                    for (cfg in configured) {
-                        val ssid = cfg.SSID.trim('"', ' ')
-                        if (ssid.isNotBlank() && ssid.length > 1) {
-                            networkList.add(ssid)
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingNetworks = true) }
+            try {
+                // Ya estamos conectados por Bluetooth en este paso
+                val payload = """{"action":"scan_wifi"}"""
+                val response = bluetoothRepository.sendMessageAndWaitForReply(payload, 15000L)
+                
+                if (response != null) {
+                    val obj = json.parseToJsonElement(response).jsonObject
+                    val status = obj["status"]?.jsonPrimitive?.content
+                    if (status == "success") {
+                        val networksArray = obj["networks"]?.jsonArray
+                        if (networksArray != null) {
+                            val networks = networksArray.mapNotNull { it.jsonPrimitive.content.takeIf { s -> s.isNotBlank() } }.toSet().sorted()
+                            _uiState.update { it.copy(availableNetworks = networks, isLoadingNetworks = false) }
+                            return@launch
                         }
                     }
                 }
-
-                _uiState.update {
-                    it.copy(
-                        availableNetworks = networkList.toList().sorted(),
-                        isLoadingNetworks = false
-                    )
-                }
-            } else {
-                _uiState.update { it.copy(isLoadingNetworks = false) }
+            } catch (e: Exception) {
+                // Silently fallback if error
             }
-        } catch (_: Exception) {
             _uiState.update { it.copy(isLoadingNetworks = false) }
         }
     }
@@ -165,18 +157,38 @@ class GateRegistrationViewModel @Inject constructor(
             }
 
             bluetoothRepository.connectToDevice(address)
-            bluetoothRepository.connectionState.first { state ->
-                when (state) {
-                    is BluetoothConnectionState.Connected -> {
-                        _uiState.update { it.copy(step = GateStep.WiFiConfig(), isSubmitting = false) }
-                        true
-                    }
-                    is BluetoothConnectionState.Error -> {
-                        _uiState.update { it.copy(step = GateStep.Error(state.message), isSubmitting = false) }
-                        true
-                    }
-                    else -> false
+            
+            val connectedState = bluetoothRepository.connectionState.first { state ->
+                state is BluetoothConnectionState.Connected || state is BluetoothConnectionState.Error
+            }
+            
+            if (connectedState is BluetoothConnectionState.Error) {
+                _uiState.update { it.copy(step = GateStep.Error(connectedState.message), isSubmitting = false) }
+                return@launch
+            }
+
+            _uiState.update { it.copy(step = GateStep.GettingDeviceInfo, isSubmitting = true) }
+            
+            val infoPayload = """{"action":"get_info"}"""
+            val infoResponse = bluetoothRepository.sendMessageAndWaitForReply(infoPayload, timeoutMs = 10000)
+            
+            if (infoResponse == null) {
+                _uiState.update { it.copy(step = GateStep.Error("No se pudo obtener información del ESP32 (Timeout)"), isSubmitting = false) }
+                return@launch
+            }
+
+            try {
+                val obj = json.parseToJsonElement(infoResponse).jsonObject
+                val status = obj["status"]?.jsonPrimitive?.content
+                if (status != "success") {
+                    val msg = obj["message"]?.jsonPrimitive?.content ?: "Error desconocido"
+                    _uiState.update { it.copy(step = GateStep.Error("Error obteniendo info: $msg"), isSubmitting = false) }
+                    return@launch
                 }
+                val mac = obj["mac_address"]?.jsonPrimitive?.content ?: throw Exception("Sin MAC")
+                _uiState.update { it.copy(macAddress = mac, step = GateStep.WiFiConfig(mac), isSubmitting = false) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(step = GateStep.Error("Respuesta inválida al get_info: ${e.message}"), isSubmitting = false) }
             }
         }
     }
@@ -184,7 +196,12 @@ class GateRegistrationViewModel @Inject constructor(
     fun sendWiFiConfig() {
         viewModelScope.launch {
             val state = _uiState.value
-            _uiState.update { it.copy(isSubmitting = true) }
+            if (state.macAddress.isBlank()) {
+                _uiState.update { it.copy(step = GateStep.Error("No hay MAC address disponible"), isSubmitting = false) }
+                return@launch
+            }
+            
+            _uiState.update { it.copy(step = GateStep.RegisteringInOdoo, isSubmitting = true) }
 
             val safeHostname = state.gateName.lowercase()
                 .replace(Regex("[^a-z0-9-]"), "-")
@@ -192,28 +209,42 @@ class GateRegistrationViewModel @Inject constructor(
                 .take(63)
                 .ifEmpty { "gate" }
 
+            val odooResult = syncRepository.registerGate(state.gateName, state.macAddress)
+            
+            if (odooResult.isFailure) {
+                _uiState.update { it.copy(step = GateStep.Error("Error en Odoo: ${odooResult.exceptionOrNull()?.message}"), isSubmitting = false) }
+                return@launch
+            }
+            
+            val response = odooResult.getOrNull()
+            val apiToken = response?.apiToken
+            if (apiToken.isNullOrBlank()) {
+                _uiState.update { it.copy(step = GateStep.Error("Odoo no retornó un api_token válido"), isSubmitting = false) }
+                return@launch
+            }
+            
+            _uiState.update { it.copy(apiToken = apiToken) }
+
             val payload = buildJsonObject {
                 put("action", "config_network")
-                put("ssid", state.ssid)
-                put("password", state.password)
+                put("ssid", state.ssid.trim())
+                put("password", state.password.trim())
                 put("bt_name", state.gateName)
                 put("hostname", safeHostname)
-                put("iot_token", SecurityConstants.IOT_TOKEN)
-                put("odoo_url", "${ApiConstants.BASE_URL}/api/update_esp_ip")
+                put("api_token", apiToken)
+                put("odoo_url", "${ApiConstants.BASE_URL}/api/v1/gates/ping")
             }.toString()
 
-            // Mostrar paso VerifyingWifi inmediatamente
             _uiState.update { it.copy(step = GateStep.VerifyingWifi, isSubmitting = true) }
 
-            val response = bluetoothRepository.sendMessageAndWaitForReply(payload, 40000L)
+            val btResponse = bluetoothRepository.sendMessageAndWaitForReply(payload, 40000L)
 
-            if (response == null) {
-                // Verificar si BT se desconectó (auto-disconnect del ESP32 post-WiFi)
+            if (btResponse == null) {
                 val btState = bluetoothRepository.connectionState.value
                 if (btState is BluetoothConnectionState.Idle) {
                     _uiState.update {
                         it.copy(
-                            step = GateStep.Error("El ESP32 se desconectó. La configuración WiFi fue enviada pero no se recibió confirmación. Verifica si el ESP32 se conectó al WiFi."),
+                            step = GateStep.Error("El ESP32 se desconectó sin confirmar (posible éxito, revisa Odoo)."),
                             isSubmitting = false
                         )
                     }
@@ -224,45 +255,25 @@ class GateRegistrationViewModel @Inject constructor(
             }
 
             try {
-                val jsonElement = json.parseToJsonElement(response)
-                val obj = jsonElement.jsonObject
+                val obj = json.parseToJsonElement(btResponse).jsonObject
                 val status = obj["status"]?.jsonPrimitive?.content ?: "error"
                 if (status == "success") {
-                    val mac = obj["mac_address"]?.jsonPrimitive?.content
-                    if (mac != null) {
-                        _uiState.update { it.copy(step = GateStep.RegisteringInOdoo, macAddress = mac, isSubmitting = true) }
-                        
-                        syncRepository.registerGate(state.gateName, mac)
-                            .onSuccess { response ->
-                                val gateId = response.gateId
-                                val msg = response.message ?: "Portón registrado exitosamente"
-                                _uiState.update {
-                                    it.copy(
-                                        step = GateStep.LocalDone(odooId = gateId, message = msg),
-                                        odooRegistered = true,
-                                        odooMessage = msg,
-                                        isSubmitting = false
-                                    )
-                                }
-                                _events.emit(GateRegistrationEvent.GateRegisteredInOdoo(
-                                    name = state.gateName,
-                                    macAddress = mac,
-                                    btName = state.gateName,
-                                    hostname = safeHostname,
-                                    odooId = gateId
-                                ))
-                            }
-                            .onFailure { e ->
-                                _uiState.update {
-                                    it.copy(
-                                        step = GateStep.Error("Error al registrar en Odoo: ${e.message}"),
-                                        isSubmitting = false
-                                    )
-                                }
-                            }
-                    } else {
-                        _uiState.update { it.copy(step = GateStep.Error("Respuesta del ESP32 no contiene mac_address"), isSubmitting = false) }
+                    val msg = response.message ?: "Portón registrado exitosamente"
+                    _uiState.update {
+                        it.copy(
+                            step = GateStep.LocalDone(odooId = response.gateId, message = msg),
+                            odooRegistered = true,
+                            odooMessage = msg,
+                            isSubmitting = false
+                        )
                     }
+                    _events.emit(GateRegistrationEvent.GateRegisteredInOdoo(
+                        name = state.gateName,
+                        macAddress = state.macAddress,
+                        btName = state.gateName,
+                        hostname = safeHostname,
+                        odooId = response.gateId
+                    ))
                 } else {
                     val msg = obj["message"]?.jsonPrimitive?.content ?: "Error del ESP32"
                     _uiState.update { it.copy(step = GateStep.Error(msg), isSubmitting = false) }

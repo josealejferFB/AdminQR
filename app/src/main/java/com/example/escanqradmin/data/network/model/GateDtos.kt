@@ -24,7 +24,8 @@ data class GateRegisterRequest(
 data class GateRegisterResponse(
     val success: JsonElement = JsonPrimitive(""),
     @SerialName("gate_id") val gateId: Int? = null,
-    val message: String? = null
+    val message: String? = null,
+    @SerialName("api_token") val apiToken: String? = null
 ) {
     val isSuccess: Boolean get() = success.jsonPrimitive.let { it.content == "success" || it.booleanOrNull == true }
 }

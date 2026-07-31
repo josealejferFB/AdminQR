@@ -17,6 +17,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -196,16 +197,12 @@ class SyncRepositoryImpl @Inject constructor(
                     put("cedula", data.cedula)
                     put("nombre", data.userName)
                     put("placas", data.plate)
-                    if (addGateIds.isNotEmpty()) {
-                        put("add_gate_ids", buildJsonArray {
-                            addGateIds.forEach { add(it) }
-                        })
-                    }
-                    if (removeGateIds.isNotEmpty()) {
-                        put("remove_gate_ids", buildJsonArray {
-                            removeGateIds.forEach { add(it) }
-                        })
-                    }
+                    put("add_gate_ids", buildJsonArray {
+                        addGateIds.forEach { add(JsonPrimitive(it)) }
+                    })
+                    put("remove_gate_ids", buildJsonArray {
+                        removeGateIds.forEach { add(JsonPrimitive(it)) }
+                    })
                 })
             }.toString()
 

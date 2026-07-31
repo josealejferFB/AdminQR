@@ -55,12 +55,8 @@ import com.example.escanqradmin.presentation.common.sharedcomponents.SkeletonUse
 import com.example.escanqradmin.presentation.ui.home.components.EmptyStateView
 import com.example.escanqradmin.presentation.ui.home.components.EmptyStateType
 import com.example.escanqradmin.presentation.ui.home.components.OnboardingSheet
-import com.example.escanqradmin.presentation.theme.color.*
 import com.example.escanqradmin.presentation.ui.home.components.ActiveUserCard
-import com.example.escanqradmin.presentation.ui.home.components.BluetoothConnectionPanel
-import com.example.escanqradmin.presentation.ui.home.components.BluetoothDialog
 import com.example.escanqradmin.presentation.ui.home.components.GateRegistrationDialog
-import com.example.escanqradmin.presentation.ui.home.components.ReconfigureNetworkDialog
 import com.example.escanqradmin.presentation.ui.home.components.SearchBar
 import com.example.escanqradmin.presentation.ui.home.components.StatCard
 import com.example.escanqradmin.presentation.common.sharedcomponents.QrCodeBox
@@ -90,48 +86,17 @@ fun HomeScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showActiveUsers by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showBluetoothDialog by remember { mutableStateOf(false) }
-    var showProvisioningDialog by remember { mutableStateOf(false) }
     var showGateRegistrationDialog by remember { mutableStateOf(false) }
+    var showProvisioningDialog by remember { mutableStateOf(false) }
     var userToDelete by remember { mutableStateOf<ActiveUser?>(null) }
-    var showReconfigureDialog by remember { mutableStateOf(false) }
-    var selectedGateForDialog by remember { mutableStateOf<GateInfo?>(null) }
-
     LaunchedEffect(Unit) {
+        viewModel.startDiscovery()
         viewModel.refreshData()
         viewModel.snackbarMessages.collectLatest { message ->
             snackbarHostState.showSnackbar(
                 message = message,
                 duration = SnackbarDuration.Short
             )
-        }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        if (permissions.values.all { it }) {
-            showBluetoothDialog = true
-            viewModel.startDiscovery()
-        }
-    }
-
-    val requestBluetoothAction = {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
-        } else {
-            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-
-        val allGranted = permissions.all { perm ->
-            androidx.core.content.ContextCompat.checkSelfPermission(navController.context, perm) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-
-        if (allGranted) {
-            showBluetoothDialog = true
-            viewModel.startDiscovery()
-        } else {
-            permissionLauncher.launch(permissions)
         }
     }
 
@@ -308,39 +273,14 @@ fun HomeScreen(
                                 selectedMacAddress = uiState.selectedMacAddress,
                                 onSelect = { viewModel.selectGate(it) },
                                 onAddGate = { showGateRegistrationDialog = true },
-                                onReconfigureNetwork = { gate ->
-                                    selectedGateForDialog = gate
-                                    showReconfigureDialog = true
-                                },
                                 onDeleteGate = { gate ->
-                                    if (gate.isOdooRegistered && gate.id != null) {
-                                        viewModel.deleteGate(gate.id)
-                                    } else {
-                                        viewModel.deleteLocalGate(gate.macAddress)
-                                    }
+                                    viewModel.deleteGate(gate)
                                 }
                             )
                         }
                     }
 
-                    item {
-                        val connectedGate = viewModel.getConnectedGate(uiState.gates)
-                        val pairedAddresses = pairedDevices.map { it.address }
 
-                        BluetoothConnectionPanel(
-                            gates = uiState.gates,
-                            connectionState = bluetoothConnectionState,
-                            pairedDeviceAddresses = pairedAddresses,
-                            connectedGateName = connectedGate?.name,
-                            onConnectToGate = { viewModel.connectToGate(it) },
-                            onDisconnect = { viewModel.disconnect() },
-                            onPairGate = {
-                                requestBluetoothAction()
-                            },
-                            onUnpairGate = { viewModel.unpairGate(it) },
-                            onRegisterNew = { showGateRegistrationDialog = true }
-                        )
-                    }
 
                     item {
                         Row(
@@ -553,19 +493,6 @@ fun HomeScreen(
                 )
             }
 
-            if (showBluetoothDialog) {
-                BluetoothDialog(
-                    onDismiss = { showBluetoothDialog = false; viewModel.stopDiscovery() },
-                    pairedDevices = pairedDevices,
-                    scannedDevices = scannedDevices,
-                    isScanning = isScanning,
-                    connectionState = bluetoothConnectionState,
-                    onStartScan = { viewModel.startDiscovery() },
-                    onStopScan = { viewModel.stopDiscovery() },
-                    onConnect = { address -> viewModel.connectToDevice(address) },
-                    onDisconnect = { viewModel.disconnect() }
-                )
-            }
 
             if (showProvisioningDialog) {
                 ProvisioningQrDialog(
@@ -598,6 +525,7 @@ fun HomeScreen(
 
                 GateRegistrationDialog(
                     uiState = gateUiState,
+                    registeredGates = uiState.gates,
                     scannedDevices = scannedDevices,
                     pairedDevices = pairedDevices,
                     isScanning = isScanning,
@@ -619,20 +547,6 @@ fun HomeScreen(
                         showGateRegistrationDialog = false
                     },
                     onReset = { gateRegistrationViewModel.resetToSelectBluetooth() }
-                )
-            }
-
-            if (showReconfigureDialog && selectedGateForDialog != null) {
-                ReconfigureNetworkDialog(
-                    gate = selectedGateForDialog!!,
-                    connectionState = bluetoothConnectionState,
-                    onConnect = { viewModel.connectToGate(selectedGateForDialog!!) },
-                    onSendMessageAndWaitForReply = { msg, timeout -> viewModel.sendMessageAndWaitForReply(msg, timeout) },
-                    onDisconnect = { viewModel.disconnect() },
-                    onDismiss = {
-                        showReconfigureDialog = false
-                        selectedGateForDialog = null
-                    }
                 )
             }
         }
@@ -734,7 +648,6 @@ private fun GateChipRow(
     selectedMacAddress: String?,
     onSelect: (String?) -> Unit,
     onAddGate: () -> Unit,
-    onReconfigureNetwork: (GateInfo) -> Unit,
     onDeleteGate: (GateInfo) -> Unit
 ) {
     LazyRow(
@@ -755,7 +668,6 @@ private fun GateChipRow(
                 gate = gate,
                 isSelected = selectedMacAddress == gate.macAddress,
                 onSelect = { onSelect(gate.macAddress) },
-                onReconfigureNetwork = { onReconfigureNetwork(gate) },
                 onDeleteGate = { onDeleteGate(gate) }
             )
         }
@@ -774,7 +686,6 @@ private fun ChipWithMenu(
     gate: GateInfo,
     isSelected: Boolean,
     onSelect: () -> Unit,
-    onReconfigureNetwork: () -> Unit,
     onDeleteGate: () -> Unit
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -874,17 +785,6 @@ private fun ChipWithMenu(
                 },
                 onClick = {},
                 enabled = false
-            )
-
-            DropdownMenuItem(
-                text = { Text("Configurar Red WiFi") },
-                onClick = {
-                    menuExpanded = false
-                    onReconfigureNetwork()
-                },
-                leadingIcon = {
-                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
             )
 
             DropdownMenuItem(

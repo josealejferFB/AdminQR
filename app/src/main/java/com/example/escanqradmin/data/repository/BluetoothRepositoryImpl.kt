@@ -171,25 +171,42 @@ class BluetoothRepositoryImpl @Inject constructor(
                 
                 // Cancelar discovery mejora la velocidad de conexión
                 bluetoothAdapter.cancelDiscovery()
+                
+                // [CRITICAL FIX 3] Dar tiempo a la radio Bluetooth de Android para que termine de cancelar el escaneo
+                // antes de intentar abrir un socket RFCOMM. Si se hace de inmediato, muchos teléfonos (ej. Xiaomi/Samsung)
+                // rechazan el socket con "read failed, socket might closed or timeout".
+                delay(500)
 
                 try {
                     withTimeout(20000) {
                         try {
-                            // Método estándar con UUID SPP
-                            val newSocket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
-                            socketMutex.withLock { socket = newSocket }
-                            var connectJob = launch(Dispatchers.IO) { newSocket.connect() }
+                            // INTENTO 1: Conexión Insegura (Mucho más fiable con ESP32 sin emparejamiento estricto)
+                            val insecureSocket = device.createInsecureRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                            socketMutex.withLock { socket = insecureSocket }
+                            var connectJob = launch(Dispatchers.IO) { insecureSocket.connect() }
                             connectJob.join()
-                        } catch (e: Exception) {
-                            if (e is CancellationException) throw e // Don't catch the timeout's cancellation
-                            // FALLBACK: Conexión por reflexión (canal 1)
-                            socketMutex.withLock {
-                                socket?.close()
-                                val fallbackSocket = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
-                                    .invoke(device, 1) as BluetoothSocket
-                                socket = fallbackSocket
-                                var connectJob = launch(Dispatchers.IO) { fallbackSocket.connect() }
+                        } catch (e1: Exception) {
+                            if (e1 is CancellationException) throw e1
+                            
+                            try {
+                                // INTENTO 2: Método estándar Seguro
+                                socketMutex.withLock { socket?.close() }
+                                val secureSocket = device.createRfcommSocketToServiceRecord(UUID.fromString("00001101-0000-1000-8000-00805F9B34FB"))
+                                socketMutex.withLock { socket = secureSocket }
+                                var connectJob = launch(Dispatchers.IO) { secureSocket.connect() }
                                 connectJob.join()
+                            } catch (e2: Exception) {
+                                if (e2 is CancellationException) throw e2
+                                
+                                // INTENTO 3: FALLBACK por reflexión (canal 1)
+                                socketMutex.withLock {
+                                    socket?.close()
+                                    val fallbackSocket = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                                        .invoke(device, 1) as BluetoothSocket
+                                    socket = fallbackSocket
+                                    var connectJob = launch(Dispatchers.IO) { fallbackSocket.connect() }
+                                    connectJob.join()
+                                }
                             }
                         }
                     }
@@ -216,6 +233,7 @@ class BluetoothRepositoryImpl @Inject constructor(
                     socket = null
                 }
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 Log.e("BluetoothRepository", "Exception al conectar", e)
                 _connectionState.value = BluetoothConnectionState.Error("Fallo de conexión: ${e.message}")
                 socketMutex.withLock { 

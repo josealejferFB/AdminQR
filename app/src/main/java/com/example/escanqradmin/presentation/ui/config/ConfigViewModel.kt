@@ -97,7 +97,15 @@ class ConfigViewModel @Inject constructor(
     }
 
     fun onProtocolChange(value: String) {
-        _uiState.update { it.copy(protocol = value) }
+        _uiState.update { 
+            var newPort = it.port
+            if (value == "https" && it.port == "8059") {
+                newPort = ""
+            } else if (value == "http" && it.port.isEmpty()) {
+                newPort = "8059"
+            }
+            it.copy(protocol = value, port = newPort) 
+        }
     }
 
     fun onHostChange(value: String) {

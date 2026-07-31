@@ -277,8 +277,8 @@ fun ActiveUserCard(
                                 val resolvedNames = gates.filter { it.macAddress in selectedGates }.map { it.name }
                                 val addedMACs = selectedGates - initialGates
                                 val removedMACs = initialGates - selectedGates
-                                val addedIds = addedMACs.mapNotNull { mac -> gates.find { it.macAddress == mac }?.id }
-                                val removedIds = removedMACs.mapNotNull { mac -> gates.find { it.macAddress == mac }?.id }
+                                val addedIds = addedMACs.mapNotNull { mac -> gates.find { it.macAddress.equals(mac, ignoreCase = true) }?.id }
+                                val removedIds = removedMACs.mapNotNull { mac -> gates.find { it.macAddress.equals(mac, ignoreCase = true) }?.id }
                                 onUpdate(
                                     user.copy(
                                         name = name,

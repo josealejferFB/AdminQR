@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -220,7 +221,7 @@ private fun GateListCard(
                     onClick = onFetch,
                     enabled = !isLoading,
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = AppShapes.Button
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
@@ -325,9 +326,8 @@ fun ConfigurationCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(AppShapes.Input)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), AppShapes.Input)
+                    .clip(AppShapes.Surface)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     .padding(16.dp)
             ) {
                 Column {
@@ -349,7 +349,7 @@ fun ConfigurationCard(
                     )
                     if (host.isNotEmpty()) {
                         Text(
-                            text = "Endpoints: $endpointSync, $endpointConductores, $endpointRegisterGate",
+                            text = "Rutas: $endpointSync, $endpointConductores, $endpointRegisterGate",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -400,7 +400,7 @@ fun ConfigurationCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.Input,
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                 leadingIcon = {
                     Icon(
                         if (host.matches(Regex("^\\d.*"))) Icons.Default.Router else Icons.Default.Language,
@@ -423,7 +423,7 @@ fun ConfigurationCard(
                     modifier = Modifier.weight(1f),
                     shape = AppShapes.Input,
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                     leadingIcon = {
                         Icon(Icons.Default.Cable, null, tint = if (port.isNotEmpty()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant)
                     },
@@ -456,9 +456,11 @@ fun ConfigurationCard(
                 value = endpointSync,
                 onValueChange = onEndpointSyncChange,
                 label = { Text("Ruta Control Acceso") },
+                placeholder = { Text("ej. /api/control_acceso") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.Input,
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 leadingIcon = {
                     Icon(Icons.Default.Upload, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
@@ -472,9 +474,11 @@ fun ConfigurationCard(
                 value = endpointConductores,
                 onValueChange = onEndpointConductoresChange,
                 label = { Text("Ruta Conductores") },
+                placeholder = { Text("ej. /api/get_conductores") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.Input,
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 leadingIcon = {
                     Icon(Icons.Default.Download, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
@@ -488,9 +492,11 @@ fun ConfigurationCard(
                 value = endpointRegisterGate,
                 onValueChange = onEndpointRegisterGateChange,
                 label = { Text("Ruta Registrar Portón") },
+                placeholder = { Text("ej. /api/v1/gates/register") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.Input,
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 leadingIcon = {
                     Icon(Icons.Default.AddCircle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
@@ -504,9 +510,11 @@ fun ConfigurationCard(
                 value = endpointGatesList,
                 onValueChange = onEndpointGatesListChange,
                 label = { Text("Ruta Listar Portones") },
+                placeholder = { Text("ej. /api/v1/gates/list") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.Input,
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 leadingIcon = {
                     Icon(Icons.AutoMirrored.Filled.List, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
@@ -520,9 +528,11 @@ fun ConfigurationCard(
                 value = endpointGateUpdate,
                 onValueChange = onEndpointGateUpdateChange,
                 label = { Text("Ruta Actualizar Portón") },
+                placeholder = { Text("ej. /api/v1/gates/update") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.Input,
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 leadingIcon = {
                     Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
@@ -536,9 +546,11 @@ fun ConfigurationCard(
                 value = endpointGateUsers,
                 onValueChange = onEndpointGateUsersChange,
                 label = { Text("Ruta Usuarios de Portón") },
+                placeholder = { Text("ej. /api/v1/gates/{id}/users") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = AppShapes.Input,
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 leadingIcon = {
                     Icon(Icons.Default.Group, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 },
@@ -557,7 +569,7 @@ fun ConfigurationCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                shape = AppShapes.Input,
+                shape = AppShapes.Button,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                 enabled = !isLoading
             ) {
